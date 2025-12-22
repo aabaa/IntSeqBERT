@@ -1,7 +1,7 @@
 # tests/test_dataset.py
 import torch
 import pytest
-from src.dataset import OEISDataset
+from intseq_bert.dataset import OEISDataset
 
 def test_dataset_initialization():
     ds = OEISDataset() # dummy data

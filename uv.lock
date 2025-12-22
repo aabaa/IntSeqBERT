@@ -39,9 +39,9 @@ wheels = [
 ]
 
 [[package]]
-name = "intseqbert"
+name = "intseq-bert"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "numpy" },
     { name = "sympy" },

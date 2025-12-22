@@ -7,7 +7,7 @@ import os
 from typing import List, Optional
 
 # Import functions from utils
-from src.utils import (
+from .utils import (
     is_prime_check, is_square_check, is_square_free_check, get_valuation, 
     get_popcount, get_digit_sum
 )

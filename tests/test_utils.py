@@ -1,6 +1,6 @@
 # tests/test_utils.py
 import pytest
-from src.utils import is_prime_check, is_square_check, is_square_free_check, get_valuation, get_popcount, get_digit_sum
+from intseq_bert.utils import is_prime_check, is_square_check, is_square_free_check, get_valuation, get_popcount, get_digit_sum
 
 def test_is_prime_check():
     assert not is_prime_check(0)
