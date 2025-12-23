@@ -8,8 +8,8 @@ from typing import List, Optional
 
 # Import functions from utils
 from .utils import (
-    is_prime_check, is_square_check, is_square_free_check, get_valuation, 
-    get_popcount, get_digit_sum
+    is_prime, is_square, is_square_free, valuation, 
+    popcount, digit_sum
 )
 
 class OEISDataset(Dataset):
@@ -128,17 +128,17 @@ class OEISDataset(Dataset):
             # Valuation (2, 3, 5)
             vals = []
             for p in [2, 3, 5]:
-                v = math.log1p(get_valuation(x, p))
+                v = math.log1p(valuation(x, p))
                 vals.append(v)
             
             is_z = 1.0 if x == 0 else 0.0
-            is_sf = 1.0 if is_square_free_check(x) else 0.0
-            is_p = 1.0 if is_prime_check(x_abs) else 0.0
-            is_sq = 1.0 if is_square_check(x_abs) else 0.0
+            is_sf = 1.0 if is_square_free(x) else 0.0
+            is_p = 1.0 if is_prime(x_abs) else 0.0
+            is_sq = 1.0 if is_square(x_abs) else 0.0
             
             # --- 4. Digital (2 dims) ---
-            pop_log = math.log1p(get_popcount(x))
-            d_sum_log = math.log1p(get_digit_sum(x))
+            pop_log = math.log1p(popcount(x))
+            d_sum_log = math.log1p(digit_sum(x))
             
             # Combine all features (Total 24 dims)
             feat = [
