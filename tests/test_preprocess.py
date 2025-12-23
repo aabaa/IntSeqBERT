@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 
 # Modules to be tested
-from intseq_bert import preprocess, schemas
+from intseq_bert import preprocess, schemas, converters
 
 def create_gzipped_file(path: Path, content: str):
     """Helper function: Write string to a file with gzip compression"""
@@ -107,6 +107,77 @@ A000002 Name for Sequence Two
     # Check if name remains an empty string when not found
     rec9 = next(r for r in merged_records if r.oeis_id == "A999999")
     assert rec9.name == ""
+
+def test_process_merge_metadata_end_to_end(tmp_path):
+    """
+    Test for merging metadata (Keywords, Offset, Related) from .seq files into JSONL
+    """
+    # 1. Create base JSONL
+    records = [
+        schemas.OEISRecord(oeis_id="A000001", sequence=[1, 2, 3]), # Should be updated
+        schemas.OEISRecord(oeis_id="A000002", sequence=[4, 5, 6]), # Should be updated
+        schemas.OEISRecord(oeis_id="A000003", sequence=[7, 8, 9])  # No .seq file -> should not be updated
+    ]
+    input_jsonl = tmp_path / "step2.jsonl"
+    schemas.save_records(records, str(input_jsonl))
+
+    # 2. Create .seq directory structure (mimicking oeisdata/seq/A000/A000001.seq etc.)
+    seq_root = tmp_path / "seq"
+    a000_dir = seq_root / "A000"
+    a000_dir.mkdir(parents=True)
+
+    # A000001.seq: Keywords and Offset
+    # Correct format: %K A000001 keyword...
+    seq1_content = """
+%I A000001
+%K A000001 nonn, core
+%O A000001 1,5
+    """.strip()
+    (a000_dir / "A000001.seq").write_text(seq1_content, encoding='utf-8')
+
+    # A000002.seq: Related (Cross-refs)
+    seq2_content = """
+%I A000002
+%Y A000002 Cf. A000005, A000010.
+    """.strip()
+    (a000_dir / "A000002.seq").write_text(seq2_content, encoding='utf-8')
+
+    # A000099.seq: ID not in dataset (.seq exists but not in JSONL)
+    # -> Should be ignored (no error)
+    seq99_content = "%K A000099 test"
+    (a000_dir / "A000099.seq").write_text(seq99_content, encoding='utf-8')
+
+    # 3. Prepare execution arguments
+    output_jsonl = tmp_path / "final.jsonl"
+    args = argparse.Namespace(
+        input_jsonl=str(input_jsonl),
+        seq_dir=str(seq_root),
+        output=str(output_jsonl)
+    )
+
+    # 4. Execution
+    preprocess.process_merge_metadata(args)
+
+    # 5. Verification
+    assert output_jsonl.exists()
+    final_records = schemas.load_records(str(output_jsonl))
+    assert len(final_records) == 3 # Record count should remain the same
+
+    # A000001: Check if keywords and offset are reflected
+    rec1 = next(r for r in final_records if r.oeis_id == "A000001")
+    assert "nonn" in rec1.keywords
+    assert "core" in rec1.keywords
+    assert rec1.offset_a == 1
+    
+    # A000002: Check if related IDs are reflected
+    rec2 = next(r for r in final_records if r.oeis_id == "A000002")
+    assert "A000005" in rec2.related
+    assert "A000010" in rec2.related
+    
+    # A000003: No change
+    rec3 = next(r for r in final_records if r.oeis_id == "A000003")
+    assert rec3.keywords == []
+    assert rec3.offset_a == 0
 
 def test_cli_execution_stripped(tmp_path, monkeypatch):
     """
