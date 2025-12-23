@@ -10,8 +10,13 @@ from . import utils
 # ==========================================
 
 def log_magnitude(seq: List[int]) -> List[float]:
-    """Computes log(1 + |x|)."""
-    return [math.log1p(abs(x)) if x != 0 else 0.0 for x in seq]
+    """
+    Computes magnitude: 1 + log(|x|) for x != 0, else 0.0.
+    This preserves linearity for exponential sequences while strictly separating 
+    |x|=1 (val=1.0) from x=0 (val=0.0).
+    """
+    # Modified logic: 1 + log(abs(x))
+    return [1.0 + math.log(abs(x)) if x != 0 else 0.0 for x in seq]
 
 def sign(seq: List[int]) -> List[float]:
     """Computes sign of x: 1.0, -1.0, or 0.0."""
@@ -45,11 +50,17 @@ def direction(seq: List[int]) -> List[float]:
     return dirs
 
 def log_raw_diff(seq: List[int]) -> List[float]:
-    """Computes log(1 + |x_n - x_{n-1}|)."""
+    """
+    Computes sparsity: 1 + log(|diff|) for diff != 0, else 0.0.
+    Distinguishes 'no change' (0.0) from 'step size 1' (1.0).
+    """
     diffs = [0.0] * len(seq)
     for i in range(1, len(seq)):
         raw_diff = abs(seq[i] - seq[i-1])
-        diffs[i] = math.log1p(raw_diff)
+        if raw_diff != 0:
+            diffs[i] = 1.0 + math.log(raw_diff)
+        else:
+            diffs[i] = 0.0
     return diffs
 
 # ==========================================
@@ -94,15 +105,11 @@ def is_prime(seq: List[int]) -> List[float]:
     return [1.0 if utils.is_prime(abs(x)) else 0.0 for x in seq]
 
 def is_square(seq: List[int]) -> List[float]:
-    # FIX: Do not use abs(x) here. Negative numbers are not squares.
-    # utils.is_square handles negative checks.
     return [1.0 if utils.is_square(x) else 0.0 for x in seq]
 
 def is_cube(seq: List[int]) -> List[float]:
     res = []
     for x in seq:
-        # For cubes, x^3 preserves sign. Checking abs(x) is sufficient
-        # because if |x| is a cube k^3, then x is a cube of (sgn(x)*k).
         _, exact = integer_nthroot(abs(x), 3)
         res.append(1.0 if exact else 0.0)
     return res
