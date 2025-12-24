@@ -178,7 +178,10 @@ def train(config: Dict[str, Any]) -> None:
     
     epochs = config.get("epochs", 10)
     num_training_steps = len(train_loader) * epochs
-    num_warmup_steps = config.get("warmup_steps", num_training_steps // 10)
+    
+    num_warmup_steps = config.get("warmup_steps")
+    if num_warmup_steps is None:
+        num_warmup_steps = max(1, num_training_steps // 10)
     
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
