@@ -273,3 +273,79 @@ def test_sequence_length_flexibility(sample_model):
             output = model(inputs, attention_mask)
         
         assert output["prediction"].shape == (batch_size, seq_len, input_dim)
+
+
+def test_load_from_checkpoint(tmp_path):
+    """Test loading a model from checkpoint file."""
+    # Create a model and save a checkpoint
+    model = IntSeqBERT(
+        input_dim=27,
+        d_model=64,
+        nhead=4,
+        num_layers=2
+    )
+    
+    # Create a checkpoint
+    checkpoint_path = tmp_path / "test_checkpoint.pt"
+    checkpoint = {
+        "epoch": 5,
+        "model_state_dict": model.state_dict(),
+        "config": {
+            "input_dim": 27,
+            "d_model": 64,
+            "nhead": 4,
+            "num_layers": 2,
+            "dim_feedforward": 512,
+            "max_len": 5000,
+            "dropout": 0.1
+        },
+        "train_loss": 0.5,
+        "val_loss": 0.6
+    }
+    torch.save(checkpoint, checkpoint_path)
+    
+    # Load the model using classmethod (force CPU for consistent comparison)
+    loaded_model, loaded_checkpoint = IntSeqBERT.load_from_checkpoint(
+        str(checkpoint_path), device='cpu'
+    )
+    
+    # Move original model to CPU for comparison
+    model = model.cpu()
+    
+    # Verify model architecture matches
+    assert loaded_model.input_dim == 27
+    assert loaded_model.d_model == 64
+    
+    # Verify checkpoint data is returned
+    assert loaded_checkpoint["epoch"] == 5
+    assert loaded_checkpoint["train_loss"] == 0.5
+    
+    # Verify state dicts match
+    original_params = model.state_dict()
+    loaded_params = loaded_model.state_dict()
+    
+    for key in original_params.keys():
+        assert torch.allclose(original_params[key], loaded_params[key])
+
+
+def test_load_from_checkpoint_with_device(tmp_path):
+    """Test loading with explicit device specification."""
+    model = IntSeqBERT(d_model=32, nhead=2, num_layers=1)
+    
+    checkpoint_path = tmp_path / "checkpoint.pt"
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "config": {
+            "d_model": 32,
+            "nhead": 2,
+            "num_layers": 1
+        }
+    }
+    torch.save(checkpoint, checkpoint_path)
+    
+    # Load with explicit device (cpu always available)
+    loaded_model, _ = IntSeqBERT.load_from_checkpoint(str(checkpoint_path), device='cpu')
+    
+    # Verify model is on CPU
+    assert next(loaded_model.parameters()).device.type == 'cpu'
+

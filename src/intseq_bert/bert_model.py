@@ -106,6 +106,60 @@ class IntSeqBERT(nn.Module):
             nn.Linear(d_model, input_dim)
         )
     
+    @classmethod
+    def load_from_checkpoint(
+        cls,
+        checkpoint_path: str,
+        device: Optional[str] = None
+    ) -> tuple['IntSeqBERT', Dict]:
+        """
+        Load a trained model and its config from a checkpoint file.
+        
+        Args:
+            checkpoint_path: Path to checkpoint file (e.g., 'checkpoints/best_model.pt')
+            device: Device to load model onto ('cuda', 'cpu', etc.)
+                   If None, uses 'cuda' if available, else 'cpu'
+        
+        Returns:
+            Tuple of (model_instance, config_dict)
+        
+        Example:
+            >>> model, config = IntSeqBERT.load_from_checkpoint('checkpoints/best_model.pt')
+            >>> print(f"Loaded model from epoch {config['epoch']}")
+        """
+        # Determine device
+        if device is None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        # Load checkpoint
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        # Extract model configuration from checkpoint
+        config = checkpoint.get('config', {})
+        
+        # Get model initialization parameters
+        model_args = {
+            'input_dim': config.get('input_dim', 27),
+            'd_model': config.get('d_model', 128),
+            'nhead': config.get('nhead', 4),
+            'num_layers': config.get('num_layers', 6),
+            'dim_feedforward': config.get('dim_feedforward', 512),
+            'max_len': config.get('max_len', 5000),
+            'dropout': config.get('dropout', 0.1)
+        }
+        
+        # Initialize model
+        model = cls(**model_args)
+        
+        # Load state dict
+        model.load_state_dict(checkpoint['model_state_dict'])
+        
+        # Move to device
+        model = model.to(device)
+        
+        return model, checkpoint
+    
+    
     def forward(
         self,
         inputs: torch.Tensor,

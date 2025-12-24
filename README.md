@@ -127,7 +127,7 @@ uv run python -m intseq_bert.encoder \
 Train IntSeqBERT with masked reconstruction:
 
 ```bash
-uv run python -m intseq_bert.train \
+uv run python -m intseq_bert.train_bert \
   --features_path data/oeis/features.pt \
   --output_dir checkpoints/v1 \
   --epochs 20 \
@@ -142,7 +142,7 @@ uv run python -m intseq_bert.train \
 
 ```bash
 # Large model with metadata filtering
-uv run python -m intseq_bert.train \
+uv run python -m intseq_bert.train_bert \
   --features_path data/oeis/features.pt \
   --metadata_path data/oeis/data_step3.jsonl \
   --output_dir checkpoints/large \
@@ -180,7 +180,7 @@ uv run python -m intseq_bert.train \
 
 ```bash
 # Filter by keywords
-uv run python -m intseq_bert.train \
+uv run python -m intseq_bert.train_bert \
   --features_path data/oeis/features.pt \
   --metadata_path data/oeis/data_step3.jsonl \
   --include_tags nonn core \

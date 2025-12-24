@@ -26,7 +26,7 @@ def setup_logging(output_dir: Path) -> logging.Logger:
     log_file = output_dir / "train.log"
     
     # Create logger
-    logger = logging.getLogger("intseq_bert.train")
+    logger = logging.getLogger("intseq_bert.train_bert")
     logger.setLevel(logging.INFO)
     
     # Console handler

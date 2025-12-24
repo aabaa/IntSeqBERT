@@ -6,7 +6,7 @@ import pytest
 import torch
 from pathlib import Path
 
-from intseq_bert.train import train
+from intseq_bert.train_bert import train
 
 
 def test_training_smoke(tmp_path):
