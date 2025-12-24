@@ -14,12 +14,17 @@ def test_decoder_initialization():
     """Test decoder can be initialized with default parameters."""
     decoder = NumberTheoreticDecoder()
     
-    # Check architecture components exist
-    assert hasattr(decoder, 'shared_encoder')
+    # Check architecture components exist (Updated for ResNet)
+    # The new model uses input_proj and ResBlocks instead of shared_encoder
+    assert hasattr(decoder, 'input_proj')
+    assert hasattr(decoder, 'input_bn')
+    assert hasattr(decoder, 'fc1')  # ResBlock 1
+    assert hasattr(decoder, 'fc2')  # ResBlock 2
+    
     assert hasattr(decoder, 'sign_head')
     assert hasattr(decoder, 'mag_head')
     
-    # Check all modulo heads (Updated for new architecture)
+    # Check all modulo heads
     assert hasattr(decoder, 'mod3_head')
     assert hasattr(decoder, 'mod5_head')
     assert hasattr(decoder, 'mod7_head')   # New
@@ -33,9 +38,9 @@ def test_decoder_initialization():
     assert hasattr(decoder, 'crt_basis_lut')
     assert hasattr(decoder, 'crt_lcm_lut')
     
-    # Check dimensions
+    # Check dimensions (Updated defaults)
     assert decoder.input_dim == 35
-    assert decoder.hidden_dim == 256
+    assert decoder.hidden_dim == 512  # Changed from 256 to 512
     
     # Count parameters
     num_params = sum(p.numel() for p in decoder.parameters() if p.requires_grad)

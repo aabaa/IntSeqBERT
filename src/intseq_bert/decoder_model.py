@@ -63,44 +63,51 @@ def precompute_crt_lut():
 class NumberTheoreticDecoder(nn.Module):
     """
     Decoder that reconstructs integers from 35-dimensional feature vectors.
-    Uses Dynamic Confidence-Ordered CRT for robust reconstruction.
+    Uses Residual Connections and Dynamic CRT.
     """
     
     def __init__(
         self,
         input_dim: int = 35,
-        hidden_dim: int = 256,
-        dropout: float = 0.1
+        hidden_dim: int = 512,  # 容量アップ
+        dropout: float = 0.05   # ★0.0ではなく0.05（BERTノイズ対策の保険）
     ):
         super().__init__()
         
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         
-        # Shared encoder
-        self.shared_encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
-        )
+        # Input projection (35 -> 512)
+        self.input_proj = nn.Linear(input_dim, hidden_dim)
+        self.input_bn = nn.LayerNorm(hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+        
+        # Residual Blocks (Pre-Norm style is more stable)
+        # Block 1
+        self.ln1 = nn.LayerNorm(hidden_dim)
+        self.fc1 = nn.Linear(hidden_dim, hidden_dim)
+        self.act1 = nn.GELU()
+        
+        # Block 2
+        self.ln2 = nn.LayerNorm(hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.act2 = nn.GELU()
         
         # Multi-task heads
-        self.sign_head = nn.Linear(hidden_dim, 3)           # 0:-, 1:0, 2:+
+        self.sign_head = nn.Linear(hidden_dim, 3)
         self.mag_head = nn.Linear(hidden_dim, NUM_MAGNITUDE_BINS)
         
-        # Modulo heads (Note: 4, 6, 2 are covered by 8 and 3)
+        # Modulo heads
         self.mod3_head = nn.Linear(hidden_dim, 3)
-        self.mod5_head = nn.Linear(hidden_dim, 5)   # Supervision only
+        self.mod5_head = nn.Linear(hidden_dim, 5)
         self.mod7_head = nn.Linear(hidden_dim, 7)
         self.mod8_head = nn.Linear(hidden_dim, 8)
-        self.mod10_head = nn.Linear(hidden_dim, 10) # Supervision only
+        self.mod10_head = nn.Linear(hidden_dim, 10)
         self.mod11_head = nn.Linear(hidden_dim, 11)
         self.mod13_head = nn.Linear(hidden_dim, 13)
-        self.mod100_head = nn.Linear(hidden_dim, 100) # Used to derive mod25
+        self.mod100_head = nn.Linear(hidden_dim, 100)
 
-        # Register CRT Lookup Tables as buffers (saved with model)
+        # Register CRT Buffers
         basis_lut, lcm_lut = precompute_crt_lut()
         self.register_buffer('crt_basis_lut', basis_lut)
         self.register_buffer('crt_lcm_lut', lcm_lut)
@@ -109,7 +116,28 @@ class NumberTheoreticDecoder(nn.Module):
         if x.dim() == 1:
             x = x.unsqueeze(0)
         
-        h = self.shared_encoder(x)
+        # Input Projection
+        out = self.input_proj(x)
+        out = self.input_bn(out)
+        out = self.dropout(out)
+        
+        # ResBlock 1 (Skip Connection)
+        residual = out
+        out = self.ln1(out)
+        out = self.fc1(out)
+        out = self.act1(out)
+        out = self.dropout(out)
+        out = out + residual  # Add
+        
+        # ResBlock 2 (Skip Connection)
+        residual = out
+        out = self.ln2(out)
+        out = self.fc2(out)
+        out = self.act2(out)
+        out = self.dropout(out)
+        out = out + residual  # Add
+        
+        h = out
         
         return {
             "sign": self.sign_head(h),

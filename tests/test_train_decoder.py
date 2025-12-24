@@ -156,8 +156,9 @@ def test_decoder_training_smoke(tmp_path):
     assert 'decoder_state_dict' in checkpoint
     
     # Verify decoder parameters match expected input dim
+    # Updated to check input_proj instead of shared_encoder
     state_dict = checkpoint['decoder_state_dict']
-    assert state_dict['shared_encoder.0.weight'].shape[1] == 35
+    assert state_dict['input_proj.weight'].shape[1] == 35
 
 
 def test_bert_gradient_frozen(tmp_path):
@@ -284,8 +285,8 @@ def test_bypass_mode_training(tmp_path):
     assert 'decoder_state_dict' in checkpoint
     
     # Check that decoder was configured for 35-dim input
-    # The shared_encoder first layer should be (35 -> 256)
-    first_weight_key = 'shared_encoder.0.weight'
+    # The new architecture uses 'input_proj' instead of 'shared_encoder'
+    first_weight_key = 'input_proj.weight'
     if first_weight_key in checkpoint['decoder_state_dict']:
         first_layer_weight = checkpoint['decoder_state_dict'][first_weight_key]
         assert first_layer_weight.shape[1] == 35  # Input dimension
