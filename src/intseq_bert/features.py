@@ -1,6 +1,7 @@
 import math
 from typing import List
 from sympy import integer_nthroot
+import numpy as np
 
 # Import the utility module as a namespace
 from . import utils
@@ -132,3 +133,50 @@ def is_power_of_2(seq: List[int]) -> List[float]:
         else:
             res.append(1.0 if (x & (x - 1) == 0) else 0.0)
     return res
+
+def extract_features(seq: List[int]) -> np.ndarray:
+    """
+    Extracts all features for a given sequence.
+    Returns:
+        np.ndarray: Shape (SeqLen, 27), dtype=float32
+    """
+    if not seq:
+        return np.zeros((0, 27), dtype=np.float32)
+
+    features_list = []
+
+    # 1. Analytic (6)
+    features_list.append(log_magnitude(seq))
+    features_list.append(sign(seq))
+    features_list.append(diff1(seq))
+    features_list.append(diff2(seq))
+    features_list.append(direction(seq))
+    features_list.append(log_raw_diff(seq))
+
+    # 2. Valuation (3)
+    for p in [2, 3, 5]:
+        features_list.append(valuation(seq, p))
+
+    # 3. Boolean (5)
+    features_list.append(is_zero(seq))
+    features_list.append(is_square_free(seq))
+    features_list.append(is_prime(seq))
+    features_list.append(is_square(seq))
+    features_list.append(is_cube(seq))
+
+    # 4. Digital (3)
+    features_list.append(popcount(seq))
+    features_list.append(digit_sum(seq))
+    features_list.append(is_power_of_2(seq))
+
+    # 5. Algebraic (10)
+    # Bases: [3, 4, 5, 6, 8]
+    bases = [3, 4, 5, 6, 8]
+    for m in bases:
+        features_list.append(mod_sin(seq, m))
+        features_list.append(mod_cos(seq, m))
+
+    # Convert to numpy array [27, SeqLen] -> Transpose -> [SeqLen, 27]
+    # Use float32 to match PyTorch default expectation
+    return np.array(features_list, dtype=np.float32).T
+

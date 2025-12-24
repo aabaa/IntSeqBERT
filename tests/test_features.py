@@ -127,3 +127,25 @@ def test_is_power_of_2():
     seq = [1, 2, 4, 3, 0, -2]
     expected = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
     assert_close(features.is_power_of_2(seq), expected)
+
+def test_extract_features_dimensions():
+    import numpy as np
+    # Empty seq
+    res_empty = features.extract_features([])
+    assert res_empty.shape == (0, 27)
+    
+    # Normal seq
+    seq = [1, 2, 3, 4, 5]
+    res = features.extract_features(seq)
+    
+    assert res.shape == (5, 27)
+    assert res.dtype == np.float32
+    
+    # Check consistency (roughly)
+    # Col 0: Log Magnitude
+    # x=1 -> 1.0
+    assert math.isclose(res[0, 0], 1.0, abs_tol=1e-5)
+    
+    # Col 1: Sign
+    # x=1 -> 1.0
+    assert math.isclose(res[0, 1], 1.0)
