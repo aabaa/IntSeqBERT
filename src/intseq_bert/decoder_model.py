@@ -1,5 +1,6 @@
 """
 Number-theoretic decoder for reconstructing integers from feature vectors.
+Implements Dynamic Confidence-Ordered CRT and Parallel Hypothesis Scoring.
 """
 
 import math
@@ -8,28 +9,61 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Dict
 
-from .features import log_magnitude
-
-
-# Configuration constants for magnitude binning
+# Configuration constants
 NUM_MAGNITUDE_BINS = 4096
 MAX_LOG_VALUE = 100.0  # Covers up to 10^100
+
+# =========================================================
+# Dynamic CRT Lookup Table (Precomputed Logic)
+# Bases: 3, 7, 8, 11, 13, 25 (Coprime set covering all features)
+# =========================================================
+PRIMES = [3, 7, 8, 11, 13, 25]
+NUM_BASES = 6
+LUT_SIZE = 1 << NUM_BASES  # 64
+
+def extended_gcd(a, b):
+    """Extended Euclidean Algorithm."""
+    if a == 0: return b, 0, 1
+    d, x1, y1 = extended_gcd(b % a, a)
+    x = y1 - (b // a) * x1
+    return d, x, x1
+
+def precompute_crt_lut():
+    """
+    Precomputes CRT Basis and LCM for all 64 subsets of moduli.
+    Returns: (basis_lut, lcm_lut) on CPU
+    """
+    basis_lut = torch.zeros((LUT_SIZE, NUM_BASES), dtype=torch.long)
+    lcm_lut = torch.zeros((LUT_SIZE,), dtype=torch.long)
+
+    for mask in range(1, LUT_SIZE):
+        selected = [i for i in range(NUM_BASES) if (mask >> i) & 1]
+        if not selected:
+            lcm_lut[mask] = 1
+            continue
+        
+        mods = [PRIMES[i] for i in selected]
+        current_lcm = 1
+        for m in mods:
+            current_lcm = math.lcm(current_lcm, m)
+        lcm_lut[mask] = current_lcm
+        
+        for i in selected:
+            m_i = PRIMES[i]
+            M_i = current_lcm // m_i
+            _, inv, _ = extended_gcd(M_i, m_i)
+            # Basis weight: w_i = (inv * M_i)
+            # We use Python int for precision before tensor conversion
+            weight = (inv % m_i) * M_i
+            basis_lut[mask, i] = weight
+            
+    return basis_lut, lcm_lut
+
 
 class NumberTheoreticDecoder(nn.Module):
     """
     Decoder that reconstructs integers from 35-dimensional feature vectors.
-    
-    Uses multi-task learning to predict:
-    - Sign (classification: -, 0, +)
-    - Magnitude (classification: 4096 bins covering 0 to 10^100)
-    - Modulo residues (classification: mod 3, 5, 7, 8, 10, 11, 13, 100)
-    
-    Reconstruction uses probabilistic Chinese Remainder Theorem search.
-    
-    Args:
-        input_dim: Input feature dimension (default: 35)
-        hidden_dim: Hidden layer dimension (default: 256)
-        dropout: Dropout rate (default: 0.1)
+    Uses Dynamic Confidence-Ordered CRT for robust reconstruction.
     """
     
     def __init__(
@@ -43,7 +77,7 @@ class NumberTheoreticDecoder(nn.Module):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         
-        # Shared encoder (expand compressed features)
+        # Shared encoder
         self.shared_encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -54,43 +88,32 @@ class NumberTheoreticDecoder(nn.Module):
         
         # Multi-task heads
         self.sign_head = nn.Linear(hidden_dim, 3)           # 0:-, 1:0, 2:+
-        self.mag_head = nn.Linear(hidden_dim, NUM_MAGNITUDE_BINS)  # Classification (4096 bins)
-        self.mod3_head = nn.Linear(hidden_dim, 3)           # mod 3
-        self.mod5_head = nn.Linear(hidden_dim, 5)           # mod 5
-        self.mod7_head = nn.Linear(hidden_dim, 7)           # mod 7
-        self.mod8_head = nn.Linear(hidden_dim, 8)           # mod 8
-        self.mod10_head = nn.Linear(hidden_dim, 10)         # mod 10
-        self.mod11_head = nn.Linear(hidden_dim, 11)         # mod 11
-        self.mod13_head = nn.Linear(hidden_dim, 13)         # mod 13
-        self.mod100_head = nn.Linear(hidden_dim, 100)       # mod 100
-    
+        self.mag_head = nn.Linear(hidden_dim, NUM_MAGNITUDE_BINS)
+        
+        # Modulo heads (Note: 4, 6, 2 are covered by 8 and 3)
+        self.mod3_head = nn.Linear(hidden_dim, 3)
+        self.mod5_head = nn.Linear(hidden_dim, 5)   # Supervision only
+        self.mod7_head = nn.Linear(hidden_dim, 7)
+        self.mod8_head = nn.Linear(hidden_dim, 8)
+        self.mod10_head = nn.Linear(hidden_dim, 10) # Supervision only
+        self.mod11_head = nn.Linear(hidden_dim, 11)
+        self.mod13_head = nn.Linear(hidden_dim, 13)
+        self.mod100_head = nn.Linear(hidden_dim, 100) # Used to derive mod25
+
+        # Register CRT Lookup Tables as buffers (saved with model)
+        basis_lut, lcm_lut = precompute_crt_lut()
+        self.register_buffer('crt_basis_lut', basis_lut)
+        self.register_buffer('crt_lcm_lut', lcm_lut)
+        
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """
-        Forward pass through decoder.
-        
-        Args:
-            x: Input features (batch_size, input_dim) or (input_dim,)
-        
-        Returns:
-            Dictionary with predictions from all heads:
-                - sign: (batch, 3) logits
-                - mag: (batch, 1) regression
-                - mod3: (batch, 3) logits
-                - mod5: (batch, 5) logits
-                - mod8: (batch, 8) logits
-                - mod10: (batch, 10) logits
-        """
-        # Handle single vector input
         if x.dim() == 1:
             x = x.unsqueeze(0)
         
-        # Shared encoding
         h = self.shared_encoder(x)
         
-        # Multi-task predictions
         return {
             "sign": self.sign_head(h),
-            "mag": self.mag_head(h),      # Now (batch, 4096) logits
+            "mag": self.mag_head(h),
             "mod3": self.mod3_head(h),
             "mod5": self.mod5_head(h),
             "mod7": self.mod7_head(h),
@@ -102,108 +125,168 @@ class NumberTheoreticDecoder(nn.Module):
         }
     
     @staticmethod
-    def log_value_to_bin(log_val: float) -> int:
-        """Convert log10 magnitude to bin index."""
-        if log_val <= 0:
-            return 0
-        bin_idx = int((log_val / MAX_LOG_VALUE) * NUM_MAGNITUDE_BINS)
-        return max(0, min(bin_idx, NUM_MAGNITUDE_BINS - 1))
-    
-    @staticmethod
-    def bin_to_log_range(bin_idx: int) -> Tuple[float, float]:
-        """Convert bin index to (log_min, log_max) range."""
+    def bin_to_log_range_vec(bin_indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Convert bin indices to (log_min, log_center) tensors."""
         bin_width = MAX_LOG_VALUE / NUM_MAGNITUDE_BINS
-        log_min = bin_idx * bin_width
-        log_max = (bin_idx + 1) * bin_width
-        return (log_min, log_max)
-    
+        log_min = bin_indices.float() * bin_width
+        log_center = (bin_indices.float() + 0.5) * bin_width
+        return log_min, log_center
+
     def batch_reconstruct(
         self,
         feature_vectors: torch.Tensor,
-        top_k_bins: int = 5,
-        neighbors: int = 3
+        top_k_bins: int = 5,   # Kept for API compatibility
+        neighbors: int = 3     # Kept for API compatibility
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Fully vectorized bin-based reconstruction with Top-K magnitude proposals.
-        
-        Args:
-            feature_vectors: (B, input_dim) feature vectors
-            top_k_bins: Number of top magnitude bins to explore (default: 5)
-            neighbors: Neighbor radius around bin center ±neighbors (default: 3)
-        
-        Returns:
-            Tuple of:
-                - best_integers: (B,) reconstructed integers
-                - best_scores: (B,) confidence scores
+        Reconstruct integers using Dynamic Confidence-Ordered CRT.
         """
         was_training = self.training
         self.eval()
         
         with torch.no_grad():
-            batch_size = feature_vectors.shape[0]
-            device = feature_vectors.device
-            
-            # 1. Get predictions for entire batch
             preds = self.forward(feature_vectors)
+            batch_size = feature_vectors.size(0)
+            device = feature_vectors.device
+
+            # ------------------------------------------------
+            # 0. Basic Predictions (Sign & Magnitude)
+            # ------------------------------------------------
+            # Sign: 0->(-1), 1->(0), 2->(+1)
+            sign_probs = F.softmax(preds['sign'], dim=1)
+            sign_idx = torch.argmax(sign_probs, dim=1)
+            sign_val = sign_idx - 1  # {-1, 0, 1}
+
+            # Magnitude (Center of Top-1 Bin)
+            mag_log_probs_all = F.log_softmax(preds["mag"], dim=1)
+            top_bin = torch.argmax(mag_log_probs_all, dim=1)
+            _, log_center = self.bin_to_log_range_vec(top_bin)
+            est_mag = torch.pow(10, log_center.to(device)) # (B,)
+
+            # ------------------------------------------------
+            # 1. Rank Moduli by Information Gain (Log-Odds Lift)
+            # ------------------------------------------------
+            # Bases config: Name, Modulus Size
+            bases_config = [
+                ('mod3', 3), ('mod7', 7), ('mod8', 8),
+                ('mod11', 11), ('mod13', 13), ('mod100', 25)
+            ]
             
-            # 2. Get sign
-            sign_idx = torch.argmax(preds["sign"], dim=1)  # (B,)
-            sign_value = sign_idx - 1  # Map to [-1, 0, 1]
+            scores_list = []
+            residues_list = []
+            head_log_probs = [] # Keep for final scoring
             
-            # 3. Top-K magnitude bins
-            mag_probs = F.softmax(preds["mag"], dim=1)  # (B, 4096)
-            topk_probs, topk_bins = torch.topk(mag_probs, top_k_bins, dim=1)  # (B, K)
+            for name, m in bases_config:
+                if m == 25:
+                    # Marginalize mod100 -> mod25
+                    lp100 = F.log_softmax(preds['mod100'], dim=1)
+                    # p(r mod 25) = sum p(r + 25k mod 100)
+                    p25 = torch.zeros(batch_size, 25, device=device)
+                    for i in range(4):
+                        p25 += torch.exp(lp100[:, i*25:(i+1)*25])
+                    log_p = torch.log(p25 + 1e-10)
+                else:
+                    log_p = F.log_softmax(preds[name], dim=1)
+                
+                head_log_probs.append(log_p)
+
+                # Info Score = log(P_top) + log(m)
+                # This prioritizes mods that are confident AND informative (e.g., mod25)
+                max_lp, max_idx = torch.max(log_p, dim=1)
+                score = max_lp + math.log(m)
+                
+                scores_list.append(score)
+                residues_list.append(max_idx)
             
-            # 4. VECTORIZED GRID GENERATION
-            # Convert bins to magnitude centers
+            # Stack: (B, 6)
+            all_scores = torch.stack(scores_list, dim=1)
+            all_residues = torch.stack(residues_list, dim=1)
+            
+            # Sort by confidence (descending)
+            # sorted_indices[b] gives the permutation of mod indices for batch b
+            _, sorted_indices = torch.sort(all_scores, descending=True, dim=1)
+
+            # ------------------------------------------------
+            # 2. Parallel CRT Hypotheses Generation (Levels 2 to 6)
+            # ------------------------------------------------
+            candidates_list = []
+            
+            # We generate hypotheses using Top-K confident mods for k in [2, 3, 4, 5, 6]
+            # This allows simpler (safer) hypotheses to compete with complex (full) ones.
+            
+            for k in range(2, 7):
+                # Identify which mods to use
+                top_k_idx = sorted_indices[:, :k] # (B, k)
+                
+                # Create bitmask for LUT
+                # shift 1 by index, then sum to create mask
+                mask = torch.sum(1 << top_k_idx, dim=1) # (B,)
+                
+                # Lookup Basis and LCM
+                curr_basis = self.crt_basis_lut[mask] # (B, 6)
+                curr_lcm = self.crt_lcm_lut[mask]     # (B,)
+                
+                # Vectorized CRT: x_base = sum(r_i * w_i) % LCM
+                # Note: curr_basis has 0 for unused mods, so direct mult is safe
+                x_base = torch.sum(all_residues * curr_basis, dim=1) % curr_lcm
+                
+                # LCM Stepping: Find k s.t. x_base + k*LCM is closest to est_mag
+                diff = est_mag - x_base.float()
+                step_k = torch.round(diff / curr_lcm.float())
+                cand_mag = x_base + step_k.long() * curr_lcm
+                
+                # Apply Sign (Important!)
+                cand_final = cand_mag * sign_val
+                
+                candidates_list.append(cand_final)
+
+            # ------------------------------------------------
+            # 3. Unified Scoring & Selection
+            # ------------------------------------------------
+            # Stack all hypotheses: (B, 5) -> 5 candidates per sample
+            all_cands = torch.stack(candidates_list, dim=1) # (B, 5)
+            
+            # Calculate Total Score = log P(Bin) + sum log P(Mod)
+            
+            # A. Bin Probability Score
+            cand_abs = all_cands.float().abs()
+            cand_log10 = torch.log10(cand_abs + 1e-10)
             bin_width = MAX_LOG_VALUE / NUM_MAGNITUDE_BINS
-            log_centers = (topk_bins.float() + 0.5) * bin_width  # (B, K) log10 values
-            mag_centers = torch.pow(10, log_centers).long()  # (B, K) integer magnitudes
+            cand_bins = (cand_log10 / bin_width).long().clamp(0, NUM_MAGNITUDE_BINS - 1)
             
-            # Create offset grid: (-neighbors, ..., +neighbors)
-            num_neighbors = 2 * neighbors + 1
-            offsets = torch.arange(-neighbors, neighbors + 1, device=device)  # (Neighbors,)
+            # Gather log probs from mag head: (B, 5)
+            score_mag = torch.gather(mag_log_probs_all, 1, cand_bins)
             
-            # Broadcast: (B, K, 1) + (1, 1, Neighbors) -> (B, K, Neighbors)
-            candidates_grid = mag_centers.unsqueeze(2) + offsets.view(1, 1, -1)
+            # B. Modulo Probability Score (Check against ALL 6 bases)
+            score_mods = torch.zeros_like(score_mag)
             
-            # Apply sign: (B, 1, 1) * (B, K, Neighbors) -> (B, K, Neighbors)
-            candidates_grid = sign_value.view(-1, 1, 1) * candidates_grid
+            for i, (name, m) in enumerate(bases_config):
+                lp = head_log_probs[i] # (B, m)
+                mod_val = m
+                
+                # Candidate residues: (B, 5)
+                cand_res = all_cands.abs() % mod_val
+                
+                # Gather scores: (B, 5)
+                s = torch.gather(lp, 1, cand_res)
+                score_mods += s
             
-            # Flatten to (B, Total_Candidates) where Total = K * Neighbors
-            total_candidates = top_k_bins * num_neighbors
-            candidates = candidates_grid.view(batch_size, total_candidates)  # (B, T)
+            # Total Score
+            total_score = score_mag + score_mods
             
-            # 5. VECTORIZED SCORING
-            # Initialize scores
-            scores = torch.zeros(batch_size, total_candidates, device=device, dtype=torch.float32)
-            
-            # Add magnitude bin probabilities
-            # Map candidates back to bins and gather their log probabilities
-            mag_log_probs = torch.log(mag_probs + 1e-10)  # (B, 4096)
-            candidate_abs = torch.abs(candidates.float())
-            candidate_log = torch.log10(candidate_abs + 1e-10)  # Use log10
-            candidate_bins = (candidate_log / bin_width).long().clamp(0, NUM_MAGNITUDE_BINS - 1)
-            mag_scores = torch.gather(mag_log_probs, 1, candidate_bins)  # (B, T)
-            scores += mag_scores
-            
-            # Modulo scoring for all 8 heads
-            mod_heads = ['mod3', 'mod5', 'mod7', 'mod8', 'mod10', 'mod11', 'mod13', 'mod100']
-            mod_bases = [3, 5, 7, 8, 10, 11, 13, 100]
-            
-            for head, base in zip(mod_heads, mod_bases):
-                mod_log_probs = F.log_softmax(preds[head], dim=1)  # (B, base)
-                residues = candidates % base  # (B, T)
-                mod_scores = torch.gather(mod_log_probs, 1, residues)  # (B, T)
-                scores += mod_scores
-            
-            # 6. VECTORIZED SELECTION
-            best_indices = torch.argmax(scores, dim=1)  # (B,)
-            best_integers = torch.gather(candidates, 1, best_indices.unsqueeze(1)).squeeze(1)
-            best_scores = torch.gather(scores, 1, best_indices.unsqueeze(1)).squeeze(1)
-        
+            # Select Best
+            best_idx = torch.argmax(total_score, dim=1) # (B,)
+            best_integers = torch.gather(all_cands, 1, best_idx.unsqueeze(1)).squeeze(1)
+            best_scores = torch.gather(total_score, 1, best_idx.unsqueeze(1)).squeeze(1)
+
         if was_training:
             self.train()
         
         return best_integers, best_scores
 
+    def reconstruct_value(self, features: torch.Tensor, **kwargs) -> Tuple[int, float]:
+        """Wrapper for backward compatibility."""
+        if features.dim() == 1:
+            features = features.unsqueeze(0)
+        best_ints, best_scores = self.batch_reconstruct(features)
+        return best_ints[0].item(), best_scores[0].item()

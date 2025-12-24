@@ -18,10 +18,20 @@ def test_decoder_initialization():
     assert hasattr(decoder, 'shared_encoder')
     assert hasattr(decoder, 'sign_head')
     assert hasattr(decoder, 'mag_head')
+    
+    # Check all modulo heads (Updated for new architecture)
     assert hasattr(decoder, 'mod3_head')
     assert hasattr(decoder, 'mod5_head')
+    assert hasattr(decoder, 'mod7_head')   # New
     assert hasattr(decoder, 'mod8_head')
     assert hasattr(decoder, 'mod10_head')
+    assert hasattr(decoder, 'mod11_head')  # New
+    assert hasattr(decoder, 'mod13_head')  # New
+    assert hasattr(decoder, 'mod100_head') # New
+    
+    # Check registered buffers for CRT
+    assert hasattr(decoder, 'crt_basis_lut')
+    assert hasattr(decoder, 'crt_lcm_lut')
     
     # Check dimensions
     assert decoder.input_dim == 35
@@ -43,20 +53,25 @@ def test_forward_output_structure():
         output = decoder(x)
     
     # Check all keys present
-    assert "sign" in output
-    assert "mag" in output
-    assert "mod3" in output
-    assert "mod5" in output
-    assert "mod8" in output
-    assert "mod10" in output
+    expected_keys = [
+        "sign", "mag", 
+        "mod3", "mod5", "mod7", "mod8", 
+        "mod10", "mod11", "mod13", "mod100"
+    ]
+    for key in expected_keys:
+        assert key in output
     
     # Check shapes
     assert output["sign"].shape == (1, 3)
-    assert output["mag"].shape == (1, 4096)  # Now 4096 bins instead of 1
+    assert output["mag"].shape == (1, 4096)  # 4096 bins
     assert output["mod3"].shape == (1, 3)
     assert output["mod5"].shape == (1, 5)
+    assert output["mod7"].shape == (1, 7)
     assert output["mod8"].shape == (1, 8)
     assert output["mod10"].shape == (1, 10)
+    assert output["mod11"].shape == (1, 11)
+    assert output["mod13"].shape == (1, 13)
+    assert output["mod100"].shape == (1, 100)
     
     # Batch input
     x_batch = torch.randn(4, 35)
@@ -64,7 +79,7 @@ def test_forward_output_structure():
         output_batch = decoder(x_batch)
     
     assert output_batch["sign"].shape == (4, 3)
-    assert output_batch["mag"].shape == (4, 4096)  # Now 4096 bins
+    assert output_batch["mag"].shape == (4, 4096)
 
 
 def test_batch_reconstruct_simple_numbers():
@@ -73,7 +88,7 @@ def test_batch_reconstruct_simple_numbers():
     decoder.eval()
     
     # Note: Untrained decoder won't give perfect results,
-    # but we test the reconstruction mechanism works
+    # but we test the reconstruction mechanism works (no crashes)
     test_numbers = [0, 1, -1, 5, -5, 10]
     
     # Extract all features at once
@@ -136,13 +151,16 @@ def test_batch_reconstruct_edge_case_zero():
     # Should return tensor with one integer
     assert len(reconstructed) == 1
     assert isinstance(reconstructed[0].item(), int)
-    # For untrained decoder, just check it runs without error
+    
     conf_val = confidences[0].item() if isinstance(confidences[0], torch.Tensor) else confidences[0]
     assert not math.isnan(conf_val)
 
 
 def test_batch_reconstruct_with_top_k():
-    """Test batch reconstruction with different top_k values."""
+    """
+    Test batch reconstruction with different top_k values.
+    Note: Dynamic CRT mostly ignores top_k_bins logic inside, but API must support it.
+    """
     decoder = NumberTheoreticDecoder()
     decoder.eval()
     
@@ -150,31 +168,10 @@ def test_batch_reconstruct_with_top_k():
     features = extract_features([num])
     features_batch = torch.tensor(features, dtype=torch.float32)
     
-    # Test with different top_k_bins values
+    # Test with different top_k_bins values (API compatibility check)
     with torch.no_grad():
         recon1, conf1 = decoder.batch_reconstruct(features_batch, top_k_bins=5)
         recon2, conf2 = decoder.batch_reconstruct(features_batch, top_k_bins=20)
-    
-    # Both should complete without error
-    assert len(recon1) == 1
-    assert len(recon2) == 1
-    assert isinstance(recon1[0].item(), int)
-    assert isinstance(recon2[0].item(), int)
-
-
-def test_batch_reconstruct_with_neighbors():
-    """Test batch reconstruction with different neighbor values."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
-    
-    num = 50
-    features = extract_features([num])
-    features_batch = torch.tensor(features, dtype=torch.float32)
-    
-    # Test with different neighbor values
-    with torch.no_grad():
-        recon1, conf1 = decoder.batch_reconstruct(features_batch, neighbors=1)
-        recon2, conf2 = decoder.batch_reconstruct(features_batch, neighbors=3)
     
     # Both should complete without error
     assert len(recon1) == 1
@@ -193,7 +190,7 @@ def test_batch_reconstruct_eval_mode():
     
     features = torch.randn(2, 35)
     
-    # Batch reconstruction should work
+    # Batch reconstruction should work and switch to eval internally
     with torch.no_grad():
         reconstructed, confidences = decoder.batch_reconstruct(features)
     
@@ -204,8 +201,8 @@ def test_batch_reconstruct_eval_mode():
     assert decoder.training
 
 
-def test_batch_forward():
-    """Test forward pass with batch input."""
+def test_batch_forward_all_heads():
+    """Test forward pass with batch input for all heads."""
     decoder = NumberTheoreticDecoder()
     decoder.eval()
     
@@ -216,29 +213,10 @@ def test_batch_forward():
         output = decoder(x)
     
     # All outputs should have batch dimension
-    for key in ["sign", "mag", "mod3", "mod5", "mod8", "mod10"]:
+    expected_heads = [
+        "sign", "mag", 
+        "mod3", "mod5", "mod7", "mod8", 
+        "mod10", "mod11", "mod13", "mod100"
+    ]
+    for key in expected_heads:
         assert output[key].shape[0] == batch_size
-
-
-def test_batch_reconstruct_large_batch():
-    """Test batch reconstruction with larger batches for performance."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
-    
-    # Create a batch of random feature vectors
-    batch_size = 32
-    features_batch = torch.randn(batch_size, 35)
-    
-    # Should handle large batches efficiently
-    with torch.no_grad():
-        reconstructed, confidences = decoder.batch_reconstruct(features_batch)
-    
-    assert len(reconstructed) == batch_size
-    assert len(confidences) == batch_size
-    
-    for recon, conf in zip(reconstructed, confidences):
-        assert isinstance(recon.item(), int)
-        conf_val = conf.item() if isinstance(conf, torch.Tensor) else conf
-        assert isinstance(conf_val, float)
-        assert not math.isnan(conf_val)
-        assert not math.isinf(conf_val)

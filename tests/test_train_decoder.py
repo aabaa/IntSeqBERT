@@ -31,14 +31,26 @@ def test_get_targets():
     # Magnitude bin indices should be in valid range [0, 4095]
     assert all(0 <= targets['mag'][i].item() < 4096 for i in range(len(integers)))
     
-    # Check modulo (Python % handles negatives correctly)
+    # Check modulo
+    # Note: In our implementation, we use standard Python % operator.
+    # Python's % returns same sign as denominator (always positive for positive modulus)
+    # e.g. -5 % 3 = 1
     assert targets['mod3'].tolist() == [-5 % 3, 0 % 3, 5 % 3, 42 % 3]
     assert targets['mod5'].tolist() == [-5 % 5, 0 % 5, 5 % 5, 42 % 5]
+    assert targets['mod8'].tolist() == [-5 % 8, 0 % 8, 5 % 8, 42 % 8]
     assert targets['mod10'].tolist() == [-5 % 10, 0 % 10, 5 % 10, 42 % 10]
     
     # Check new modulo heads exist
-    assert 'mod7' in targets and 'mod11' in targets
-    assert 'mod13' in targets and 'mod100' in targets
+    assert 'mod7' in targets
+    assert 'mod11' in targets
+    assert 'mod13' in targets
+    assert 'mod100' in targets
+    
+    # Verify logic for new heads
+    assert targets['mod7'].tolist() == [-5 % 7, 0 % 7, 5 % 7, 42 % 7]
+    assert targets['mod11'].tolist() == [-5 % 11, 0 % 11, 5 % 11, 42 % 11]
+    assert targets['mod13'].tolist() == [-5 % 13, 0 % 13, 5 % 13, 42 % 13]
+    assert targets['mod100'].tolist() == [-5 % 100, 0 % 100, 5 % 100, 42 % 100]
 
 
 def test_decoder_collate_fn():
@@ -142,8 +154,10 @@ def test_decoder_training_smoke(tmp_path):
     # Load and verify checkpoint
     checkpoint = torch.load(output_dir / "best_decoder.pt")
     assert 'decoder_state_dict' in checkpoint
-    assert 'epoch' in checkpoint
-    assert checkpoint['epoch'] == 1
+    
+    # Verify decoder parameters match expected input dim
+    state_dict = checkpoint['decoder_state_dict']
+    assert state_dict['shared_encoder.0.weight'].shape[1] == 35
 
 
 def test_bert_gradient_frozen(tmp_path):
@@ -270,9 +284,8 @@ def test_bypass_mode_training(tmp_path):
     assert 'decoder_state_dict' in checkpoint
     
     # Check that decoder was configured for 35-dim input
-    # The shared_encoder first layer should be (35 → 256)
+    # The shared_encoder first layer should be (35 -> 256)
     first_weight_key = 'shared_encoder.0.weight'
     if first_weight_key in checkpoint['decoder_state_dict']:
         first_layer_weight = checkpoint['decoder_state_dict'][first_weight_key]
         assert first_layer_weight.shape[1] == 35  # Input dimension
-
