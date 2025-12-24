@@ -256,9 +256,11 @@ def evaluate_decoder(
     perfect_count = 0
     rescued_count = 0
     failed_count = 0
+
+    pbar = tqdm(dataloader, desc="Validation", leave=False)
     
     with torch.no_grad():
-        for batch in dataloader:
+        for batch in pbar:
             masked_inputs = batch['masked_inputs'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             mask_indices = batch['mask_indices'].to(device)
@@ -291,7 +293,7 @@ def evaluate_decoder(
             # CRT reconstruction evaluation
             for i in range(batch_size):
                 true_int = target_integers[i]
-                recon_int, _ = decoder.reconstruct_value(bert_vectors[i].cpu())
+                recon_int, _ = decoder.reconstruct_value(bert_vectors[i])
                 
                 # Compute magnitude error
                 true_mag = log_magnitude([true_int])[0]
@@ -308,6 +310,10 @@ def evaluate_decoder(
                 else:
                     # Failed: CRT couldn't save it
                     failed_count += 1
+            
+            # Update rescue rate
+            current_rescue_rate = (rescued_count / total_samples) * 100 if total_samples > 0 else 0
+            pbar.set_postfix({"rescue_rate": f"{current_rescue_rate:.1f}%"})
     
     # Compute final metrics
     if total_samples == 0:
