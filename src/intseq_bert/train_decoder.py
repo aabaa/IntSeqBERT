@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from . import schemas
 from .bert_model import IntSeqBERT
-from .decoder_model import NumberTheoreticDecoder, inverse_magnitude
+from .decoder_model import NumberTheoreticDecoder
 from .features import log_magnitude
 
 
