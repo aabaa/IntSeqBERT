@@ -52,15 +52,20 @@ uv sync
 **Step 1: Download OEIS Data**
 
 ```bash
-# Download stripped file (integer sequences only)
+# Download stripped and names file
+mkdir -p data/oeis/raw
+cd data/oeis/raw
 wget http://oeis.org/stripped.gz
-gunzip stripped.gz
-mv stripped data/oeis/stripped
-
-# Download names file (optional, for metadata)
 wget http://oeis.org/names.gz
+gunzip stripped.gz
 gunzip names.gz
-mv names data/oeis/names
+
+# Download complete OEIS sequence data from GitHub
+cd ../
+git clone https://github.com/oeis/oeisdata/
+mv oeisdata/seq .
+rm -rf oeisdata/
+cd ../..
 ```
 
 **Step 2: Preprocess Raw Data**
@@ -69,18 +74,28 @@ Convert raw OEIS format to JSONL:
 
 ```bash
 uv run python -m intseq_bert.preprocess \
-  process-stripped \
-  --input data/oeis/stripped \
+  stripped \
+  --input data/oeis/raw/stripped \
   --output data/oeis/data_step1.jsonl
 ```
 
-Optional: Merge with sequence names
+Merge with sequence names
 
 ```bash
 uv run python -m intseq_bert.preprocess \
   merge-names \
-  --sequences data/oeis/data_step1.jsonl \
-  --names data/oeis/names \
+  --input-jsonl data/oeis/data_step1.jsonl \
+  --input-names data/oeis/raw/names \
+  --output data/oeis/data_step2.jsonl
+```
+
+Merge with sequence metadata
+
+```bash
+uv run python -m intseq_bert.preprocess \
+  merge-metadata \
+  --input-jsonl data/oeis/data_step2.jsonl \
+  --seq-dir data/oeis/seq \
   --output data/oeis/data_step3.jsonl
 ```
 
@@ -91,8 +106,7 @@ Convert JSONL to 27-dimensional feature tensors:
 ```bash
 uv run python -m intseq_bert.encoder \
   --input data/oeis/data_step3.jsonl \
-  --output data/oeis/features.pt \
-  --batch_size 1000
+  --output data/oeis/features.pt
 ```
 
 This creates a `.pt` file with format: `{oeis_id: Tensor(seq_len, 27)}`
@@ -104,13 +118,7 @@ Train the backbone model to understand sequence contexts.
 ```bash
 uv run python -m intseq_bert.train_bert \
   --features_path data/oeis/features.pt \
-  --output_dir checkpoints/bert \
-  --epochs 20 \
-  --batch_size 128 \
-  --lr 1e-4 \
-  --d_model 128 \
-  --nhead 4 \
-  --num_layers 6
+  --output_dir checkpoints/bert
 ```
 
 **Output:**
@@ -129,10 +137,7 @@ uv run python -m intseq_bert.train_decoder \
   --bert_checkpoint checkpoints/bert/best_model.pt \
   --features_path data/oeis/features.pt \
   --jsonl_path data/oeis/data_step3.jsonl \
-  --output_dir checkpoints/decoder \
-  --epochs 10 \
-  --batch_size 64 \
-  --lr 1e-3
+  --output_dir checkpoints/decoder
 ```
 
 **Why two data sources?**
@@ -267,34 +272,90 @@ print(f"Loaded model from epoch {checkpoint['epoch']}")
 
 ## 🔬 Advanced Usage
 
-### Custom Training Parameters
+Below is a complete list of command-line arguments for training scripts.
 
-**BERT Training:**
+### 1. IntSeqBERT Encoder (`train_bert.py`)
+
+Run `python -m intseq_bert.train_bert [options]`
+
+**Data & Output**
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--features_path` | `data/oeis/features.pt` | Path to the feature tensor file. |
+| `--metadata_path` | `None` | Path to metadata JSONL (reserved for filtering). |
+| `--output_dir` | `checkpoints` | Directory to save checkpoints and logs. |
+
+**Model Architecture**
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--d_model` | `128` | Dimension of the Transformer model. |
+| `--nhead` | `4` | Number of attention heads. |
+| `--num_layers` | `6` | Number of encoder layers. |
+| `--dim_feedforward` | `512` | Dimension of the FeedForward Network (FFN). |
+| `--dropout` | `0.1` | Dropout rate. |
+
+**Training Hyperparameters**
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--epochs` | `10` | Total number of training epochs. |
+| `--batch_size` | `32` | Batch size per step. |
+| `--lr` | `1e-4` | Learning rate (AdamW). |
+| `--weight_decay` | `0.01` | Weight decay for regularization. |
+| `--warmup_steps` | `None` | Linear warmup steps (default: 10% of total). |
+| `--max_grad_norm` | `1.0` | Gradient clipping threshold. |
+| `--log_interval` | `100` | Log training metrics every N steps. |
+
+**Data Processing**
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--mask_prob` | `0.15` | Probability of masking tokens (BERT objective). |
+| `--min_len` | `10` | Minimum sequence length to include. |
+| `--val_ratio` | `0.1` | Ratio of data used for validation. |
+| `--test_ratio` | `0.1` | Ratio of data used for testing. |
+| `--seed` | `42` | Random seed for reproducibility. |
+
+---
+
+### 2. NumberTheoreticDecoder (`train_decoder.py`)
+
+Run `python -m intseq_bert.train_decoder [options]`
+
+**Required Arguments**
+| Argument | Description |
+| :--- | :--- |
+| `--bert_checkpoint` | Path to the trained IntSeqBERT checkpoint (`.pt`). |
+| `--features_path` | Path to the feature tensor file. |
+| `--jsonl_path` | Path to the original JSONL data (source of ground truth integers). |
+
+**Optional Arguments**
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--output_dir` | `checkpoints/decoder` | Directory to save checkpoints and logs. |
+| `--epochs` | `10` | Total number of training epochs. |
+| `--batch_size` | `32` | Batch size. |
+| `--lr` | `1e-3` | Learning rate. |
+| `--weight_decay` | `0.01` | Weight decay. |
+| `--seed` | `42` | Random seed. |
+
+### Example: Training a Large Model
+
+# 1. Train Large Encoder
 ```bash
 uv run python -m intseq_bert.train_bert \
   --features_path data/oeis/features.pt \
-  --metadata_path data/oeis/data_step3.jsonl \
-  --include_tags nonn core \
-  --exclude_tags dead \
-  --d_model 256 \
-  --nhead 8 \
-  --num_layers 12 \
-  --epochs 30 \
-  --batch_size 256 \
-  --lr 5e-5 \
-  --warmup_steps 2000
+  --output_dir checkpoints/bert_large \
+  --d_model 256 --nhead 8 --num_layers 12 --dim_feedforward 1024 \
+  --epochs 30 --batch_size 64 --lr 5e-5
 ```
 
-**Decoder Training:**
+# 2. Train Decoder on Large Encoder
 ```bash
 uv run python -m intseq_bert.train_decoder \
-  --bert_checkpoint checkpoints/large_bert/best_model.pt \
+  --bert_checkpoint checkpoints/bert_large/best_model.pt \
   --features_path data/oeis/features.pt \
   --jsonl_path data/oeis/data_step3.jsonl \
-  --epochs 20 \
-  --batch_size 128 \
-  --lr 5e-4 \
-  --weight_decay 0.01
+  --output_dir checkpoints/decoder_large \
+  --epochs 20 --lr 5e-4
 ```
 
 ## 🤝 Contributing
