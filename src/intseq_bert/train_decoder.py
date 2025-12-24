@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from . import schemas
 from .bert_model import IntSeqBERT
-from .decoder_model import NumberTheoreticDecoder
+from .decoder_model import NumberTheoreticDecoder, NUM_MAGNITUDE_BINS, MAX_LOG_VALUE
 from .features import log_magnitude
 
 
@@ -313,7 +313,15 @@ def evaluate_decoder(
             # Decoder forward
             decoder_output = decoder(bert_vectors)
             targets = get_targets(target_integers)
+
+            # Get highest-probability bin
+            _pred_bins = decoder_output['mag'].argmax(dim=1)
             
+            # Convert bin index to log magnitude
+            _bin_width = MAX_LOG_VALUE / NUM_MAGNITUDE_BINS
+            mag_pred = (_pred_bins.float() + 0.5) * _bin_width
+            mag_pred = mag_pred.cpu()
+
             # Magnitude bin accuracy (classification)
             mag_pred_bins = decoder_output['mag'].argmax(dim=1).cpu()
             mag_target_bins = targets['mag']
@@ -385,8 +393,12 @@ def evaluate_decoder(
     logger.info(f"  Mag Bin Acc: {mag_acc:.1f}%")
     logger.info(f"  Sign Acc: {accuracies['sign_acc']:.1f}% | " +
                 f"Mod3: {accuracies['mod3_acc']:.1f}% | " +
+                f"Mod5: {accuracies['mod5_acc']:.1f}% | " +
                 f"Mod7: {accuracies['mod7_acc']:.1f}% | " +
+                f"Mod8: {accuracies['mod8_acc']:.1f}% | " +
                 f"Mod10: {accuracies['mod10_acc']:.1f}% | " +
+                f"Mod11: {accuracies['mod11_acc']:.1f}% | " +
+                f"Mod13: {accuracies['mod13_acc']:.1f}% | " +
                 f"Mod100: {accuracies['mod100_acc']:.1f}%")
     logger.info(f"  Reconstruction (n={total_samples}):")
     logger.info(f"    ✓ Perfect: {perfect_count} ({perfect_count/total_samples*100:.1f}%)")
