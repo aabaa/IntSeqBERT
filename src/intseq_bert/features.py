@@ -138,10 +138,10 @@ def extract_features(seq: List[int]) -> np.ndarray:
     """
     Extracts all features for a given sequence.
     Returns:
-        np.ndarray: Shape (SeqLen, 27), dtype=float32
+        np.ndarray: Shape (SeqLen, 35), dtype=float32
     """
     if not seq:
-        return np.zeros((0, 27), dtype=np.float32)
+        return np.zeros((0, 35), dtype=np.float32)
 
     features_list = []
 
@@ -169,14 +169,13 @@ def extract_features(seq: List[int]) -> np.ndarray:
     features_list.append(digit_sum(seq))
     features_list.append(is_power_of_2(seq))
 
-    # 5. Algebraic (10)
-    # Bases: [3, 4, 5, 6, 8]
-    bases = [3, 4, 5, 6, 8]
+    # 5. Algebraic (18)
+    bases = [3, 4, 5, 6, 7, 8, 11, 13, 100]
     for m in bases:
         features_list.append(mod_sin(seq, m))
         features_list.append(mod_cos(seq, m))
 
-    # Convert to numpy array [27, SeqLen] -> Transpose -> [SeqLen, 27]
+    # Convert to numpy array [35, SeqLen] -> Transpose -> [SeqLen, 35]
     # Use float32 to match PyTorch default expectation
     return np.array(features_list, dtype=np.float32).T
 

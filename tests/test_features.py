@@ -132,13 +132,13 @@ def test_extract_features_dimensions():
     import numpy as np
     # Empty seq
     res_empty = features.extract_features([])
-    assert res_empty.shape == (0, 27)
+    assert res_empty.shape == (0, 35)
     
     # Normal seq
     seq = [1, 2, 3, 4, 5]
     res = features.extract_features(seq)
     
-    assert res.shape == (5, 27)
+    assert res.shape == (5, 35)
     assert res.dtype == np.float32
     
     # Check consistency (roughly)

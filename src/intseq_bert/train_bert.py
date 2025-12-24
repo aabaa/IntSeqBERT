@@ -124,7 +124,7 @@ def train(config: Dict[str, Any]) -> None:
     
     # Create collator
     data_collator = collator.IntSeqCollator(
-        feature_dim=config.get("input_dim", 27),
+        feature_dim=config.get("input_dim", 35),
         mask_prob=config.get("mask_prob", 0.15)
     )
     
@@ -156,7 +156,7 @@ def train(config: Dict[str, Any]) -> None:
     # 3. Model Initialization
     logger.info("Initializing model...")
     model = bert_model.IntSeqBERT(
-        input_dim=config.get("input_dim", 27),
+        input_dim=config.get("input_dim", 35),
         d_model=config.get("d_model", 128),
         nhead=config.get("nhead", 4),
         num_layers=config.get("num_layers", 6),

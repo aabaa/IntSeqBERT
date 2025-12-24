@@ -53,9 +53,9 @@ def test_encoder_happy_path(mock_jsonl_file, tmp_path):
     tensor_a = data["A000001"]
     assert isinstance(tensor_a, torch.Tensor)
     assert tensor_a.dtype == torch.float32
-    # Features are 27-dimensional, length is original sequence length (10) - reduction due to window processing etc.
-    # (Depends on features.py specification, but at least dim=1 should be 27)
-    assert tensor_a.shape[1] == 27 
+    # Features are 35-dimensional, length is original sequence length (10) - reduction due to window processing etc.
+    # (Depends on features.py specification, but at least dim=1 should be 35)
+    assert tensor_a.shape[1] == 35
 
 def test_encoder_error_handling(tmp_path):
     """
@@ -85,7 +85,7 @@ def test_encoder_error_handling(tmp_path):
         def side_effect(seq):
             if len(seq) < 5: # A_BAD case
                 raise ValueError("Calculation Error Sim")
-            return torch.randn(len(seq), 27).numpy() # A_GOOD succeeds (dummy array)
+            return torch.randn(len(seq), 35).numpy() # A_GOOD succeeds (dummy array)
 
         mock_extract.side_effect = side_effect
         

@@ -13,7 +13,7 @@ from intseq_bert.bert_model import IntSeqBERT, PositionalEncoding
 def sample_model():
     """Create a small IntSeqBERT model for testing."""
     return IntSeqBERT(
-        input_dim=27,
+        input_dim=35,
         d_model=64,  # Smaller for faster tests
         nhead=4,
         num_layers=2,  # Fewer layers for faster tests
@@ -28,7 +28,7 @@ def dummy_batch():
     """Create dummy batch tensors for testing."""
     batch_size = 2
     seq_len = 10
-    input_dim = 27
+    input_dim = 35
     
     inputs = torch.randn(batch_size, seq_len, input_dim)
     attention_mask = torch.ones(batch_size, seq_len)  # All valid
@@ -70,7 +70,7 @@ def test_model_initialization():
     assert hasattr(model, 'prediction_head')
     
     # Check dimensions
-    assert model.input_dim == 27
+    assert model.input_dim == 35
     assert model.d_model == 128
     
     # Check model can be moved to device (basic sanity check)
@@ -134,7 +134,7 @@ def test_masked_loss_calculation(sample_model):
     model = sample_model
     batch_size = 2
     seq_len = 10
-    input_dim = 27
+    input_dim = 35
     
     # Create inputs where prediction equals labels
     inputs = torch.randn(batch_size, seq_len, input_dim)
@@ -219,7 +219,7 @@ def test_attention_mask_handling(sample_model):
     model = sample_model
     batch_size = 2
     seq_len = 10
-    input_dim = 27
+    input_dim = 35
     
     inputs = torch.randn(batch_size, seq_len, input_dim)
     
@@ -244,7 +244,7 @@ def test_attention_mask_handling(sample_model):
 def test_batch_size_flexibility(sample_model):
     """Test that model handles different batch sizes."""
     model = sample_model
-    input_dim = 27
+    input_dim = 35
     
     # Test with different batch sizes
     for batch_size in [1, 2, 8]:
@@ -262,7 +262,7 @@ def test_sequence_length_flexibility(sample_model):
     """Test that model handles different sequence lengths."""
     model = sample_model
     batch_size = 2
-    input_dim = 27
+    input_dim = 35
     
     # Test with different sequence lengths
     for seq_len in [5, 10, 50]:
@@ -279,7 +279,7 @@ def test_load_from_checkpoint(tmp_path):
     """Test loading a model from checkpoint file."""
     # Create a model and save a checkpoint
     model = IntSeqBERT(
-        input_dim=27,
+        input_dim=35,
         d_model=64,
         nhead=4,
         num_layers=2
@@ -291,7 +291,7 @@ def test_load_from_checkpoint(tmp_path):
         "epoch": 5,
         "model_state_dict": model.state_dict(),
         "config": {
-            "input_dim": 27,
+            "input_dim": 35,
             "d_model": 64,
             "nhead": 4,
             "num_layers": 2,
@@ -313,7 +313,7 @@ def test_load_from_checkpoint(tmp_path):
     model = model.cpu()
     
     # Verify model architecture matches
-    assert loaded_model.input_dim == 27
+    assert loaded_model.input_dim == 35
     assert loaded_model.d_model == 64
     
     # Verify checkpoint data is returned

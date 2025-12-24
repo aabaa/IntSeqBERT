@@ -22,7 +22,7 @@ def test_training_smoke(tmp_path):
     """
     # Create dummy features.pt with 4 sequences
     features = {
-        f"A{i:06d}": torch.randn(10, 27, dtype=torch.float32)
+        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
         for i in range(4)
     }
     features_path = tmp_path / "features.pt"
@@ -45,7 +45,7 @@ def test_training_smoke(tmp_path):
         "log_interval": 10,
         
         # Model (small for speed)
-        "input_dim": 27,
+        "input_dim": 35,
         "d_model": 32,  # Small
         "nhead": 2,  # Small
         "num_layers": 1,  # Minimal
@@ -95,7 +95,7 @@ def test_training_with_validation_improvement(tmp_path):
     """Test that best model is saved when validation improves."""
     # Create dummy features
     features = {
-        f"A{i:06d}": torch.randn(15, 27, dtype=torch.float32)
+        f"A{i:06d}": torch.randn(15, 35, dtype=torch.float32)
         for i in range(8)
     }
     features_path = tmp_path / "features.pt"
@@ -107,6 +107,7 @@ def test_training_with_validation_improvement(tmp_path):
         "epochs": 2,  # Run 2 epochs
         "batch_size": 2,
         "lr": 1e-3,
+        "input_dim": 35,
         "d_model": 32,
         "nhead": 2,
         "num_layers": 1,
@@ -134,7 +135,7 @@ def test_training_device_handling(tmp_path):
     """Test that training correctly handles device selection."""
     # Create minimal dataset
     features = {
-        f"A{i:06d}": torch.randn(10, 27, dtype=torch.float32)
+        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
         for i in range(4)
     }
     features_path = tmp_path / "features.pt"
@@ -146,6 +147,7 @@ def test_training_device_handling(tmp_path):
         "epochs": 1,
         "batch_size": 2,
         "lr": 1e-3,
+        "input_dim": 35,
         "d_model": 16,
         "nhead": 2,
         "num_layers": 1,

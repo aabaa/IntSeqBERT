@@ -53,11 +53,11 @@ class IntSeqBERT(nn.Module):
     """
     BERT-style model for integer sequence representation learning.
     
-    Takes 27-dimensional feature vectors and uses Transformer encoder
+    Takes 35-dimensional feature vectors and uses Transformer encoder
     with masked reconstruction objective.
     
     Args:
-        input_dim: Input feature dimension (default: 27)
+        input_dim: Input feature dimension (default: 35)
         d_model: Transformer hidden dimension (default: 128)
         nhead: Number of attention heads (default: 4)
         num_layers: Number of encoder layers (default: 6)
@@ -68,7 +68,7 @@ class IntSeqBERT(nn.Module):
     
     def __init__(
         self,
-        input_dim: int = 27,
+        input_dim: int = 35,
         d_model: int = 128,
         nhead: int = 4,
         num_layers: int = 6,
@@ -139,7 +139,7 @@ class IntSeqBERT(nn.Module):
         
         # Get model initialization parameters
         model_args = {
-            'input_dim': config.get('input_dim', 27),
+            'input_dim': config.get('input_dim', 35),
             'd_model': config.get('d_model', 128),
             'nhead': config.get('nhead', 4),
             'num_layers': config.get('num_layers', 6),

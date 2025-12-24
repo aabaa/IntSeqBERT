@@ -60,7 +60,7 @@ def process_encode(args):
                     continue
                 
                 # 3. Feature extraction (depends on features.py)
-                # Return value: numpy.ndarray (Shape: [SeqLen, 27])
+                # Return value: numpy.ndarray (Shape: [SeqLen, 35])
                 feat_array = features.extract_features(seq)
                 
                 # If extraction result is empty or invalid

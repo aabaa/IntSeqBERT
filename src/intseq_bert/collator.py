@@ -9,7 +9,7 @@ class IntSeqCollator:
     Collator for IntSeqBERT.
     Handles padding and dynamic masking for continuous feature vectors.
     """
-    feature_dim: int = 27
+    feature_dim: int = 35
     mask_prob: float = 0.15
     
     def __call__(self, examples: List[torch.Tensor]) -> Dict[str, torch.Tensor]:

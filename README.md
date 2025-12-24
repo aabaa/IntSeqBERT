@@ -1,6 +1,6 @@
 # IntSeqBERT
 
-**IntSeqBERT** is a Transformer-based framework designed to learn mathematical representations of integer sequences. Unlike standard language models that treat numbers as text tokens, IntSeqBERT utilizes a **27-dimensional number-theoretic feature vector** and a novel **Probabilistic CRT (Chinese Remainder Theorem) Decoder** to understand the deep structure of sequences.
+**IntSeqBERT** is a Transformer-based framework designed to learn mathematical representations of integer sequences. Unlike standard language models that treat numbers as text tokens, IntSeqBERT utilizes a **35-dimensional number-theoretic feature vector** and a novel **Probabilistic CRT (Chinese Remainder Theorem) Decoder** to understand the deep structure of sequences.
 
 ## 🏗 Architecture
 
@@ -8,7 +8,7 @@ The system consists of two main components:
 
 1. **IntSeqBERT (Encoder):**
    - Compresses integer sequences into dense vector representations.
-   - Input: Sequence of 27-dim feature vectors (Log-magnitude, Prime gaps, Valuation, etc.).
+   - Input: Sequence of 35-dim feature vectors (Log-magnitude, Prime gaps, Valuation, Algebraic features, etc.).
    - Objective: Masked Sequence Modeling.
    - Output: Context-aware feature vectors.
 
@@ -16,9 +16,10 @@ The system consists of two main components:
    - Reconstructs integers from the latent vectors produced by IntSeqBERT.
    - Mechanism: **Multi-Task Learning** + **Probabilistic CRT Search**.
    - Heads:
-     - **Sign:** Positive / Negative / Zero.
-     - **Magnitude:** Log-scale regression ($\log_{10}|x|$).
-     - **Modulo:** Classification of residues for mod 3, 5, 8, 10.
+     - **Sign:** Positive / Negative / Zero (3-class classification).
+     - **Magnitude:** 4096-bin classification covering 0 to 10^100.
+     - **Modulo:** Classification of residues for mod 3, 5, 7, 8, 10, 11, 13, 100.
+   - **Uniqueness Period:** LCM(3, 5, 7, 8, 10, 11, 13, 100) = 600,600
 
 ### Reconstruction Logic: CRT Search
 
@@ -101,7 +102,7 @@ uv run python -m intseq_bert.preprocess \
 
 **Step 3: Extract Features**
 
-Convert JSONL to 27-dimensional feature tensors:
+Convert JSONL to 35-dimensional feature tensors:
 
 ```bash
 uv run python -m intseq_bert.encoder \
@@ -109,7 +110,7 @@ uv run python -m intseq_bert.encoder \
   --output data/oeis/features.pt
 ```
 
-This creates a `.pt` file with format: `{oeis_id: Tensor(seq_len, 27)}`
+This creates a `.pt` file with format: `{oeis_id: Tensor(seq_len, 35)}`
 
 ### 3. Train IntSeqBERT (Encoder)
 
@@ -141,7 +142,7 @@ uv run python -m intseq_bert.train_decoder \
 ```
 
 **Why two data sources?**
-- `features.pt`: Provides input to frozen BERT (27-dim vectors)
+- `features.pt`: Provides input to frozen BERT (35-dim vectors)
 - `jsonl`: Provides ground truth integers for decoder targets (sign, magnitude, modulo)
 
 ### 4.1 Bypass Mode (Sanity Check)
@@ -161,7 +162,7 @@ uv run python -m intseq_bert.train_decoder \
 - **BERT training** (if bypass mode works but standard mode fails)
 - **Feature quality** (if both modes fail)
 
-In bypass mode, the decoder learns directly from 27-dim features, which already contain modulo information. You should see **mod accuracy reach ~95-100%** within a few epochs, confirming the features are adequate.
+In bypass mode, the decoder learns directly from 35-dim features, which already contain modulo information. You should see **mod accuracy reach ~95-100%** within a few epochs, confirming the features are adequate.
 
 ## 📊 Evaluation Metrics
 
@@ -192,7 +193,7 @@ IntSeqBERT/
 ├── src/intseq_bert/
 │   ├── bert_model.py         # IntSeqBERT (Encoder) definition
 │   ├── decoder_model.py      # NumberTheoreticDecoder + CRT search
-│   ├── features.py           # 27-dim Feature Extraction logic
+│   ├── features.py           # 35-dim Feature Extraction logic
 │   ├── encoder.py            # CLI for batch feature encoding
 │   ├── train_bert.py         # Training script for Encoder
 │   ├── train_decoder.py      # Training script for Decoder
@@ -219,18 +220,18 @@ uv run pytest tests/
 ```
 
 **Test Coverage:**
-- Feature extraction logic (27 dimensions)
+- Feature extraction logic (35 dimensions)
 - BERT model architecture
 - Decoder model with CRT search
 - Data loading and preprocessing
 - Training pipelines (BERT + Decoder)
 - Integration tests
 
-Currently **79 tests**, all passing.
+Currently **81 tests**, all passing.
 
 ## 🎯 Key Features
 
-### 27-Dimensional Feature Vector
+### 35-Dimensional Feature Vector
 
 Each integer is represented by:
 - **Log Magnitude** (1 dim): Continuous scale representation
@@ -242,10 +243,10 @@ Each integer is represented by:
 ### Multi-Task Decoder Architecture
 
 ```
-Input (27 dims) → Feature vector from IntSeqBERT
+Input (35 dims) → Feature vector from IntSeqBERT
     ↓
 Shared Encoder
-    Linear(27 → 256) + ReLU + Dropout
+    Linear(35 → 256) + ReLU + Dropout
     Linear(256 → 256) + ReLU
     ↓
 Multi-Task Heads
@@ -355,7 +356,7 @@ Run `python -m intseq_bert.train_decoder [options]`
 | `--lr` | `1e-3` | Learning rate. |
 | `--weight_decay` | `0.01` | Weight decay. |
 | `--seed` | `42` | Random seed. |
-| `--bypass_bert` | `False` | **Sanity check mode**: Skip BERT and use raw 27-dim features directly. |
+| `--bypass_bert` | `False` | **Sanity check mode**: Skip BERT and use raw 35-dim features directly. |
 
 ### Example: Training a Large Model
 

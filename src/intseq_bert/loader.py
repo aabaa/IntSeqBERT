@@ -21,7 +21,7 @@ class IntSeqDataset(Dataset):
     Simple PyTorch Dataset wrapper for pre-loaded feature tensors.
     
     Args:
-        tensors: List of feature tensors, each with shape (SeqLen, 27)
+        tensors: List of feature tensors, each with shape (SeqLen, 35)
     """
     
     def __init__(self, tensors: List[torch.Tensor]):

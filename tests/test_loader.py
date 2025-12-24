@@ -57,13 +57,13 @@ def tmp_features_pt(tmp_path):
     """
     Create a temporary .pt file with matching feature tensors.
     
-    Creates dummy tensors with shape (SeqLen, 27) for each sequence.
+    Creates dummy tensors with shape (SeqLen, 35) for each sequence.
     """
     features = {
-        "A000001": torch.randn(20, 27, dtype=torch.float32),
-        "A000002": torch.randn(15, 27, dtype=torch.float32),
-        "A000003": torch.randn(25, 27, dtype=torch.float32),
-        "A000004": torch.randn(10, 27, dtype=torch.float32)
+        "A000001": torch.randn(20, 35, dtype=torch.float32),
+        "A000002": torch.randn(15, 35, dtype=torch.float32),
+        "A000003": torch.randn(25, 35, dtype=torch.float32),
+        "A000004": torch.randn(10, 35, dtype=torch.float32)
     }
     
     pt_path = tmp_path / "features.pt"
@@ -92,7 +92,7 @@ def test_tag_filtering_include(tmp_jsonl_with_tags, tmp_features_pt):
     
     # Verify tensors have correct shape
     tensor1 = train_ds[0]
-    assert tensor1.shape[1] == 27  # Feature dimension
+    assert tensor1.shape[1] == 35  # Feature dimension
 
 
 def test_tag_filtering_exclude(tmp_jsonl_with_tags, tmp_features_pt):
@@ -178,10 +178,10 @@ def test_min_len_filtering(tmp_path):
     """
     # Create features with varying lengths
     features = {
-        "A000001": torch.randn(5, 27, dtype=torch.float32),   # Too short
-        "A000002": torch.randn(15, 27, dtype=torch.float32),  # OK
-        "A000003": torch.randn(8, 27, dtype=torch.float32),   # Too short
-        "A000004": torch.randn(20, 27, dtype=torch.float32)   # OK
+        "A000001": torch.randn(5, 35, dtype=torch.float32),   # Too short
+        "A000002": torch.randn(15, 35, dtype=torch.float32),  # OK
+        "A000003": torch.randn(8, 35, dtype=torch.float32),   # Too short
+        "A000004": torch.randn(20, 35, dtype=torch.float32)   # OK
     }
     
     pt_path = tmp_path / "features_varying.pt"
@@ -218,7 +218,7 @@ def test_dataset_interface(tmp_features_pt):
     # Test __getitem__ returns tensors
     tensor = train_ds[0]
     assert isinstance(tensor, torch.Tensor)
-    assert tensor.shape[1] == 27  # Feature dimension
+    assert tensor.shape[1] == 35  # Feature dimension
     
     # Test indexing works for all items
     for i in range(len(train_ds)):
@@ -241,7 +241,7 @@ def test_empty_result_handling(tmp_path):
             f.write(json.dumps(record) + '\n')
     
     # Create matching features
-    features = {"A000001": torch.randn(3, 27)}
+    features = {"A000001": torch.randn(3, 35)}
     pt_path = tmp_path / "features_nomatch.pt"
     torch.save(features, pt_path)
     

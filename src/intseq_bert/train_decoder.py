@@ -5,6 +5,7 @@ Training script for NumberTheoreticDecoder using frozen IntSeqBERT representatio
 import argparse
 import json
 import logging
+import math  # Added for log10 in magnitude binning
 import random
 from pathlib import Path
 from typing import Dict, List, Any
@@ -56,9 +57,11 @@ def get_targets(integers: List[int]) -> Dict[str, torch.Tensor]:
     Returns:
         Dictionary with target tensors for each head:
             - sign: (batch,) LongTensor [0=neg, 1=zero, 2=pos]
-            - mag: (batch,) FloatTensor [log magnitude]
-            - mod3/5/8/10: (batch,) LongTensor [residues]
+            - mag: (batch,) LongTensor [bin indices 0-4095]
+            - mod3/5/7/8/10/11/13/100: (batch,) LongTensor [residues]
     """
+    from .decoder_model import NUM_MAGNITUDE_BINS, MAX_LOG_VALUE
+    
     batch_size = len(integers)
     
     # Sign: map to [0, 1, 2]
@@ -67,24 +70,41 @@ def get_targets(integers: List[int]) -> Dict[str, torch.Tensor]:
         for x in integers
     ], dtype=torch.long)
     
-    # Magnitude: use same log_magnitude as encoder
-    mags = torch.tensor([
-        log_magnitude([x])[0] for x in integers
-    ], dtype=torch.float32)
+    # Magnitude: Convert to bin indices (classification)
+    mag_bins = []
+    for x in integers:
+        if x == 0:
+            log_val = 0.0
+        else:
+            log_val = math.log10(abs(x))  # Use log10
+        # Map to bin index
+        bin_idx = int((log_val / MAX_LOG_VALUE) * NUM_MAGNITUDE_BINS)
+        bin_idx = max(0, min(bin_idx, NUM_MAGNITUDE_BINS - 1))
+        mag_bins.append(bin_idx)
+    
+    mag_bins = torch.tensor(mag_bins, dtype=torch.long)
     
     # Modulo residues (Python % already handles negatives correctly)
     mod3 = torch.tensor([x % 3 for x in integers], dtype=torch.long)
     mod5 = torch.tensor([x % 5 for x in integers], dtype=torch.long)
+    mod7 = torch.tensor([x % 7 for x in integers], dtype=torch.long)    # NEW
     mod8 = torch.tensor([x % 8 for x in integers], dtype=torch.long)
     mod10 = torch.tensor([x % 10 for x in integers], dtype=torch.long)
+    mod11 = torch.tensor([x % 11 for x in integers], dtype=torch.long)  # NEW
+    mod13 = torch.tensor([x % 13 for x in integers], dtype=torch.long)  # NEW
+    mod100 = torch.tensor([x % 100 for x in integers], dtype=torch.long)  # NEW
     
     return {
         "sign": signs,
-        "mag": mags,
+        "mag": mag_bins,  # Now bin indices, not floats
         "mod3": mod3,
         "mod5": mod5,
+        "mod7": mod7,     # NEW
         "mod8": mod8,
-        "mod10": mod10
+        "mod10": mod10,
+        "mod11": mod11,   # NEW
+        "mod13": mod13,   # NEW
+        "mod100": mod100  # NEW
     }
 
 
@@ -115,10 +135,11 @@ def decoder_collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     
     Returns:
         Dict with:
-            - masked_inputs: (batch, max_len, 27) padded tensor
+            - masked_inputs: (batch, max_len, 35) padded tensor
             - attention_mask: (batch, max_len) padding mask
             - mask_indices: (batch,) positions that were masked
             - target_integers: List[int] ground truth integers
+            - target_features: (batch, 35) features at masked positions
     """
     batch_size = len(batch)
     
@@ -127,13 +148,13 @@ def decoder_collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     max_len = max(seq_lens)
     
     # Initialize tensors
-    masked_inputs = torch.zeros(batch_size, max_len, 27)
+    masked_inputs = torch.zeros(batch_size, max_len, 35)
     attention_mask = torch.zeros(batch_size, max_len)
     mask_indices = torch.zeros(batch_size, dtype=torch.long)
     target_integers = []
     
     for i, item in enumerate(batch):
-        features = item['features']  # (seq_len, 27)
+        features = item['features']  # (seq_len, 35)
         integers = item['integers']  # List[int]
         seq_len = len(features)
         
@@ -156,7 +177,7 @@ def decoder_collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     target_features = torch.stack([
         batch[i]['features'][mask_indices[i].item()]
         for i in range(batch_size)
-    ])  # (batch_size, 27)
+    ])  # (batch_size, 35)
     
     return {
         'masked_inputs': masked_inputs,
@@ -253,9 +274,10 @@ def evaluate_decoder(
     """
     decoder.eval()
     
-    total_mag_error = 0.0
+    total_mag_correct = 0
     correct_counts = {
-        'sign': 0, 'mod3': 0, 'mod5': 0, 'mod8': 0, 'mod10': 0
+        'sign': 0, 'mod3': 0, 'mod5': 0, 'mod7': 0, 'mod8': 0,
+        'mod10': 0, 'mod11': 0, 'mod13': 0, 'mod100': 0
     }
     total_samples = 0
     
@@ -292,13 +314,13 @@ def evaluate_decoder(
             decoder_output = decoder(bert_vectors)
             targets = get_targets(target_integers)
             
-            # Magnitude MAE
-            mag_pred = decoder_output['mag'].squeeze(-1).cpu()
-            mag_target = targets['mag']
-            total_mag_error += (mag_pred - mag_target).abs().sum().item()
+            # Magnitude bin accuracy (classification)
+            mag_pred_bins = decoder_output['mag'].argmax(dim=1).cpu()
+            mag_target_bins = targets['mag']
+            total_mag_correct += (mag_pred_bins == mag_target_bins).sum().item()
             
-            # Classification accuracies
-            for head in ['sign', 'mod3', 'mod5', 'mod8', 'mod10']:
+            # Classification accuracies for all heads
+            for head in ['sign', 'mod3', 'mod5', 'mod7', 'mod8', 'mod10', 'mod11', 'mod13', 'mod100']:
                 pred_classes = decoder_output[head].argmax(dim=1).cpu()
                 correct_counts[head] += (pred_classes == targets[head]).sum().item()
             
@@ -332,22 +354,26 @@ def evaluate_decoder(
     if total_samples == 0:
         logger.info("No samples to evaluate (empty dataloader)")
         return {
-            'mag_mae': 0.0,
+            'mag_acc': 0.0,
             'sign_acc': 0.0,
             'mod3_acc': 0.0,
             'mod5_acc': 0.0,
+            'mod7_acc': 0.0,
             'mod8_acc': 0.0,
             'mod10_acc': 0.0,
+            'mod11_acc': 0.0,
+            'mod13_acc': 0.0,
+            'mod100_acc': 0.0,
             'perfect_count': 0,
             'rescued_count': 0,
             'failed_count': 0
         }
     
-    mag_mae = total_mag_error / total_samples
+    mag_acc = (total_mag_correct / total_samples) * 100
     accuracies = {f"{k}_acc": (v / total_samples) * 100 for k, v in correct_counts.items()}
     
     results = {
-        'mag_mae': mag_mae,
+        'mag_acc': mag_acc,
         **accuracies,
         'perfect_count': perfect_count,
         'rescued_count': rescued_count,
@@ -356,10 +382,12 @@ def evaluate_decoder(
     
     # Log results
     logger.info("Evaluation Results:")
-    logger.info(f"  Mag MAE: {mag_mae:.4f}")
+    logger.info(f"  Mag Bin Acc: {mag_acc:.1f}%")
     logger.info(f"  Sign Acc: {accuracies['sign_acc']:.1f}% | " +
                 f"Mod3: {accuracies['mod3_acc']:.1f}% | " +
-                f"Mod10: {accuracies['mod10_acc']:.1f}%")
+                f"Mod7: {accuracies['mod7_acc']:.1f}% | " +
+                f"Mod10: {accuracies['mod10_acc']:.1f}% | " +
+                f"Mod100: {accuracies['mod100_acc']:.1f}%")
     logger.info(f"  Reconstruction (n={total_samples}):")
     logger.info(f"    ✓ Perfect: {perfect_count} ({perfect_count/total_samples*100:.1f}%)")
     logger.info(f"    ✓ Rescued: {rescued_count} ({rescued_count/total_samples*100:.1f}%)  ← CRT Success!")
@@ -402,7 +430,7 @@ def train_decoder(config: Dict[str, Any]) -> None:
     if bypass_bert:
         logger.info("=" * 50)
         logger.info("BYPASS MODE ENABLED")
-        logger.info("Decoder will learn from raw 27-dim features")
+        logger.info("Decoder will learn from raw 35-dim features")
         logger.info("(Skipping BERT - Sanity Check Mode)")
         logger.info("=" * 50)
     else:
@@ -447,9 +475,9 @@ def train_decoder(config: Dict[str, Any]) -> None:
     )
     
     # Initialize decoder
-    # Note: Decoder always expects 27-dim input (either raw features or BERT's prediction output)
-    decoder = NumberTheoreticDecoder(input_dim=27).to(device)
-    logger.info(f"Decoder input_dim: 27 ({'raw features' if bypass_bert else 'BERT predictions'})")
+    # Note: Decoder now expects 35-dim input
+    decoder = NumberTheoreticDecoder(input_dim=35).to(device)
+    logger.info(f"Decoder input_dim: 35 ({'raw features' if bypass_bert else 'BERT predictions'})")
     logger.info(f"Decoder parameters: {sum(p.numel() for p in decoder.parameters()):,}")
     
     # Optimizer
@@ -502,13 +530,18 @@ def train_decoder(config: Dict[str, Any]) -> None:
             targets = get_targets(target_integers)
             
             # Multi-task loss
+            # Magnitude is now classification (CrossEntropy) instead of regression (MSE)
             loss = (
                 F.cross_entropy(decoder_output['sign'], targets['sign'].to(device)) +
-                5.0 * F.mse_loss(decoder_output['mag'], targets['mag'].unsqueeze(1).to(device)) +
+                5.0 * F.cross_entropy(decoder_output['mag'], targets['mag'].to(device)) +  # Weighted for importance
                 F.cross_entropy(decoder_output['mod3'], targets['mod3'].to(device)) +
                 F.cross_entropy(decoder_output['mod5'], targets['mod5'].to(device)) +
+                F.cross_entropy(decoder_output['mod7'], targets['mod7'].to(device)) +
                 F.cross_entropy(decoder_output['mod8'], targets['mod8'].to(device)) +
-                F.cross_entropy(decoder_output['mod10'], targets['mod10'].to(device))
+                F.cross_entropy(decoder_output['mod10'], targets['mod10'].to(device)) +
+                F.cross_entropy(decoder_output['mod11'], targets['mod11'].to(device)) +
+                F.cross_entropy(decoder_output['mod13'], targets['mod13'].to(device)) +
+                F.cross_entropy(decoder_output['mod100'], targets['mod100'].to(device))
             )
             
             # Update

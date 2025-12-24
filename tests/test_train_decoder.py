@@ -26,15 +26,19 @@ def test_get_targets():
     # Check sign mapping
     assert targets['sign'].tolist() == [0, 1, 2, 2]  # neg, zero, pos, pos
     
-    # Check magnitude consistency
-    for i, x in enumerate(integers):
-        expected_mag = log_magnitude([x])[0]
-        assert abs(targets['mag'][i].item() - expected_mag) < 1e-5
+    # Check magnitude: Now bin indices (LongTensor) instead of log values
+    assert targets['mag'].dtype == torch.long
+    # Magnitude bin indices should be in valid range [0, 4095]
+    assert all(0 <= targets['mag'][i].item() < 4096 for i in range(len(integers)))
     
     # Check modulo (Python % handles negatives correctly)
     assert targets['mod3'].tolist() == [-5 % 3, 0 % 3, 5 % 3, 42 % 3]
     assert targets['mod5'].tolist() == [-5 % 5, 0 % 5, 5 % 5, 42 % 5]
     assert targets['mod10'].tolist() == [-5 % 10, 0 % 10, 5 % 10, 42 % 10]
+    
+    # Check new modulo heads exist
+    assert 'mod7' in targets and 'mod11' in targets
+    assert 'mod13' in targets and 'mod100' in targets
 
 
 def test_decoder_collate_fn():
@@ -42,11 +46,11 @@ def test_decoder_collate_fn():
     # Create fake batch
     batch = [
         {
-            'features': torch.randn(10, 27),
+            'features': torch.randn(10, 35),
             'integers': list(range(10))
         },
         {
-            'features': torch.randn(15, 27),
+            'features': torch.randn(15, 35),
             'integers': list(range(15))
         }
     ]
@@ -54,10 +58,11 @@ def test_decoder_collate_fn():
     result = decoder_collate_fn(batch)
     
     # Check shapes
-    assert result['masked_inputs'].shape == (2, 15, 27)  # max_len=15
+    assert result['masked_inputs'].shape == (2, 15, 35)  # max_len=15, 35-dim
     assert result['attention_mask'].shape == (2, 15)
     assert result['mask_indices'].shape == (2,)
     assert len(result['target_integers']) == 2
+    assert result['target_features'].shape == (2, 35)
     
     # Check attention mask
     assert result['attention_mask'][0, :10].sum() == 10  # First seq has length 10
@@ -78,7 +83,8 @@ def test_decoder_training_smoke(tmp_path):
         d_model=32,
         nhead=2,
         num_layers=1,
-        dim_feedforward=64
+        dim_feedforward=64,
+        input_dim=35
     )
     bert_checkpoint = {
         'model_state_dict': bert_model.state_dict(),
@@ -86,7 +92,8 @@ def test_decoder_training_smoke(tmp_path):
             'd_model': 32,
             'nhead': 2,
             'num_layers': 1,
-            'dim_feedforward': 64
+            'dim_feedforward': 64,
+            'input_dim': 35
         }
     }
     bert_path = tmp_path / "bert.pt"
@@ -94,7 +101,7 @@ def test_decoder_training_smoke(tmp_path):
     
     # Create dummy features.pt
     features = {
-        f"A{i:06d}": torch.randn(10, 27, dtype=torch.float32)
+        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
         for i in range(8)
     }
     features_path = tmp_path / "features.pt"
@@ -164,9 +171,9 @@ def test_load_decoder_data(tmp_path):
     """Test data loading with features and integers alignment."""
     # Create features
     features = {
-        "A000001": torch.randn(5, 27),
-        "A000002": torch.randn(8, 27),
-        "A000003": torch.randn(6, 27)
+        "A000001": torch.randn(5, 35),
+        "A000002": torch.randn(8, 35),
+        "A000003": torch.randn(6, 35)
     }
     features_path = tmp_path / "features.pt"
     torch.save(features, features_path)
@@ -202,11 +209,11 @@ def test_bypass_mode_collate():
     """Test that collate function includes target_features."""
     batch = [
         {
-            'features': torch.randn(10, 27),
+            'features': torch.randn(10, 35),
             'integers': list(range(10, 20))
         },
         {
-            'features': torch.randn(8, 27),
+            'features': torch.randn(8, 35),
             'integers': list(range(30, 38))
         }
     ]
@@ -215,14 +222,14 @@ def test_bypass_mode_collate():
     
     # Check that target_features is included
     assert 'target_features' in result
-    assert result['target_features'].shape == (2, 27)  # (batch_size, 27)
+    assert result['target_features'].shape == (2, 35)  # (batch_size, 35)
 
 
 def test_bypass_mode_training(tmp_path):
     """Test decoder training in bypass mode (without BERT)."""
     # Create dummy features
     features = {
-        f"A{i:06d}": torch.randn(10, 27, dtype=torch.float32)
+        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
         for i in range(8)
     }
     features_path = tmp_path / "features.pt"
@@ -258,14 +265,14 @@ def test_bypass_mode_training(tmp_path):
     assert output_dir.exists()
     assert (output_dir / "best_decoder.pt").exists()
     
-    # Load checkpoint and verify decoder has input_dim=27
+    # Load checkpoint and verify decoder has input_dim=35
     checkpoint = torch.load(output_dir / "best_decoder.pt")
     assert 'decoder_state_dict' in checkpoint
     
-    # Check that decoder was configured for 27-dim input
-    # The shared_encoder first layer should be (27 → 256)
+    # Check that decoder was configured for 35-dim input
+    # The shared_encoder first layer should be (35 → 256)
     first_weight_key = 'shared_encoder.0.weight'
     if first_weight_key in checkpoint['decoder_state_dict']:
         first_layer_weight = checkpoint['decoder_state_dict'][first_weight_key]
-        assert first_layer_weight.shape[1] == 27  # Input dimension
+        assert first_layer_weight.shape[1] == 35  # Input dimension
 
