@@ -3,8 +3,16 @@ from sympy import isprime, integer_nthroot
 from sympy.ntheory import multiplicity
 from sympy.ntheory.factor_ import core
 
+LIMIT_SQUARE_FREE = 10**30
+LIMIT_PRIME = 10**100
+
 def is_prime(n: int) -> bool:
-    """SymPy isprime wrapper: Handles negative inputs safely (returns False)"""
+    """
+    SymPy isprime wrapper with safety guard.
+    Skip check for extremely large integers to prevent hanging.
+    """
+    if abs(n) > LIMIT_PRIME:
+        return False  # Too large to check efficiently
     return isprime(n)
 
 def is_square(n: int) -> bool:
@@ -15,10 +23,19 @@ def is_square(n: int) -> bool:
     return exact
 
 def is_square_free(n: int) -> bool:
-    """Check if n is square-free (no square factor > 1)."""
+    """
+    Check if n is square-free. 
+    HEAVY BOTTLENECK: factorization is required.
+    Strictly restricted by LIMIT_SQUARE_FREE.
+    """
     if n == 0: return False # Treat 0 as having square factors for feature consistency
     # core(n) returns the square-free part of n. If n is square-free, core(n) == n.
     n = abs(n)
+
+    # Guard: Do not attempt to factor large numbers
+    if n > LIMIT_SQUARE_FREE:
+        return False
+    
     return core(n) == n
 
 def valuation(n: int, p: int) -> int:
