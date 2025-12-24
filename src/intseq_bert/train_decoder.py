@@ -290,12 +290,17 @@ def evaluate_decoder(
                 pred_classes = decoder_output[head].argmax(dim=1).cpu()
                 correct_counts[head] += (pred_classes == targets[head]).sum().item()
             
-            # CRT reconstruction evaluation
+            # CRT reconstruction evaluation (VECTORIZED!)
+            # Use batch_reconstruct instead of per-sample loop
+            reconstructed_ints, _ = decoder.batch_reconstruct(bert_vectors)
+            reconstructed_ints = reconstructed_ints.cpu().numpy()
+            
+            # Categorize results
             for i in range(batch_size):
                 true_int = target_integers[i]
-                recon_int, _ = decoder.reconstruct_value(bert_vectors[i])
+                recon_int = int(reconstructed_ints[i])
                 
-                # Compute magnitude error
+                # Compute magnitude error for categorization
                 true_mag = log_magnitude([true_int])[0]
                 pred_mag = mag_pred[i].item()
                 mag_error = abs(pred_mag - true_mag)
@@ -310,10 +315,6 @@ def evaluate_decoder(
                 else:
                     # Failed: CRT couldn't save it
                     failed_count += 1
-            
-            # Update rescue rate
-            current_rescue_rate = (rescued_count / total_samples) * 100 if total_samples > 0 else 0
-            pbar.set_postfix({"rescue_rate": f"{current_rescue_rate:.1f}%"})
     
     # Compute final metrics
     if total_samples == 0:

@@ -196,3 +196,105 @@ class NumberTheoreticDecoder(nn.Module):
             self.train()
         
         return best_candidate, confidence
+    
+    def batch_reconstruct(
+        self,
+        feature_vectors: torch.Tensor,
+        search_window: int = 150,
+        lambda_mag: float = 0.5
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Vectorized batch reconstruction for efficient evaluation.
+        
+        Args:
+            feature_vectors: (batch_size, input_dim) feature vectors
+            search_window: Search radius around base estimate (default: 150)
+            lambda_mag: Weight for magnitude penalty (default: 0.5)
+        
+        Returns:
+            Tuple of:
+                - best_integers: (batch_size,) reconstructed integers
+                - best_scores: (batch_size,) confidence scores
+        """
+        was_training = self.training
+        self.eval()
+        
+        with torch.no_grad():
+            batch_size = feature_vectors.shape[0]
+            device = feature_vectors.device
+            
+            # 1. Get predictions for entire batch
+            preds = self.forward(feature_vectors)
+            
+            # 2. Compute base estimates (vectorized)
+            sign_idx = torch.argmax(preds["sign"], dim=1)  # (B,)
+            sign_value = sign_idx - 1  # Map to [-1, 0, 1]
+            
+            mag_pred = preds["mag"].squeeze(-1)  # (B,)
+            
+            # Vectorized inverse_magnitude
+            mag_value = torch.where(
+                mag_pred < 0.5,
+                torch.zeros_like(mag_pred),
+                torch.exp(mag_pred - 1.0)
+            )
+            
+            x_base = (sign_value * mag_value).long()  # (B,)
+            
+            # 3. Create candidate grid
+            # Offsets: [-window, ..., +window]
+            window_size = 2 * search_window + 1
+            offsets = torch.arange(-search_window, search_window + 1, device=device)  # (W,)
+            
+            # Broadcast to create grid: (B, W)
+            candidates = x_base.unsqueeze(1) + offsets.unsqueeze(0)  # (B, W)
+            
+            # 4. Compute log probabilities for modulo heads
+            mod3_logprobs = F.log_softmax(preds["mod3"], dim=1)  # (B, 3)
+            mod5_logprobs = F.log_softmax(preds["mod5"], dim=1)  # (B, 5)
+            mod8_logprobs = F.log_softmax(preds["mod8"], dim=1)  # (B, 8)
+            mod10_logprobs = F.log_softmax(preds["mod10"], dim=1)  # (B, 10)
+            
+            # 5. Vectorized scoring
+            # Initialize scores
+            scores = torch.zeros(batch_size, window_size, device=device)
+            
+            # Modulo scores using gather
+            # For each candidate, get its residue and look up log probability
+            mod3_residues = candidates % 3  # (B, W)
+            mod5_residues = candidates % 5
+            mod8_residues = candidates % 8
+            mod10_residues = candidates % 10
+            
+            # Gather log probabilities
+            # Expand to (B, W, 1) for gathering
+            scores += torch.gather(mod3_logprobs, 1, mod3_residues)
+            scores += torch.gather(mod5_logprobs, 1, mod5_residues)
+            scores += torch.gather(mod8_logprobs, 1, mod8_residues)
+            scores += torch.gather(mod10_logprobs, 1, mod10_residues)
+            
+            # Magnitude penalty (vectorized)
+            # For each candidate, compute its true magnitude
+            # Use vectorized log_magnitude approximation
+            candidates_abs = torch.abs(candidates.float())
+            true_mag = torch.where(
+                candidates_abs < 0.5,
+                torch.zeros_like(candidates_abs),
+                torch.log(candidates_abs) / math.log(10) + 1.0
+            )
+            
+            mag_error = (true_mag - mag_pred.unsqueeze(1)) ** 2  # (B, W)
+            scores -= lambda_mag * mag_error
+            
+            # 6. Select best candidates
+            best_indices = torch.argmax(scores, dim=1)  # (B,)
+            
+            # Gather best integers and scores
+            best_integers = torch.gather(candidates, 1, best_indices.unsqueeze(1)).squeeze(1)  # (B,)
+            best_scores = torch.gather(scores, 1, best_indices.unsqueeze(1)).squeeze(1)  # (B,)
+        
+        if was_training:
+            self.train()
+        
+        return best_integers, best_scores
+
