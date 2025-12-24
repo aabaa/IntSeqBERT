@@ -1,6 +1,6 @@
 """
 Number-theoretic decoder for reconstructing integers from feature vectors.
-Implements Dynamic Confidence-Ordered CRT and Parallel Hypothesis Scoring.
+Implements Dynamic Confidence-Ordered CRT and ResNet Architecture for Identity Mapping.
 """
 
 import math
@@ -53,7 +53,6 @@ def precompute_crt_lut():
             M_i = current_lcm // m_i
             _, inv, _ = extended_gcd(M_i, m_i)
             # Basis weight: w_i = (inv * M_i)
-            # We use Python int for precision before tensor conversion
             weight = (inv % m_i) * M_i
             basis_lut[mask, i] = weight
             
@@ -63,14 +62,14 @@ def precompute_crt_lut():
 class NumberTheoreticDecoder(nn.Module):
     """
     Decoder that reconstructs integers from 35-dimensional feature vectors.
-    Uses Residual Connections and Dynamic CRT.
+    Uses ResNet Architecture to solve Identity Mapping problem.
     """
     
     def __init__(
         self,
         input_dim: int = 35,
-        hidden_dim: int = 512,  # 容量アップ
-        dropout: float = 0.05   # ★0.0ではなく0.05（BERTノイズ対策の保険）
+        hidden_dim: int = 512,  # Increased capacity
+        dropout: float = 0.05   # Reduced dropout for numerical stability
     ):
         super().__init__()
         
@@ -82,20 +81,19 @@ class NumberTheoreticDecoder(nn.Module):
         self.input_bn = nn.LayerNorm(hidden_dim)
         self.dropout = nn.Dropout(dropout)
         
-        # Residual Blocks (Pre-Norm style is more stable)
-        # Block 1
+        # ResBlock 1 (Pre-Norm)
         self.ln1 = nn.LayerNorm(hidden_dim)
         self.fc1 = nn.Linear(hidden_dim, hidden_dim)
         self.act1 = nn.GELU()
         
-        # Block 2
+        # ResBlock 2 (Pre-Norm)
         self.ln2 = nn.LayerNorm(hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.act2 = nn.GELU()
         
         # Multi-task heads
-        self.sign_head = nn.Linear(hidden_dim, 3)
-        self.mag_head = nn.Linear(hidden_dim, NUM_MAGNITUDE_BINS)
+        self.sign_head = nn.Linear(hidden_dim, 3)           # 0:-, 1:0, 2:+
+        self.mag_head = nn.Linear(hidden_dim, NUM_MAGNITUDE_BINS) # Classification
         
         # Modulo heads
         self.mod3_head = nn.Linear(hidden_dim, 3)
@@ -127,7 +125,7 @@ class NumberTheoreticDecoder(nn.Module):
         out = self.fc1(out)
         out = self.act1(out)
         out = self.dropout(out)
-        out = out + residual  # Add
+        out = out + residual  # Add input to output
         
         # ResBlock 2 (Skip Connection)
         residual = out
@@ -135,7 +133,7 @@ class NumberTheoreticDecoder(nn.Module):
         out = self.fc2(out)
         out = self.act2(out)
         out = self.dropout(out)
-        out = out + residual  # Add
+        out = out + residual  # Add input to output
         
         h = out
         
@@ -163,8 +161,8 @@ class NumberTheoreticDecoder(nn.Module):
     def batch_reconstruct(
         self,
         feature_vectors: torch.Tensor,
-        top_k_bins: int = 5,   # Kept for API compatibility
-        neighbors: int = 3     # Kept for API compatibility
+        top_k_bins: int = 5,
+        neighbors: int = 3
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Reconstruct integers using Dynamic Confidence-Ordered CRT.
@@ -180,7 +178,6 @@ class NumberTheoreticDecoder(nn.Module):
             # ------------------------------------------------
             # 0. Basic Predictions (Sign & Magnitude)
             # ------------------------------------------------
-            # Sign: 0->(-1), 1->(0), 2->(+1)
             sign_probs = F.softmax(preds['sign'], dim=1)
             sign_idx = torch.argmax(sign_probs, dim=1)
             sign_val = sign_idx - 1  # {-1, 0, 1}
@@ -194,7 +191,6 @@ class NumberTheoreticDecoder(nn.Module):
             # ------------------------------------------------
             # 1. Rank Moduli by Information Gain (Log-Odds Lift)
             # ------------------------------------------------
-            # Bases config: Name, Modulus Size
             bases_config = [
                 ('mod3', 3), ('mod7', 7), ('mod8', 8),
                 ('mod11', 11), ('mod13', 13), ('mod100', 25)
@@ -202,13 +198,11 @@ class NumberTheoreticDecoder(nn.Module):
             
             scores_list = []
             residues_list = []
-            head_log_probs = [] # Keep for final scoring
+            head_log_probs = []
             
             for name, m in bases_config:
                 if m == 25:
-                    # Marginalize mod100 -> mod25
                     lp100 = F.log_softmax(preds['mod100'], dim=1)
-                    # p(r mod 25) = sum p(r + 25k mod 100)
                     p25 = torch.zeros(batch_size, 25, device=device)
                     for i in range(4):
                         p25 += torch.exp(lp100[:, i*25:(i+1)*25])
@@ -217,21 +211,14 @@ class NumberTheoreticDecoder(nn.Module):
                     log_p = F.log_softmax(preds[name], dim=1)
                 
                 head_log_probs.append(log_p)
-
-                # Info Score = log(P_top) + log(m)
-                # This prioritizes mods that are confident AND informative (e.g., mod25)
                 max_lp, max_idx = torch.max(log_p, dim=1)
                 score = max_lp + math.log(m)
                 
                 scores_list.append(score)
                 residues_list.append(max_idx)
             
-            # Stack: (B, 6)
             all_scores = torch.stack(scores_list, dim=1)
             all_residues = torch.stack(residues_list, dim=1)
-            
-            # Sort by confidence (descending)
-            # sorted_indices[b] gives the permutation of mod indices for batch b
             _, sorted_indices = torch.sort(all_scores, descending=True, dim=1)
 
             # ------------------------------------------------
@@ -239,42 +226,26 @@ class NumberTheoreticDecoder(nn.Module):
             # ------------------------------------------------
             candidates_list = []
             
-            # We generate hypotheses using Top-K confident mods for k in [2, 3, 4, 5, 6]
-            # This allows simpler (safer) hypotheses to compete with complex (full) ones.
-            
             for k in range(2, 7):
-                # Identify which mods to use
-                top_k_idx = sorted_indices[:, :k] # (B, k)
+                top_k_idx = sorted_indices[:, :k]
+                mask = torch.sum(1 << top_k_idx, dim=1)
                 
-                # Create bitmask for LUT
-                # shift 1 by index, then sum to create mask
-                mask = torch.sum(1 << top_k_idx, dim=1) # (B,)
+                curr_basis = self.crt_basis_lut[mask]
+                curr_lcm = self.crt_lcm_lut[mask]
                 
-                # Lookup Basis and LCM
-                curr_basis = self.crt_basis_lut[mask] # (B, 6)
-                curr_lcm = self.crt_lcm_lut[mask]     # (B,)
-                
-                # Vectorized CRT: x_base = sum(r_i * w_i) % LCM
-                # Note: curr_basis has 0 for unused mods, so direct mult is safe
                 x_base = torch.sum(all_residues * curr_basis, dim=1) % curr_lcm
                 
-                # LCM Stepping: Find k s.t. x_base + k*LCM is closest to est_mag
                 diff = est_mag - x_base.float()
                 step_k = torch.round(diff / curr_lcm.float())
                 cand_mag = x_base + step_k.long() * curr_lcm
                 
-                # Apply Sign (Important!)
                 cand_final = cand_mag * sign_val
-                
                 candidates_list.append(cand_final)
 
             # ------------------------------------------------
             # 3. Unified Scoring & Selection
             # ------------------------------------------------
-            # Stack all hypotheses: (B, 5) -> 5 candidates per sample
             all_cands = torch.stack(candidates_list, dim=1) # (B, 5)
-            
-            # Calculate Total Score = log P(Bin) + sum log P(Mod)
             
             # A. Bin Probability Score
             cand_abs = all_cands.float().abs()
@@ -282,28 +253,20 @@ class NumberTheoreticDecoder(nn.Module):
             bin_width = MAX_LOG_VALUE / NUM_MAGNITUDE_BINS
             cand_bins = (cand_log10 / bin_width).long().clamp(0, NUM_MAGNITUDE_BINS - 1)
             
-            # Gather log probs from mag head: (B, 5)
             score_mag = torch.gather(mag_log_probs_all, 1, cand_bins)
             
-            # B. Modulo Probability Score (Check against ALL 6 bases)
+            # B. Modulo Probability Score
             score_mods = torch.zeros_like(score_mag)
             
             for i, (name, m) in enumerate(bases_config):
-                lp = head_log_probs[i] # (B, m)
-                mod_val = m
-                
-                # Candidate residues: (B, 5)
-                cand_res = all_cands.abs() % mod_val
-                
-                # Gather scores: (B, 5)
+                lp = head_log_probs[i]
+                cand_res = all_cands.abs() % m
                 s = torch.gather(lp, 1, cand_res)
                 score_mods += s
             
-            # Total Score
             total_score = score_mag + score_mods
             
-            # Select Best
-            best_idx = torch.argmax(total_score, dim=1) # (B,)
+            best_idx = torch.argmax(total_score, dim=1)
             best_integers = torch.gather(all_cands, 1, best_idx.unsqueeze(1)).squeeze(1)
             best_scores = torch.gather(total_score, 1, best_idx.unsqueeze(1)).squeeze(1)
 
