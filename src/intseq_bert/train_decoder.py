@@ -152,11 +152,18 @@ def decoder_collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         masked_inputs[i, :seq_len] = masked_feat
         attention_mask[i, :seq_len] = 1
     
+    # Collect target features for bypass mode (features at masked positions)
+    target_features = torch.stack([
+        batch[i]['features'][mask_indices[i].item()]
+        for i in range(batch_size)
+    ])  # (batch_size, 27)
+    
     return {
         'masked_inputs': masked_inputs,
         'attention_mask': attention_mask,
         'mask_indices': mask_indices,
-        'target_integers': target_integers
+        'target_integers': target_integers,
+        'target_features': target_features  # For bypass mode
     }
 
 
@@ -265,16 +272,21 @@ def evaluate_decoder(
             attention_mask = batch['attention_mask'].to(device)
             mask_indices = batch['mask_indices'].to(device)
             target_integers = batch['target_integers']
+            target_features = batch['target_features'].to(device)  # For bypass mode
             
             batch_size = masked_inputs.size(0)
             total_samples += batch_size
             
-            # Get BERT representations
-            bert_output = bert_model(masked_inputs, attention_mask)
-            predictions = bert_output["prediction"]
-            
-            # Extract at masked positions
-            bert_vectors = predictions[torch.arange(batch_size), mask_indices]
+            # Get representations
+            if bert_model is None:
+                # Bypass mode: Use raw features directly
+                bert_vectors = target_features
+            else:
+                # Standard mode: Pass through BERT
+                bert_output = bert_model(masked_inputs, attention_mask)
+                predictions = bert_output["prediction"]
+                # Extract at masked positions
+                bert_vectors = predictions[torch.arange(batch_size), mask_indices]
             
             # Decoder forward
             decoder_output = decoder(bert_vectors)
@@ -381,15 +393,27 @@ def train_decoder(config: Dict[str, Any]) -> None:
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logger.info(f"Using device: {device}")
     
-    # Load frozen BERT
-    logger.info(f"Loading frozen BERT from {config['bert_checkpoint']}")
-    bert_model, _ = IntSeqBERT.load_from_checkpoint(
-        config['bert_checkpoint'],
-        device=device
-    )
-    bert_model.eval()
-    bert_model.requires_grad_(False)
-    logger.info("BERT frozen successfully")
+    # Check if bypass mode is enabled
+    bypass_bert = config.get('bypass_bert', False)
+    
+    # Load BERT (or skip in bypass mode)
+    bert_model = None
+    
+    if bypass_bert:
+        logger.info("=" * 50)
+        logger.info("BYPASS MODE ENABLED")
+        logger.info("Decoder will learn from raw 27-dim features")
+        logger.info("(Skipping BERT - Sanity Check Mode)")
+        logger.info("=" * 50)
+    else:
+        logger.info(f"Loading frozen BERT from {config['bert_checkpoint']}")
+        bert_model, bert_checkpoint = IntSeqBERT.load_from_checkpoint(
+            config['bert_checkpoint'],
+            device=device
+        )
+        bert_model.eval()
+        bert_model.requires_grad_(False)
+        logger.info("BERT frozen successfully")
     
     # Load data
     logger.info("Loading data...")
@@ -423,7 +447,9 @@ def train_decoder(config: Dict[str, Any]) -> None:
     )
     
     # Initialize decoder
-    decoder = NumberTheoreticDecoder().to(device)
+    # Note: Decoder always expects 27-dim input (either raw features or BERT's prediction output)
+    decoder = NumberTheoreticDecoder(input_dim=27).to(device)
+    logger.info(f"Decoder input_dim: 27 ({'raw features' if bypass_bert else 'BERT predictions'})")
     logger.info(f"Decoder parameters: {sum(p.numel() for p in decoder.parameters()):,}")
     
     # Optimizer
@@ -453,16 +479,21 @@ def train_decoder(config: Dict[str, Any]) -> None:
             attention_mask = batch['attention_mask'].to(device)
             mask_indices = batch['mask_indices'].to(device)
             target_integers = batch['target_integers']
+            target_features = batch['target_features'].to(device)
             
             batch_size = masked_inputs.size(0)
             
-            # Pass through frozen BERT
-            with torch.no_grad():
-                bert_output = bert_model(masked_inputs, attention_mask)
-                predictions = bert_output["prediction"]
-            
-            # Extract masked positions (vectorized gather)
-            bert_vectors = predictions[torch.arange(batch_size), mask_indices]
+            # Get feature vectors
+            if bypass_bert:
+                # Bypass mode: Use raw features directly
+                bert_vectors = target_features
+            else:
+                # Standard mode: Pass through frozen BERT
+                with torch.no_grad():
+                    bert_output = bert_model(masked_inputs, attention_mask)
+                    predictions = bert_output["prediction"]
+                    # Extract masked positions (vectorized gather)
+                    bert_vectors = predictions[torch.arange(batch_size), mask_indices]
             
             # Decoder forward
             decoder_output = decoder(bert_vectors)
@@ -522,8 +553,8 @@ def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Train decoder for IntSeqBERT")
     
-    parser.add_argument("--bert_checkpoint", type=str, required=True,
-                        help="Path to trained BERT checkpoint")
+    parser.add_argument("--bert_checkpoint", type=str, default=None,
+                        help="Path to trained BERT checkpoint (not needed if --bypass_bert)")
     parser.add_argument("--features_path", type=str, required=True,
                         help="Path to features.pt file")
     parser.add_argument("--jsonl_path", type=str, required=True,
@@ -540,8 +571,15 @@ def main():
                         help="Weight decay")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed")
+    parser.add_argument("--bypass_bert", action="store_true",
+                        help="Bypass BERT and use raw features (sanity check mode)")
     
     args = parser.parse_args()
+    
+    # Validate arguments
+    if not args.bypass_bert and args.bert_checkpoint is None:
+        parser.error("--bert_checkpoint is required unless --bypass_bert is specified")
+    
     config = vars(args)
     
     train_decoder(config)

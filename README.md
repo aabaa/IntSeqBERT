@@ -144,6 +144,25 @@ uv run python -m intseq_bert.train_decoder \
 - `features.pt`: Provides input to frozen BERT (27-dim vectors)
 - `jsonl`: Provides ground truth integers for decoder targets (sign, magnitude, modulo)
 
+### 4.1 Bypass Mode (Sanity Check)
+
+For debugging, you can bypass BERT and feed raw features directly to the decoder using `--bypass_bert`:
+
+```bash
+uv run python -m intseq_bert.train_decoder \
+  --bypass_bert \
+  --features_path data/oeis/features.pt \
+  --jsonl_path data/oeis/data_step3.jsonl \
+  --output_dir checkpoints/decoder_bypass \
+  --epochs 5
+```
+
+**Purpose**: This sanity check mode helps isolate whether issues come from:
+- **BERT training** (if bypass mode works but standard mode fails)
+- **Feature quality** (if both modes fail)
+
+In bypass mode, the decoder learns directly from 27-dim features, which already contain modulo information. You should see **mod accuracy reach ~95-100%** within a few epochs, confirming the features are adequate.
+
 ## 📊 Evaluation Metrics
 
 When training the decoder, you will see a **Reconstruction Report**:
@@ -336,6 +355,7 @@ Run `python -m intseq_bert.train_decoder [options]`
 | `--lr` | `1e-3` | Learning rate. |
 | `--weight_decay` | `0.01` | Weight decay. |
 | `--seed` | `42` | Random seed. |
+| `--bypass_bert` | `False` | **Sanity check mode**: Skip BERT and use raw 27-dim features directly. |
 
 ### Example: Training a Large Model
 

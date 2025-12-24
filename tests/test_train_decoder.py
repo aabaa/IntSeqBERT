@@ -119,6 +119,7 @@ def test_decoder_training_smoke(tmp_path):
         'epochs': 1,
         'batch_size': 2,
         'lr': 1e-3,
+        'bypass_bert': False,  # Explicitly disable bypass mode
         'seed': 42
     }
     
@@ -195,3 +196,76 @@ def test_load_decoder_data(tmp_path):
     assert 'features' in sample
     assert 'integers' in sample
     assert len(sample['features']) == len(sample['integers'])
+
+
+def test_bypass_mode_collate():
+    """Test that collate function includes target_features."""
+    batch = [
+        {
+            'features': torch.randn(10, 27),
+            'integers': list(range(10, 20))
+        },
+        {
+            'features': torch.randn(8, 27),
+            'integers': list(range(30, 38))
+        }
+    ]
+    
+    result = decoder_collate_fn(batch)
+    
+    # Check that target_features is included
+    assert 'target_features' in result
+    assert result['target_features'].shape == (2, 27)  # (batch_size, 27)
+
+
+def test_bypass_mode_training(tmp_path):
+    """Test decoder training in bypass mode (without BERT)."""
+    # Create dummy features
+    features = {
+        f"A{i:06d}": torch.randn(10, 27, dtype=torch.float32)
+        for i in range(8)
+    }
+    features_path = tmp_path / "features.pt"
+    torch.save(features, features_path)
+    
+    # Create dummy JSONL
+    jsonl_path = tmp_path / "data.jsonl"
+    with open(jsonl_path, 'w') as f:
+        for i in range(8):
+            record = {
+                "oeis_id": f"A{i:06d}",
+                "sequence": list(range(i * 10, (i + 1) * 10))
+            }
+            f.write(json.dumps(record) + '\n')
+    
+    # Run bypass mode training
+    config = {
+        'bert_checkpoint': None,  # Not needed in bypass mode
+        'features_path': str(features_path),
+        'jsonl_path': str(jsonl_path),
+        'output_dir': str(tmp_path / "decoder_bypass"),
+        'epochs': 1,
+        'batch_size': 2,
+        'lr': 1e-3,
+        'bypass_bert': True,  # Enable bypass mode
+        'seed': 42
+    }
+    
+    train_decoder(config)
+    
+    # Verify outputs
+    output_dir = tmp_path / "decoder_bypass"
+    assert output_dir.exists()
+    assert (output_dir / "best_decoder.pt").exists()
+    
+    # Load checkpoint and verify decoder has input_dim=27
+    checkpoint = torch.load(output_dir / "best_decoder.pt")
+    assert 'decoder_state_dict' in checkpoint
+    
+    # Check that decoder was configured for 27-dim input
+    # The shared_encoder first layer should be (27 → 256)
+    first_weight_key = 'shared_encoder.0.weight'
+    if first_weight_key in checkpoint['decoder_state_dict']:
+        first_layer_weight = checkpoint['decoder_state_dict'][first_weight_key]
+        assert first_layer_weight.shape[1] == 27  # Input dimension
+
