@@ -2,14 +2,20 @@ import argparse
 import gzip
 import logging
 import sys
+import json
+import torch
+import multiprocessing
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 from tqdm import tqdm
 import os
+from functools import partial
 
 # Import modules
 from . import converters
 from . import schemas
+# New feature extraction logic
+from intseq_bert.features import extract_features
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -20,6 +26,10 @@ def _open_text(path: str):
     if p.suffix == '.gz':
         return gzip.open(p, 'rt', encoding='utf-8', errors='ignore')
     return open(p, 'rt', encoding='utf-8', errors='ignore')
+
+# ==========================================
+# Existing Pipeline Steps
+# ==========================================
 
 def process_stripped(args):
     """Handler for converting stripped.gz to jsonl."""
@@ -35,7 +45,6 @@ def process_stripped(args):
     
     count = 0
     with _open_text(input_path) as fin, open(output_path, 'w', encoding='utf-8') as fout:
-        # Use tqdm to wrap the iterator
         iterator = converter.parse(fin)
         for record in tqdm(iterator, desc="Converting"):
             fout.write(record.to_json_line() + '\n')
@@ -70,7 +79,6 @@ def process_merge_names(args):
             
             record = schemas.OEISRecord.from_json_line(line)
             
-            # Update name if exists
             if record.oeis_id in names_map:
                 record.name = names_map[record.oeis_id]
                 updated_count += 1
@@ -80,14 +88,11 @@ def process_merge_names(args):
     logger.info(f"Finished. Updated names for {updated_count} records.")
 
 def process_merge_metadata(args):
-    """
-    Handler for merging metadata from .seq files into existing jsonl.
-    """
+    """Handler for merging metadata from .seq files into existing jsonl."""
     jsonl_path = Path(args.input_jsonl)
     seq_dir = Path(args.seq_dir)
     output_path = Path(args.output)
     
-    # Check inputs
     if not jsonl_path.exists():
         logger.error(f"Input JSONL not found: {jsonl_path}")
         return
@@ -95,12 +100,8 @@ def process_merge_metadata(args):
         logger.error(f"Sequence directory not found: {seq_dir}")
         return
 
-    # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # ---------------------------------------------------------
-    # Step 1: Load existing JSONL records into memory
-    # ---------------------------------------------------------
     logger.info("Step 1: Loading existing JSONL records into memory map...")
     records_map: Dict[str, schemas.OEISRecord] = {}
     
@@ -112,11 +113,7 @@ def process_merge_metadata(args):
             
     logger.info(f"Loaded {len(records_map)} records into memory.")
 
-    # ---------------------------------------------------------
-    # Step 2: Traverse .seq files and update records
-    # ---------------------------------------------------------
     logger.info(f"Step 2: Scanning .seq files in {seq_dir}...")
-    
     seq_parser = converters.SeqMetadataConverter()
     updated_count = 0
     
@@ -147,9 +144,6 @@ def process_merge_metadata(args):
 
     logger.info(f"Metadata merge complete. Updated {updated_count} records.")
 
-    # ---------------------------------------------------------
-    # Step 3: Write merged data to output
-    # ---------------------------------------------------------
     logger.info(f"Step 3: Saving fully merged data to {output_path}...")
     
     with open(output_path, 'w', encoding='utf-8') as fout:
@@ -158,6 +152,86 @@ def process_merge_metadata(args):
             fout.write(records_map[oid].to_json_line() + '\n')
             
     logger.info("Done.")
+
+# ==========================================
+# New Step: Feature Extraction
+# ==========================================
+
+def _process_feature_chunk(chunk: List[Dict], output_dir: Path) -> int:
+    """Helper for multiprocessing feature extraction."""
+    count = 0
+    for record in chunk:
+        oeis_id = record.get('oeis_id')
+        seq = record.get('sequence')
+        
+        # Skip invalid or too short sequences
+        if not oeis_id or not seq or len(seq) < 5:
+            continue
+            
+        try:
+            seq_ints = [int(x) for x in seq]
+            
+            # Extract features (New Dual Stream Logic)
+            features_dict = extract_features(seq_ints)
+            
+            # Save structure
+            save_data = {
+                'oeis_id': oeis_id,
+                'mag_features': features_dict['mag_features'], # (Seq, 5)
+                'mod_features': features_dict['mod_features'], # (Seq, 200)
+                'targets': features_dict['targets']            # Dict[str, Tensor]
+            }
+            
+            torch.save(save_data, output_dir / f"{oeis_id}.pt")
+            count += 1
+            
+        except Exception:
+            continue
+            
+    return count
+
+def process_features(args):
+    """Handler for extracting features from jsonl to .pt files."""
+    jsonl_path = Path(args.input)
+    output_dir = Path(args.output_dir)
+    num_workers = args.workers
+    chunk_size = args.chunk_size
+    
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"Loading data from {jsonl_path}")
+    chunks = []
+    current_chunk = []
+    
+    # Read JSONL and chunk it
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                if not line.strip(): continue
+                record = json.loads(line)
+                current_chunk.append(record)
+                if len(current_chunk) >= chunk_size:
+                    chunks.append(current_chunk)
+                    current_chunk = []
+            except json.JSONDecodeError:
+                continue
+    
+    if current_chunk:
+        chunks.append(current_chunk)
+        
+    logger.info(f"Split data into {len(chunks)} chunks. Starting processing with {num_workers} workers...")
+    
+    # Run multiprocessing
+    process_func = partial(_process_feature_chunk, output_dir=output_dir)
+    
+    total_processed = 0
+    with multiprocessing.Pool(num_workers) as pool:
+        results = list(tqdm(pool.imap(process_func, chunks), total=len(chunks), desc="Extracting Features"))
+        total_processed = sum(results)
+        
+    logger.info(f"Successfully processed {total_processed} sequences.")
+    logger.info(f"Saved feature files to {output_dir}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="OEIS Data Preprocessing Pipeline")
@@ -178,14 +252,22 @@ def main():
     p_names.set_defaults(func=process_merge_names)
     
     # Subcommand: merge-metadata
-    p_meta = subparsers.add_parser("merge-metadata", help="Merge .seq metadata (keywords, offset, etc.)")
+    p_meta = subparsers.add_parser("merge-metadata", help="Merge .seq metadata")
     p_meta.add_argument("--input-jsonl", required=True, help="Path to existing .jsonl")
     p_meta.add_argument("--seq-dir", required=True, help="Path to oeisdata/seq directory root")
     p_meta.add_argument("-o", "--output", required=True, help="Output path for fully merged .jsonl")
     p_meta.set_defaults(func=process_merge_metadata)
     
+    # Subcommand: features (NEW)
+    p_feat = subparsers.add_parser("features", help="Extract Dual Stream features to .pt files")
+    p_feat.add_argument("-i", "--input", required=True, help="Path to input .jsonl")
+    p_feat.add_argument("-o", "--output-dir", required=True, help="Output directory for .pt files")
+    p_feat.add_argument("--workers", type=int, default=4, help="Number of worker processes")
+    p_feat.add_argument("--chunk-size", type=int, default=1000, help="Chunk size for processing")
+    p_feat.set_defaults(func=process_features)
+    
     args = parser.parse_args()
     args.func(args)
 
 if __name__ == "__main__":
-    main()        
+    main()
