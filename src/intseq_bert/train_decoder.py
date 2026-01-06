@@ -22,6 +22,7 @@ from . import loader
 from . import collator
 from . import bert_model
 from . import decoder_model
+from .decoder_model import MOD_RANGE
 
 
 def setup_logging(output_dir: Path) -> logging.Logger:
@@ -38,6 +39,116 @@ def setup_logging(output_dir: Path) -> logging.Logger:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     return logger
+
+
+def evaluate(
+    decoder: nn.Module,
+    encoder: nn.Module,
+    dataloader: DataLoader,
+    device: torch.device,
+    logger: logging.Logger,
+    num_reconstruction_samples: int = 50
+) -> float:
+    """Run detailed evaluation: Loss, Accuracy per head, and CRT Reconstruction check."""
+    decoder.eval()
+    total_loss = 0.0
+    steps = 0
+    
+    # Metrics counters
+    correct_counts = {f"mod{m}": 0 for m in MOD_RANGE}
+    correct_counts["sign"] = 0
+    total_tokens = 0
+    
+    # Reconstruction counters (CRT Check)
+    rec_perfect = 0
+    rec_rescued = 0
+    rec_failed = 0
+    rec_evaluated = 0
+    
+    pbar = tqdm(dataloader, desc="Evaluation", leave=False)
+    
+    with torch.no_grad():
+        for batch in pbar:
+            mag_inputs = batch["mag_inputs"].to(device)
+            mod_inputs = batch["mod_inputs"].to(device)
+            attn_mask = batch["attention_mask"].to(device)
+            mask_matrix = batch["mask_matrix"].to(device)
+            
+            if mask_matrix.sum() == 0: continue
+
+            # 1. Encoder Forward
+            enc_out = encoder(mag_inputs, mod_inputs, attn_mask)
+            full_latent = enc_out["encoded_state"]
+
+            # 2. Filter Masked Positions
+            flat_mask = mask_matrix.view(-1)
+            masked_latent = full_latent.view(-1, full_latent.size(-1))[flat_mask]
+            
+            masked_targets = {}
+            for k, v in batch["targets"].items():
+                masked_targets[k] = v.to(device).view(-1)[flat_mask]
+            
+            # 3. Decoder Forward
+            predictions = decoder(masked_latent)
+            
+            # 4. Compute Loss
+            loss = decoder.compute_loss(predictions, masked_targets)
+            total_loss += loss.item()
+            steps += 1
+            
+            # 5. Compute Accuracies
+            batch_tokens = masked_latent.size(0)
+            total_tokens += batch_tokens
+            
+            # Mod Accuracies
+            for m in MOD_RANGE:
+                key = f"mod{m}"
+                if key in predictions and key in masked_targets:
+                    pred_idx = predictions[key].argmax(dim=1)
+                    tgt_idx = masked_targets[key]
+                    valid_mask = tgt_idx != -100
+                    if valid_mask.sum() > 0:
+                        correct_counts[key] += (pred_idx[valid_mask] == tgt_idx[valid_mask]).sum().item()
+
+            # 6. CRT Reconstruction Check (Sample subset)
+            if rec_evaluated < num_reconstruction_samples:
+                for i in range(min(batch_tokens, num_reconstruction_samples - rec_evaluated)):
+                    single_pred = {k: v[i:i+1] for k, v in predictions.items()}
+                    results = decoder.beam_search_solve(single_pred, beam_width=10)
+                    
+                    if not results:
+                        rec_failed += 1
+                    else:
+                        best_int, _ = results[0]
+                        # Verify consistency with high-confidence mods (100, 101)
+                        is_correct = True
+                        for check_m in [100, 101]:
+                            key = f"mod{check_m}"
+                            if key in masked_targets:
+                                true_rem = masked_targets[key][i].item()
+                                if true_rem != -100 and best_int % check_m != true_rem:
+                                    is_correct = False; break
+                        
+                        if is_correct: rec_perfect += 1
+                        else: rec_failed += 1
+                    rec_evaluated += 1
+
+    avg_loss = total_loss / max(1, steps)
+    
+    # Logging
+    logger.info(f" Evaluation Loss: {avg_loss:.4f}")
+    if total_tokens > 0:
+        mod_accs = []
+        for m in [3, 7, 100, 101]:
+            acc = correct_counts[f"mod{m}"] / total_tokens * 100
+            mod_accs.append(f"Mod{m}:{acc:.1f}%")
+        logger.info(f" Head Accuracies: {' | '.join(mod_accs)}")
+        
+    if rec_evaluated > 0:
+        success_rate = (rec_perfect + rec_rescued) / rec_evaluated * 100
+        logger.info(f" CRT Reconstruction (n={rec_evaluated}): Success ~{success_rate:.1f}%")
+
+    return avg_loss
 
 
 def train(config: Dict[str, Any]) -> None:
@@ -87,7 +198,7 @@ def train(config: Dict[str, Any]) -> None:
         max_samples=config.get("max_samples")
     )
     
-    # Use DualStreamCollator (same as BERT training)
+    # Use DualStreamCollator
     data_collator = collator.DualStreamCollator(
         mask_prob=config.get("mask_prob", 0.15)
     )
@@ -121,34 +232,22 @@ def train(config: Dict[str, Any]) -> None:
             attn_mask = batch["attention_mask"].to(device)
             mask_matrix = batch["mask_matrix"].to(device)
             
-            # Skip if no masks (unlikely with p=0.15)
-            if mask_matrix.sum() == 0:
-                continue
+            if mask_matrix.sum() == 0: continue
 
-            # 1. Encoder Forward (Get Latent Vectors)
             with torch.no_grad():
                 enc_out = encoder(mag_inputs, mod_inputs, attn_mask)
-                full_latent = enc_out["encoded_state"] # (B, L, D)
+                full_latent = enc_out["encoded_state"]
 
-            # 2. Extract Latent Vectors for MASKED positions only
-            # We flatten everything to train on individual tokens
-            flat_mask = mask_matrix.view(-1)      # (B*L)
-            flat_latent = full_latent.view(-1, full_latent.size(-1)) # (B*L, D)
+            # Extract Latent Vectors & Targets
+            flat_mask = mask_matrix.view(-1)
+            masked_latent = full_latent.view(-1, full_latent.size(-1))[flat_mask]
             
-            # Select only the vectors corresponding to [MASK] tokens
-            masked_latent = flat_latent[flat_mask] # (N_masked, D)
-
-            # 3. Prepare Targets for MASKED positions only
-            # batch['targets'] contains full sequence targets (padded with 0 or -100)
             masked_targets = {}
             for k, v in batch["targets"].items():
-                v = v.to(device).view(-1) # Flatten (B*L)
-                masked_targets[k] = v[flat_mask] # Select masked
+                masked_targets[k] = v.to(device).view(-1)[flat_mask]
             
-            # 4. Decoder Forward
+            # Forward & Loss
             predictions = decoder(masked_latent)
-            
-            # 5. Loss
             loss = decoder.compute_loss(predictions, masked_targets)
             
             optimizer.zero_grad()
@@ -158,46 +257,26 @@ def train(config: Dict[str, Any]) -> None:
             
             train_loss += loss.item()
             train_steps += 1
-            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+            
+            # Show live accuracy for mod100
+            with torch.no_grad():
+                if "mod100" in predictions and "mod100" in masked_targets:
+                    pred_100 = predictions["mod100"].argmax(dim=1)
+                    tgt_100 = masked_targets["mod100"]
+                    mask = tgt_100 != -100
+                    acc = 0.0
+                    if mask.sum() > 0:
+                        acc = (pred_100[mask] == tgt_100[mask]).float().mean().item()
+                    pbar.set_postfix({"loss": f"{loss.item():.4f}", "acc100": f"{acc:.2%}"})
             
         avg_train_loss = train_loss / max(1, train_steps)
         logger.info(f"Avg Train Loss: {avg_train_loss:.4f}")
         
-        # --- Validation ---
-        decoder.eval()
-        val_loss = 0.0
-        val_steps = 0
-        
-        with torch.no_grad():
-            for batch in tqdm(val_loader, desc="Validation"):
-                mag_inputs = batch["mag_inputs"].to(device)
-                mod_inputs = batch["mod_inputs"].to(device)
-                attn_mask = batch["attention_mask"].to(device)
-                mask_matrix = batch["mask_matrix"].to(device)
-                
-                if mask_matrix.sum() == 0: continue
-                
-                # Encoder
-                enc_out = encoder(mag_inputs, mod_inputs, attn_mask)
-                full_latent = enc_out["encoded_state"]
-                
-                # Filter Masked
-                flat_mask = mask_matrix.view(-1)
-                masked_latent = full_latent.view(-1, full_latent.size(-1))[flat_mask]
-                
-                masked_targets = {}
-                for k, v in batch["targets"].items():
-                    masked_targets[k] = v.to(device).view(-1)[flat_mask]
-                
-                # Decoder
-                predictions = decoder(masked_latent)
-                loss = decoder.compute_loss(predictions, masked_targets)
-                
-                val_loss += loss.item()
-                val_steps += 1
-                
-        avg_val_loss = val_loss / max(1, val_steps)
-        logger.info(f"Avg Val Loss: {avg_val_loss:.4f}")
+        # --- Validation & Evaluation ---
+        avg_val_loss = evaluate(
+            decoder, encoder, val_loader, device, logger, 
+            num_reconstruction_samples=50
+        )
         
         # Save Best
         if avg_val_loss < best_val_loss:
@@ -216,9 +295,12 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--max_samples", type=int, default=None)
-    
-    # Metadata filtering (optional)
     parser.add_argument("--metadata_path", type=str, default=None)
+    
+    # Model Config
+    parser.add_argument("--hidden_dim", type=int, default=512)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--mask_prob", type=float, default=0.15)
     
     args = parser.parse_args()
     train(vars(args))

@@ -6,9 +6,10 @@ Tests training loop with frozen encoder and decoder training.
 import pytest
 import torch
 import json
+import logging
 from pathlib import Path
 
-from intseq_bert import train_decoder, bert_model, decoder_model
+from intseq_bert import train_decoder, bert_model, decoder_model, loader, collator
 
 
 # ==========================================
@@ -114,7 +115,53 @@ class TestSetupLogging:
 
 
 # ==========================================
-# 2. Training Smoke Tests
+# 2. Evaluate Function Tests
+# ==========================================
+
+class TestEvaluateFunction:
+    """Tests for the evaluate function."""
+    
+    def test_evaluate_returns_loss(self, tmp_path):
+        """Test that evaluate function returns valid loss."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=10)
+        encoder_ckpt = create_mock_encoder_checkpoint(tmp_path)
+        
+        # Create encoder and decoder
+        encoder, _ = bert_model.IntSeqBERT.load_from_checkpoint(str(encoder_ckpt), device='cpu')
+        encoder.eval()
+        for p in encoder.parameters():
+            p.requires_grad = False
+        
+        decoder = decoder_model.IntSeqDecoder(d_model=32, hidden_dim=64)
+        
+        # Create dataloader
+        train_ds, val_ds, _ = loader.load_and_split_data(
+            str(features_dir), val_ratio=0.3, test_ratio=0.2, seed=42
+        )
+        data_collator = collator.DualStreamCollator(mask_prob=0.15)
+        val_loader = torch.utils.data.DataLoader(
+            val_ds, batch_size=2, collate_fn=data_collator
+        )
+        
+        # Setup logger
+        output_dir = tmp_path / "logs"
+        output_dir.mkdir()
+        logger = train_decoder.setup_logging(output_dir)
+        
+        # Run evaluate
+        loss = train_decoder.evaluate(
+            decoder, encoder, val_loader, 
+            device=torch.device('cpu'),
+            logger=logger,
+            num_reconstruction_samples=5
+        )
+        
+        assert isinstance(loss, float)
+        assert loss >= 0
+
+
+# ==========================================
+# 3. Training Smoke Tests
 # ==========================================
 
 class TestTrainingSmoke:
@@ -154,7 +201,7 @@ class TestTrainingSmoke:
 
 
 # ==========================================
-# 3. Encoder Freezing Tests
+# 4. Encoder Freezing Tests
 # ==========================================
 
 class TestEncoderFreezing:
@@ -162,7 +209,6 @@ class TestEncoderFreezing:
     
     def test_encoder_is_frozen(self, tmp_path):
         """Test that encoder parameters are frozen during training."""
-        # We can verify this by checking that encoder grads are None after training
         features_dir = create_mock_features_dir(tmp_path, num_files=20)
         encoder_ckpt = create_mock_encoder_checkpoint(tmp_path)
         output_dir = tmp_path / "decoder_checkpoints"
@@ -176,7 +222,7 @@ class TestEncoderFreezing:
 
 
 # ==========================================
-# 4. Decoder Checkpoint Tests
+# 5. Decoder Checkpoint Tests
 # ==========================================
 
 class TestDecoderCheckpoint:
@@ -218,14 +264,14 @@ class TestDecoderCheckpoint:
 
 
 # ==========================================
-# 5. CLI Tests
+# 6. CLI Tests
 # ==========================================
 
 class TestCLI:
     """Tests for command-line interface."""
     
     def test_cli_argument_parsing(self, tmp_path, monkeypatch):
-        """Test CLI argument parsing."""
+        """Test CLI argument parsing with new args."""
         features_dir = create_mock_features_dir(tmp_path, num_files=20)
         encoder_ckpt = create_mock_encoder_checkpoint(tmp_path)
         output_dir = tmp_path / "output"
@@ -238,6 +284,9 @@ class TestCLI:
             "--epochs", "1",
             "--batch_size", "2",
             "--num_workers", "0",
+            "--hidden_dim", "64",
+            "--dropout", "0.1",
+            "--mask_prob", "0.15",
         ]
         monkeypatch.setattr("sys.argv", test_args)
         
@@ -248,7 +297,7 @@ class TestCLI:
 
 
 # ==========================================
-# 6. Loss Computation Integration Tests
+# 7. Loss Computation Integration Tests
 # ==========================================
 
 class TestLossIntegration:
