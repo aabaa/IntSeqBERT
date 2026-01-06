@@ -1,5 +1,6 @@
 """
-Training script for IntSeqBERT model.
+Training script for IntSeqBERT model (Dual Stream Architecture).
+Pretrains the encoder using Masked Modeling on both Magnitude and Mod Spectrum streams.
 """
 
 import argparse
@@ -25,7 +26,6 @@ def setup_logging(output_dir: Path) -> logging.Logger:
     """Setup logging to console and file."""
     log_file = output_dir / "train.log"
     
-    # Create logger
     logger = logging.getLogger("intseq_bert.train_bert")
     logger.setLevel(logging.INFO)
     
@@ -40,7 +40,6 @@ def setup_logging(output_dir: Path) -> logging.Logger:
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(console_formatter)
     
-    # Add handlers
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     
@@ -52,22 +51,10 @@ def get_cosine_schedule_with_warmup(
     num_warmup_steps: int,
     num_training_steps: int
 ) -> torch.optim.lr_scheduler.LambdaLR:
-    """
-    Create learning rate scheduler with linear warmup and cosine decay.
-    
-    Args:
-        optimizer: The optimizer
-        num_warmup_steps: Number of warmup steps
-        num_training_steps: Total training steps
-    
-    Returns:
-        Learning rate scheduler
-    """
+    """Create learning rate scheduler with linear warmup and cosine decay."""
     def lr_lambda(current_step: int) -> float:
         if current_step < num_warmup_steps:
-            # Linear warmup
             return float(current_step) / float(max(1, num_warmup_steps))
-        # Cosine decay
         progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
     
@@ -75,19 +62,15 @@ def get_cosine_schedule_with_warmup(
 
 
 def train(config: Dict[str, Any]) -> None:
-    """
-    Main training function.
+    """Main training function for Dual Stream BERT."""
     
-    Args:
-        config: Configuration dictionary with training parameters
-    """
-    # 1. Setup
+    # 1. Setup Output
     output_dir = Path(config.get("output_dir", "checkpoints"))
     output_dir.mkdir(parents=True, exist_ok=True)
     
     logger = setup_logging(output_dir)
     logger.info("=" * 50)
-    logger.info("Starting IntSeqBERT Training")
+    logger.info("Starting IntSeqBERT Training (Dual Stream)")
     logger.info("=" * 50)
     
     # Save config
@@ -96,7 +79,7 @@ def train(config: Dict[str, Any]) -> None:
         json.dump(config, f, indent=2)
     logger.info(f"Saved config to {config_path}")
     
-    # Determine device
+    # Device setup
     if torch.cuda.is_available():
         device = torch.device("cuda")
         logger.info(f"Using CUDA: {torch.cuda.get_device_name(0)}")
@@ -108,33 +91,38 @@ def train(config: Dict[str, Any]) -> None:
         logger.info("Using CPU")
     
     # 2. Data Loading
-    logger.info("Loading data...")
+    logger.info("Loading data from directory...")
+    
+    # Use the new load_and_split_data for directory-based .pt files
     train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=config["features_path"],
+        features_dir=config["features_dir"],  # Changed from features_path
         metadata_path=config.get("metadata_path"),
         include_tags=config.get("include_tags"),
         exclude_tags=config.get("exclude_tags"),
-        val_ratio=config.get("val_ratio", 0.1),
-        test_ratio=config.get("test_ratio", 0.1),
+        val_ratio=config.get("val_ratio", 0.05),
+        test_ratio=config.get("test_ratio", 0.05),
         seed=config.get("seed", 42),
-        min_len=config.get("min_len", 10)
+        max_samples=config.get("max_samples") # Optional debugging limit
     )
     
     logger.info(f"Dataset sizes - Train: {len(train_ds)}, Val: {len(val_ds)}, Test: {len(test_ds)}")
     
-    # Create collator
-    data_collator = collator.IntSeqCollator(
-        feature_dim=config.get("input_dim", 35),
+    # Create DualStreamCollator
+    data_collator = collator.DualStreamCollator(
         mask_prob=config.get("mask_prob", 0.15)
     )
     
-    # Create data loaders
+    # Create DataLoaders
+    # num_workers > 0 is now safe and recommended because Dataset is lazy-loading
+    num_workers = config.get("num_workers", 4)
+    
     train_loader = DataLoader(
         train_ds,
         batch_size=config.get("batch_size", 32),
         shuffle=True,
         collate_fn=data_collator,
-        num_workers=0  # Set to 0 to avoid multiprocessing issues
+        num_workers=num_workers,
+        pin_memory=True
     )
     
     val_loader = DataLoader(
@@ -142,7 +130,8 @@ def train(config: Dict[str, Any]) -> None:
         batch_size=config.get("batch_size", 32),
         shuffle=False,
         collate_fn=data_collator,
-        num_workers=0
+        num_workers=num_workers,
+        pin_memory=True
     )
     
     test_loader = DataLoader(
@@ -150,13 +139,15 @@ def train(config: Dict[str, Any]) -> None:
         batch_size=config.get("batch_size", 32),
         shuffle=False,
         collate_fn=data_collator,
-        num_workers=0
+        num_workers=num_workers,
+        pin_memory=True
     )
     
     # 3. Model Initialization
-    logger.info("Initializing model...")
+    logger.info("Initializing Dual Stream Model...")
     model = bert_model.IntSeqBERT(
-        input_dim=config.get("input_dim", 35),
+        mag_dim=config.get("mag_dim", 5),
+        mod_dim=config.get("mod_dim", 200),
         d_model=config.get("d_model", 128),
         nhead=config.get("nhead", 4),
         num_layers=config.get("num_layers", 6),
@@ -200,21 +191,33 @@ def train(config: Dict[str, Any]) -> None:
         logger.info(f"Epoch {epoch}/{epochs}")
         logger.info(f"{'=' * 50}")
         
-        # Training
+        # --- Training ---
         model.train()
         train_loss = 0.0
         train_steps = 0
         
         pbar = tqdm(train_loader, desc=f"Training")
         for batch in pbar:
-            # Move batch to device
-            inputs = batch["inputs"].to(device)
-            labels = batch["labels"].to(device)
+            # Move batch to device (handle dict keys dynamically)
+            # Keys: mag_inputs, mod_inputs, attention_mask, mask_matrix, mag_labels, mod_labels, targets
+            
+            mag_inputs = batch["mag_inputs"].to(device)
+            mod_inputs = batch["mod_inputs"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             mask_matrix = batch["mask_matrix"].to(device)
+            mag_labels = batch["mag_labels"].to(device)
+            mod_labels = batch["mod_labels"].to(device)
             
             # Forward pass
-            outputs = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
+            outputs = model(
+                mag_inputs=mag_inputs,
+                mod_inputs=mod_inputs,
+                attention_mask=attention_mask,
+                mag_labels=mag_labels,
+                mod_labels=mod_labels,
+                mask_matrix=mask_matrix
+            )
+            
             loss = outputs["loss"]
             
             # Backward pass
@@ -240,33 +243,42 @@ def train(config: Dict[str, Any]) -> None:
             
             # Log periodically
             if global_step % config.get("log_interval", 100) == 0:
-                logger.info(f"Step {global_step}: loss={loss.item():.4f}, lr={scheduler.get_last_lr()[0]:.2e}")
+                logger.info(f"Step {global_step}: loss={loss.item():.4f}")
         
         avg_train_loss = train_loss / train_steps
         logger.info(f"Average training loss: {avg_train_loss:.4f}")
         
-        # Validation
+        # --- Validation ---
         model.eval()
         val_loss = 0.0
         val_steps = 0
         
         with torch.no_grad():
             for batch in tqdm(val_loader, desc="Validation"):
-                inputs = batch["inputs"].to(device)
-                labels = batch["labels"].to(device)
+                mag_inputs = batch["mag_inputs"].to(device)
+                mod_inputs = batch["mod_inputs"].to(device)
                 attention_mask = batch["attention_mask"].to(device)
                 mask_matrix = batch["mask_matrix"].to(device)
+                mag_labels = batch["mag_labels"].to(device)
+                mod_labels = batch["mod_labels"].to(device)
                 
-                outputs = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
+                outputs = model(
+                    mag_inputs=mag_inputs,
+                    mod_inputs=mod_inputs,
+                    attention_mask=attention_mask,
+                    mag_labels=mag_labels,
+                    mod_labels=mod_labels,
+                    mask_matrix=mask_matrix
+                )
+                
                 loss = outputs["loss"]
-                
                 val_loss += loss.item()
                 val_steps += 1
         
         avg_val_loss = val_loss / val_steps if val_steps > 0 else float('inf')
         logger.info(f"Validation loss: {avg_val_loss:.4f}")
         
-        # Checkpointing
+        # --- Checkpointing ---
         checkpoint = {
             "epoch": epoch,
             "global_step": global_step,
@@ -281,7 +293,6 @@ def train(config: Dict[str, Any]) -> None:
         # Save last model
         last_path = output_dir / "last_model.pt"
         torch.save(checkpoint, last_path)
-        logger.info(f"Saved last checkpoint to {last_path}")
         
         # Save best model
         if avg_val_loss < best_val_loss:
@@ -290,7 +301,7 @@ def train(config: Dict[str, Any]) -> None:
             torch.save(checkpoint, best_path)
             logger.info(f"✓ New best model! Validation loss: {best_val_loss:.4f}")
     
-    # 6. Testing
+    # 6. Testing (Final Eval)
     logger.info(f"\n{'=' * 50}")
     logger.info("Final Evaluation on Test Set")
     logger.info(f"{'=' * 50}")
@@ -298,94 +309,76 @@ def train(config: Dict[str, Any]) -> None:
     # Load best model
     best_checkpoint = torch.load(output_dir / "best_model.pt")
     model.load_state_dict(best_checkpoint["model_state_dict"])
-    logger.info(f"Loaded best model from epoch {best_checkpoint['epoch']}")
-    
     model.eval()
+    
     test_loss = 0.0
     test_steps = 0
     
     with torch.no_grad():
         for batch in tqdm(test_loader, desc="Testing"):
-            inputs = batch["inputs"].to(device)
-            labels = batch["labels"].to(device)
+            mag_inputs = batch["mag_inputs"].to(device)
+            mod_inputs = batch["mod_inputs"].to(device)
             attention_mask = batch["attention_mask"].to(device)
             mask_matrix = batch["mask_matrix"].to(device)
+            mag_labels = batch["mag_labels"].to(device)
+            mod_labels = batch["mod_labels"].to(device)
             
-            outputs = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
-            loss = outputs["loss"]
-            
-            test_loss += loss.item()
+            outputs = model(
+                mag_inputs=mag_inputs,
+                mod_inputs=mod_inputs,
+                attention_mask=attention_mask,
+                mag_labels=mag_labels,
+                mod_labels=mod_labels,
+                mask_matrix=mask_matrix
+            )
+            test_loss += outputs["loss"].item()
             test_steps += 1
     
     avg_test_loss = test_loss / test_steps if test_steps > 0 else float('inf')
     logger.info(f"Test loss: {avg_test_loss:.4f}")
     
-    logger.info(f"\n{'=' * 50}")
-    logger.info("Training Complete!")
-    logger.info(f"Best validation loss: {best_val_loss:.4f}")
-    logger.info(f"Test loss: {avg_test_loss:.4f}")
-    logger.info(f"Checkpoints saved to: {output_dir}")
-    logger.info(f"{'=' * 50}")
+    logger.info("Training Complete.")
 
 
 def main():
-    """Command-line interface for training."""
-    parser = argparse.ArgumentParser(description="Train IntSeqBERT model")
+    parser = argparse.ArgumentParser(description="Train IntSeqBERT model (Dual Stream)")
     
     # Data arguments
-    parser.add_argument("--features_path", type=str, default="data/oeis/features.pt",
-                        help="Path to features.pt file")
+    parser.add_argument("--features_dir", type=str, required=True,
+                        help="Directory containing .pt files (output of preprocess features)")
     parser.add_argument("--metadata_path", type=str, default=None,
-                        help="Path to metadata JSONL for filtering")
+                        help="Path to metadata JSONL for filtering (optional)")
     parser.add_argument("--output_dir", type=str, default="checkpoints",
                         help="Output directory for checkpoints")
+    parser.add_argument("--num_workers", type=int, default=4,
+                        help="Number of dataloader workers")
+    parser.add_argument("--max_samples", type=int, default=None,
+                        help="Limit number of samples for debugging")
     
     # Training arguments
-    parser.add_argument("--epochs", type=int, default=10,
-                        help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=32,
-                        help="Batch size")
-    parser.add_argument("--lr", type=float, default=1e-4,
-                        help="Learning rate")
-    parser.add_argument("--weight_decay", type=float, default=0.01,
-                        help="Weight decay")
-    parser.add_argument("--warmup_steps", type=int, default=None,
-                        help="Warmup steps (default: 10% of total)")
-    parser.add_argument("--max_grad_norm", type=float, default=1.0,
-                        help="Max gradient norm for clipping")
-    parser.add_argument("--log_interval", type=int, default=100,
-                        help="Log every N steps")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--weight_decay", type=float, default=0.01)
+    parser.add_argument("--warmup_steps", type=int, default=None)
+    parser.add_argument("--max_grad_norm", type=float, default=1.0)
+    parser.add_argument("--log_interval", type=int, default=100)
     
     # Model arguments
-    parser.add_argument("--d_model", type=int, default=128,
-                        help="Model dimension")
-    parser.add_argument("--nhead", type=int, default=4,
-                        help="Number of attention heads")
-    parser.add_argument("--num_layers", type=int, default=6,
-                        help="Number of encoder layers")
-    parser.add_argument("--dim_feedforward", type=int, default=512,
-                        help="FFN dimension")
-    parser.add_argument("--dropout", type=float, default=0.1,
-                        help="Dropout rate")
+    parser.add_argument("--mag_dim", type=int, default=5)
+    parser.add_argument("--mod_dim", type=int, default=200)
+    parser.add_argument("--d_model", type=int, default=128)
+    parser.add_argument("--nhead", type=int, default=4)
+    parser.add_argument("--num_layers", type=int, default=6)
+    parser.add_argument("--dim_feedforward", type=int, default=512)
+    parser.add_argument("--dropout", type=float, default=0.1)
     
-    # Data processing arguments
-    parser.add_argument("--val_ratio", type=float, default=0.1,
-                        help="Validation set ratio")
-    parser.add_argument("--test_ratio", type=float, default=0.1,
-                        help="Test set ratio")
-    parser.add_argument("--mask_prob", type=float, default=0.15,
-                        help="Masking probability")
-    parser.add_argument("--min_len", type=int, default=10,
-                        help="Minimum sequence length")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed")
+    # Masking
+    parser.add_argument("--mask_prob", type=float, default=0.15)
     
     args = parser.parse_args()
-    
-    # Convert args to config dict
     config = vars(args)
     
-    # Run training
     train(config)
 
 

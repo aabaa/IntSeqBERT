@@ -1,163 +1,230 @@
 """
-Integration tests for training script.
+Tests for IntSeqBERT training script (Dual Stream Architecture).
+Tests LR scheduler, training loop, and CLI.
 """
 
 import pytest
 import torch
+import argparse
+import json
 from pathlib import Path
 
-from intseq_bert.train_bert import train
+from intseq_bert import train_bert, bert_model
 
 
-def test_training_smoke(tmp_path):
-    """
-    Smoke test: verify training completes for 1 epoch with minimal data.
+# ==========================================
+# Helper Functions
+# ==========================================
+
+def create_mock_features_dir(tmp_path: Path, num_files: int = 10):
+    """Create a mock features directory with .pt files."""
+    features_dir = tmp_path / "features"
+    features_dir.mkdir()
     
-    This is an integration test that ensures all components work together:
-    - Data loading
-    - Collator
-    - Model
-    - Training loop
-    - Checkpointing
-    """
-    # Create dummy features.pt with 4 sequences
-    features = {
-        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
-        for i in range(4)
+    for i in range(num_files):
+        seq_len = 15
+        data = {
+            'oeis_id': f'A{i:06d}',
+            'mag_features': torch.randn(seq_len, 5),
+            'mod_features': torch.randn(seq_len, 200),
+            'targets': {
+                'mag': torch.randn(seq_len),
+                **{f'mod{m}': torch.randint(0, m, (seq_len,)) for m in range(2, 102)}
+            }
+        }
+        torch.save(data, features_dir / f"A{i:06d}.pt")
+    
+    return features_dir
+
+
+def get_minimal_training_config(features_dir: Path, output_dir: Path) -> dict:
+    """Get minimal training configuration for tests."""
+    return {
+        'features_dir': str(features_dir),
+        'output_dir': str(output_dir),
+        'epochs': 1,
+        'batch_size': 2,
+        'lr': 1e-4,
+        'd_model': 32,
+        'nhead': 2,
+        'num_layers': 1,
+        'dim_feedforward': 64,
+        'mag_dim': 5,
+        'mod_dim': 200,
+        'num_workers': 0,
+        'val_ratio': 0.2,
+        'test_ratio': 0.2,
     }
-    features_path = tmp_path / "features.pt"
-    torch.save(features, features_path)
+
+
+# ==========================================
+# 1. LR Scheduler Tests
+# ==========================================
+
+class TestLRScheduler:
+    """Tests for get_cosine_schedule_with_warmup function."""
     
-    # Create minimal config
-    config = {
-        # Paths
-        "features_path": str(features_path),
-        "metadata_path": None,
-        "output_dir": str(tmp_path / "checkpoints"),
+    def test_scheduler_creation(self):
+        """Test scheduler can be created."""
+        model = bert_model.IntSeqBERT(d_model=64, num_layers=2)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
         
-        # Training (minimal for speed)
-        "epochs": 1,
-        "batch_size": 2,
-        "lr": 1e-3,
-        "weight_decay": 0.01,
-        "warmup_steps": 2,
-        "max_grad_norm": 1.0,
-        "log_interval": 10,
+        scheduler = train_bert.get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=100,
+            num_training_steps=1000
+        )
         
-        # Model (small for speed)
-        "input_dim": 35,
-        "d_model": 32,  # Small
-        "nhead": 2,  # Small
-        "num_layers": 1,  # Minimal
-        "dim_feedforward": 64,  # Small
-        "dropout": 0.1,
+        assert scheduler is not None
+    
+    def test_warmup_phase(self):
+        """Test LR increases during warmup."""
+        model = bert_model.IntSeqBERT(d_model=64, num_layers=2)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
         
-        # Data
-        "val_ratio": 0.25,  # 1 sequence
-        "test_ratio": 0.25,  # 1 sequence
-        "mask_prob": 0.15,
-        "min_len": 5,
-        "seed": 42
-    }
+        scheduler = train_bert.get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=10,
+            num_training_steps=100
+        )
+        
+        # LR should increase during warmup
+        lrs = []
+        for step in range(10):
+            lrs.append(scheduler.get_last_lr()[0])
+            optimizer.step()
+            scheduler.step()
+        
+        # Each subsequent LR should be >= previous during warmup
+        for i in range(1, len(lrs)):
+            assert lrs[i] >= lrs[i-1]
     
-    # Run training (should complete without errors)
-    train(config)
-    
-    # Verify outputs exist
-    output_dir = tmp_path / "checkpoints"
-    assert output_dir.exists()
-    
-    # Check checkpoint files
-    best_model_path = output_dir / "best_model.pt"
-    last_model_path = output_dir / "last_model.pt"
-    config_path = output_dir / "config.json"
-    log_path = output_dir / "train.log"
-    
-    assert best_model_path.exists(), "best_model.pt should exist"
-    assert last_model_path.exists(), "last_model.pt should exist"
-    assert config_path.exists(), "config.json should exist"
-    assert log_path.exists(), "train.log should exist"
-    
-    # Verify checkpoint can be loaded
-    checkpoint = torch.load(best_model_path)
-    assert "epoch" in checkpoint
-    assert "model_state_dict" in checkpoint
-    assert "optimizer_state_dict" in checkpoint
-    assert "scheduler_state_dict" in checkpoint
-    assert "train_loss" in checkpoint
-    assert "val_loss" in checkpoint
-    
-    # Verify epoch is correct
-    assert checkpoint["epoch"] == 1
+    def test_decay_phase(self):
+        """Test LR decreases after warmup (cosine decay)."""
+        model = bert_model.IntSeqBERT(d_model=64, num_layers=2)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        
+        scheduler = train_bert.get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=10,
+            num_training_steps=100
+        )
+        
+        # Skip warmup
+        for _ in range(10):
+            optimizer.step()
+            scheduler.step()
+        
+        # LR should decrease during decay
+        peak_lr = scheduler.get_last_lr()[0]
+        
+        for _ in range(50):
+            optimizer.step()
+            scheduler.step()
+        
+        mid_lr = scheduler.get_last_lr()[0]
+        assert mid_lr < peak_lr
 
 
-def test_training_with_validation_improvement(tmp_path):
-    """Test that best model is saved when validation improves."""
-    # Create dummy features
-    features = {
-        f"A{i:06d}": torch.randn(15, 35, dtype=torch.float32)
-        for i in range(8)
-    }
-    features_path = tmp_path / "features.pt"
-    torch.save(features, features_path)
+# ==========================================
+# 2. Training Smoke Tests
+# ==========================================
+
+class TestTrainingSmoke:
+    """Smoke tests for training loop."""
     
-    config = {
-        "features_path": str(features_path),
-        "output_dir": str(tmp_path / "checkpoints"),
-        "epochs": 2,  # Run 2 epochs
-        "batch_size": 2,
-        "lr": 1e-3,
-        "input_dim": 35,
-        "d_model": 32,
-        "nhead": 2,
-        "num_layers": 1,
-        "dim_feedforward": 64,
-        "val_ratio": 0.25,
-        "test_ratio": 0.25,
-        "seed": 42
-    }
+    def test_training_runs_one_epoch(self, tmp_path):
+        """Test that training completes without error."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        config = get_minimal_training_config(features_dir, tmp_path / "checkpoints")
+        
+        # Should complete without error
+        train_bert.train(config)
+        
+        # Check checkpoints exist
+        assert (tmp_path / "checkpoints" / "best_model.pt").exists()
+        assert (tmp_path / "checkpoints" / "last_model.pt").exists()
     
-    train(config)
+    def test_checkpoint_structure(self, tmp_path):
+        """Test that checkpoint has correct structure."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        config = get_minimal_training_config(features_dir, tmp_path / "checkpoints")
+        
+        train_bert.train(config)
+        
+        checkpoint = torch.load(tmp_path / "checkpoints" / "best_model.pt")
+        
+        assert 'model_state_dict' in checkpoint
+        assert 'optimizer_state_dict' in checkpoint
+        assert 'epoch' in checkpoint
+        assert 'config' in checkpoint
     
-    # Both checkpoints should exist
-    best_path = tmp_path / "checkpoints" / "best_model.pt"
-    last_path = tmp_path / "checkpoints" / "last_model.pt"
-    
-    assert best_path.exists()
-    assert last_path.exists()
-    
-    # Last checkpoint should be from epoch 2
-    last_checkpoint = torch.load(last_path)
-    assert last_checkpoint["epoch"] == 2
+    def test_config_saved_to_file(self, tmp_path):
+        """Test that config is saved during training."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        config = get_minimal_training_config(features_dir, tmp_path / "checkpoints")
+        
+        train_bert.train(config)
+        
+        # Check config was saved
+        config_path = tmp_path / "checkpoints" / "config.json"
+        assert config_path.exists()
+        
+        with open(config_path) as f:
+            saved_config = json.load(f)
+        
+        assert saved_config['d_model'] == 32
 
 
-def test_training_device_handling(tmp_path):
-    """Test that training correctly handles device selection."""
-    # Create minimal dataset
-    features = {
-        f"A{i:06d}": torch.randn(10, 35, dtype=torch.float32)
-        for i in range(4)
-    }
-    features_path = tmp_path / "features.pt"
-    torch.save(features, features_path)
+# ==========================================
+# 3. CLI Tests
+# ==========================================
+
+class TestCLI:
+    """Tests for command-line interface."""
     
-    config = {
-        "features_path": str(features_path),
-        "output_dir": str(tmp_path / "checkpoints"),
-        "epochs": 1,
-        "batch_size": 2,
-        "lr": 1e-3,
-        "input_dim": 35,
-        "d_model": 16,
-        "nhead": 2,
-        "num_layers": 1,
-        "val_ratio": 0.25,
-        "test_ratio": 0.25,
-        "seed": 42
-    }
+    def test_cli_argument_parsing(self, tmp_path, monkeypatch):
+        """Test CLI argument parsing."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        
+        test_args = [
+            "train_bert.py",
+            "--features_dir", str(features_dir),
+            "--output_dir", str(tmp_path / "output"),
+            "--epochs", "1",
+            "--batch_size", "2",
+            "--d_model", "32",
+            "--nhead", "2",
+            "--num_layers", "1",
+            "--num_workers", "0",
+        ]
+        monkeypatch.setattr("sys.argv", test_args)
+        
+        # Should complete without error
+        train_bert.main()
+        
+        assert (tmp_path / "output" / "best_model.pt").exists()
+
+
+# ==========================================
+# 4. Model Loading Tests
+# ==========================================
+
+class TestModelLoading:
+    """Tests for loading trained models."""
     
-    # Should complete regardless of device (CPU/CUDA/MPS)
-    train(config)
-    
-    # Verify checkpoint was saved
-    assert (tmp_path / "checkpoints" / "best_model.pt").exists()
+    def test_load_trained_model(self, tmp_path):
+        """Test loading a trained checkpoint."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        config = get_minimal_training_config(features_dir, tmp_path / "checkpoints")
+        
+        train_bert.train(config)
+        
+        # Load the model
+        model, checkpoint = bert_model.IntSeqBERT.load_from_checkpoint(
+            str(tmp_path / "checkpoints" / "best_model.pt"),
+            device='cpu'
+        )
+        
+        assert model.d_model == 32
+        assert checkpoint['epoch'] == 1
