@@ -135,7 +135,7 @@ uv run python -m intseq_bert.preprocess features \
 
 * **Output**: A directory `data/oeis/features/` containing ~360,000 `.pt` files (e.g., `A000001.pt`, `A000042.pt`).
 
-* **Storage**: Requires approx. 15-20 GB of disk space.
+* **Storage**: Requires approx. 30-40 GB of disk space.
 
 ### 3. Train IntSeqBERT (Encoder)
 
