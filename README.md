@@ -62,26 +62,62 @@ uv sync
 **Step 1: Download OEIS Data**
 
 ```bash
+# 1. Create directory structure
 mkdir -p data/oeis/raw
 cd data/oeis/raw
-wget http://oeis.org/stripped.gz
-wget http://oeis.org/names.gz
-# Download sequence metadata (git clone oeisdata/seq...)
-# ... (Standard OEIS data collection steps)
 
+# 2. Download basic sequence data
+# Note: Use https to ensure connection
+wget https://oeis.org/stripped.gz
+wget https://oeis.org/names.gz
+
+# 3. Unzip files (The preprocessor expects plain text for these)
+gunzip -k stripped.gz
+gunzip -k names.gz
+
+# 4. Download extended metadata (keywords, authors, offsets)
+# We need the 'seq' directory from the oeisdata repository.
+# Go up to 'data/oeis' so 'seq' lands in 'data/oeis/seq'
+cd ..
+
+# Clone the repository (Warning: This is large, approx 1GB)
+git clone https://github.com/oeis/oeisdata.git
+
+# Move the 'seq' folder to the current directory
+mv oeisdata/seq .
+
+# Clean up the rest of the cloned repository to save space
+rm -rf oeisdata
+
+# Return to project root
+cd ../..
 ```
 
 **Step 2: Preprocess & Merge Metadata**
 
 ```bash
-# Convert stripped to JSONL
+# 1. Convert raw sequences (stripped) to initial JSONL
+# Input: Space-separated integers
+# Output: Basic JSON records with OEIS ID and sequence
 uv run python -m intseq_bert.preprocess stripped \
-  --input data/oeis/raw/stripped.gz \
+  --input data/oeis/raw/stripped \
   --output data/oeis/data_step1.jsonl
 
-# Merge names and metadata...
-# (Run merge-names and merge-metadata commands)
+# 2. Merge sequence names
+# Input: data_step1.jsonl + names file
+# Output: Records with "name" field added
+uv run python -m intseq_bert.preprocess merge-names \
+  --input-jsonl data/oeis/data_step1.jsonl \
+  --input-names data/oeis/raw/names \
+  --output data/oeis/data_step2.jsonl
 
+# 3. Merge extended metadata (Keywords, Offsets) from .seq files
+# Input: data_step2.jsonl + seq/ directory
+# Output: Final enriched dataset ready for feature extraction
+uv run python -m intseq_bert.preprocess merge-metadata \
+  --input-jsonl data/oeis/data_step2.jsonl \
+  --seq-dir data/oeis/seq \
+  --output data/oeis/data_final.jsonl
 ```
 
 **Step 3: Extract Dual Stream Features**
@@ -95,7 +131,11 @@ uv run python -m intseq_bert.preprocess features \
 
 ```
 
-*Output:* `data/oeis/features/A000001.pt`, `A000002.pt`...
+* **Input**: `data/oeis/data_final.jsonl` (Created in Step 2)
+
+* **Output**: A directory `data/oeis/features/` containing ~360,000 `.pt` files (e.g., `A000001.pt`, `A000042.pt`).
+
+* **Storage**: Requires approx. 15-20 GB of disk space.
 
 ### 3. Train IntSeqBERT (Encoder)
 
