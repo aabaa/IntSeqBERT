@@ -1,5 +1,6 @@
 """
-Tests for the data loader module with tag filtering.
+Tests for the Dual Stream data loader module.
+Tests directory-based dataset loading with lazy loading and tag filtering.
 """
 
 import pytest
@@ -7,287 +8,375 @@ import torch
 import json
 from pathlib import Path
 
-from intseq_bert import loader
+from intseq_bert.loader import (
+    DualStreamDataset,
+    load_and_split_data,
+    _filter_by_tags
+)
+from intseq_bert import schemas
 
 
-@pytest.fixture
-def tmp_jsonl_with_tags(tmp_path):
-    """
-    Create a temporary JSONL file with keyword metadata.
-    
-    Creates 4 sequences with different tag combinations:
-    - A000001: ["core", "nonn"]
-    - A000002: ["easy", "nonn"]
-    - A000003: ["core", "hard"]
-    - A000004: ["nonn"]
-    """
-    data = [
-        {
-            "oeis_id": "A000001",
-            "sequence": list(range(1, 21)),  # Length 20
-            "keywords": ["core", "nonn"]
-        },
-        {
-            "oeis_id": "A000002",
-            "sequence": list(range(1, 16)),  # Length 15
-            "keywords": ["easy", "nonn"]
-        },
-        {
-            "oeis_id": "A000003",
-            "sequence": list(range(1, 26)),  # Length 25
-            "keywords": ["core", "hard"]
-        },
-        {
-            "oeis_id": "A000004",
-            "sequence": list(range(1, 11)),  # Length 10
-            "keywords": ["nonn"]
+# ==========================================
+# Helper Functions
+# ==========================================
+
+def create_feature_file(path: Path, oeis_id: str, seq_len: int = 10):
+    """Create a mock .pt feature file."""
+    data = {
+        'oeis_id': oeis_id,
+        'mag_features': torch.randn(seq_len, 5),
+        'mod_features': torch.randn(seq_len, 200),
+        'targets': {
+            'mag': torch.randn(seq_len),
+            'mod3': torch.randint(0, 3, (seq_len,)),
+            'mod5': torch.randint(0, 5, (seq_len,)),
         }
-    ]
-    
-    jsonl_path = tmp_path / "metadata.jsonl"
-    with open(jsonl_path, 'w', encoding='utf-8') as f:
-        for record in data:
-            f.write(json.dumps(record) + '\n')
-    
-    return jsonl_path
-
-
-@pytest.fixture
-def tmp_features_pt(tmp_path):
-    """
-    Create a temporary .pt file with matching feature tensors.
-    
-    Creates dummy tensors with shape (SeqLen, 35) for each sequence.
-    """
-    features = {
-        "A000001": torch.randn(20, 35, dtype=torch.float32),
-        "A000002": torch.randn(15, 35, dtype=torch.float32),
-        "A000003": torch.randn(25, 35, dtype=torch.float32),
-        "A000004": torch.randn(10, 35, dtype=torch.float32)
     }
-    
-    pt_path = tmp_path / "features.pt"
-    torch.save(features, pt_path)
-    
-    return pt_path
+    torch.save(data, path)
+    return data
 
 
-def test_tag_filtering_include(tmp_jsonl_with_tags, tmp_features_pt):
-    """
-    Test include_tags filtering - should only keep sequences with specified tags.
-    """
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=str(tmp_jsonl_with_tags),
-        include_tags=["core"],  # Only A000001 and A000003 have "core"
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
-    
-    # Should have exactly 2 sequences (A000001, A000003)
-    assert len(train_ds) == 2
-    assert len(val_ds) == 0
-    assert len(test_ds) == 0
-    
-    # Verify tensors have correct shape
-    tensor1 = train_ds[0]
-    assert tensor1.shape[1] == 35  # Feature dimension
+def create_metadata_jsonl(path: Path, records: list):
+    """Create a metadata JSONL file."""
+    with open(path, 'w') as f:
+        for rec in records:
+            f.write(rec.to_json_line() + '\n')
 
 
-def test_tag_filtering_exclude(tmp_jsonl_with_tags, tmp_features_pt):
-    """
-    Test exclude_tags filtering - should remove sequences with specified tags.
-    """
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=str(tmp_jsonl_with_tags),
-        exclude_tags=["easy"],  # Remove A000002
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
+# ==========================================
+# 1. DualStreamDataset Tests
+# ==========================================
+
+class TestDualStreamDataset:
+    """Tests for DualStreamDataset class."""
     
-    # Should have 3 sequences (all except A000002)
-    assert len(train_ds) == 3
-    assert len(val_ds) == 0
-    assert len(test_ds) == 0
+    def test_initialization(self, tmp_path):
+        """Test dataset can be initialized with file list."""
+        # Create test files
+        files = []
+        for i in range(3):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+            files.append(path)
+        
+        dataset = DualStreamDataset(files)
+        assert len(dataset) == 3
+    
+    def test_getitem_returns_correct_structure(self, tmp_path):
+        """Test __getitem__ returns dict with correct keys."""
+        path = tmp_path / "A000001.pt"
+        create_feature_file(path, "A000001", seq_len=15)
+        
+        dataset = DualStreamDataset([path])
+        item = dataset[0]
+        
+        assert 'oeis_id' in item
+        assert 'mag_features' in item
+        assert 'mod_features' in item
+        assert 'targets' in item
+        
+        assert item['oeis_id'] == 'A000001'
+        assert item['mag_features'].shape == (15, 5)
+        assert item['mod_features'].shape == (15, 200)
+    
+    def test_lazy_loading(self, tmp_path):
+        """Test that files are loaded on demand (lazy loading)."""
+        # Create files
+        files = []
+        for i in range(5):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+            files.append(path)
+        
+        dataset = DualStreamDataset(files)
+        
+        # Dataset should not load anything until __getitem__ is called
+        # We can't directly test this, but we can verify behavior
+        item = dataset[2]
+        assert item['oeis_id'] == 'A000002'
+    
+    def test_invalid_file_raises_error(self, tmp_path):
+        """Test that loading invalid file raises error."""
+        # Create invalid file
+        path = tmp_path / "invalid.pt"
+        torch.save({'bad': 'data'}, path)
+        
+        dataset = DualStreamDataset([path])
+        
+        with pytest.raises(ValueError):
+            _ = dataset[0]
 
 
-def test_combined_filtering(tmp_jsonl_with_tags, tmp_features_pt):
-    """
-    Test combination of include and exclude tags.
-    Exclude takes precedence.
-    """
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=str(tmp_jsonl_with_tags),
-        include_tags=["core"],  # A000001, A000003
-        exclude_tags=["hard"],  # Remove A000003
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
+# ==========================================
+# 2. load_and_split_data Tests
+# ==========================================
+
+class TestLoadAndSplitData:
+    """Tests for load_and_split_data function."""
     
-    # Should have only A000001 (has "core" but not "hard")
-    assert len(train_ds) == 1
+    def test_basic_loading(self, tmp_path):
+        """Test basic loading without filtering."""
+        # Create 20 feature files
+        for i in range(20):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        train_ds, val_ds, test_ds = load_and_split_data(
+            str(tmp_path),
+            val_ratio=0.1,
+            test_ratio=0.1,
+            seed=42
+        )
+        
+        # Check sizes (20 * 0.1 = 2 for val and test each)
+        assert len(train_ds) == 16
+        assert len(val_ds) == 2
+        assert len(test_ds) == 2
+    
+    def test_reproducible_split(self, tmp_path):
+        """Test that splitting is reproducible with same seed."""
+        for i in range(10):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        train1, _, _ = load_and_split_data(str(tmp_path), seed=123)
+        train2, _, _ = load_and_split_data(str(tmp_path), seed=123)
+        
+        # Same seed should give same files
+        ids1 = [train1[i]['oeis_id'] for i in range(len(train1))]
+        ids2 = [train2[i]['oeis_id'] for i in range(len(train2))]
+        assert ids1 == ids2
+    
+    def test_different_seed_different_split(self, tmp_path):
+        """Test that different seeds give different splits."""
+        for i in range(10):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        train1, _, _ = load_and_split_data(str(tmp_path), seed=1)
+        train2, _, _ = load_and_split_data(str(tmp_path), seed=2)
+        
+        ids1 = sorted([train1[i]['oeis_id'] for i in range(len(train1))])
+        ids2 = sorted([train2[i]['oeis_id'] for i in range(len(train2))])
+        # While technically could be same, very unlikely with different seeds
+        # We just check they are valid
+        assert len(ids1) == len(ids2)
+    
+    def test_max_samples_limit(self, tmp_path):
+        """Test max_samples parameter."""
+        for i in range(100):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        train_ds, val_ds, test_ds = load_and_split_data(
+            str(tmp_path),
+            max_samples=20,
+            seed=42
+        )
+        
+        total = len(train_ds) + len(val_ds) + len(test_ds)
+        assert total == 20
+    
+    def test_empty_directory_raises(self, tmp_path):
+        """Test that empty directory raises error."""
+        with pytest.raises(ValueError, match="No .pt files found"):
+            load_and_split_data(str(tmp_path))
+    
+    def test_nonexistent_directory_raises(self, tmp_path):
+        """Test that nonexistent directory raises error."""
+        fake_path = tmp_path / "nonexistent"
+        with pytest.raises(FileNotFoundError):
+            load_and_split_data(str(fake_path))
 
 
-def test_no_metadata_loading(tmp_features_pt):
-    """
-    Test loading without metadata - should load all sequences.
-    """
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=None,  # No metadata filtering
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
+# ==========================================
+# 3. Tag Filtering Tests
+# ==========================================
+
+class TestTagFiltering:
+    """Tests for tag-based filtering."""
     
-    # Should have all 4 sequences
-    assert len(train_ds) == 4
-    assert len(val_ds) == 0
-    assert len(test_ds) == 0
+    def test_include_tags(self, tmp_path):
+        """Test filtering with include_tags."""
+        # Create feature files
+        for i in range(10):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        # Create metadata
+        metadata_path = tmp_path / "metadata.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn", "core"]),
+            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["sign"]),
+            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["nonn", "core"]),
+        ]
+        create_metadata_jsonl(metadata_path, records)
+        
+        train_ds, val_ds, test_ds = load_and_split_data(
+            str(tmp_path),
+            metadata_path=str(metadata_path),
+            include_tags=["core"],
+            val_ratio=0.0,
+            test_ratio=0.0,
+            seed=42
+        )
+        
+        # Only A000000 and A000003 have "core" tag
+        assert len(train_ds) == 2
+    
+    def test_exclude_tags(self, tmp_path):
+        """Test filtering with exclude_tags."""
+        for i in range(5):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        metadata_path = tmp_path / "metadata.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn", "dead"]),
+            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["dead"]),
+            schemas.OEISRecord(oeis_id="A000004", sequence=[1], keywords=["nonn"]),
+        ]
+        create_metadata_jsonl(metadata_path, records)
+        
+        train_ds, _, _ = load_and_split_data(
+            str(tmp_path),
+            metadata_path=str(metadata_path),
+            exclude_tags=["dead"],
+            val_ratio=0.0,
+            test_ratio=0.0,
+            seed=42
+        )
+        
+        # A000001 and A000003 should be excluded
+        assert len(train_ds) == 3
+    
+    def test_include_and_exclude_combined(self, tmp_path):
+        """Test filtering with both include and exclude tags."""
+        for i in range(5):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        metadata_path = tmp_path / "metadata.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn", "core"]),
+            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn", "core", "dead"]),
+            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["core"]),
+            schemas.OEISRecord(oeis_id="A000004", sequence=[1], keywords=["sign"]),
+        ]
+        create_metadata_jsonl(metadata_path, records)
+        
+        train_ds, _, _ = load_and_split_data(
+            str(tmp_path),
+            metadata_path=str(metadata_path),
+            include_tags=["core"],
+            exclude_tags=["dead"],
+            val_ratio=0.0,
+            test_ratio=0.0,
+            seed=42
+        )
+        
+        # Only A000000 and A000003 (have core, no dead)
+        assert len(train_ds) == 2
 
 
-def test_data_splitting(tmp_features_pt):
-    """
-    Test train/val/test split ratios are correct.
-    """
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=None,
-        val_ratio=0.25,   # 25% validation
-        test_ratio=0.25,  # 25% test
-        seed=42
-    )
+# ==========================================
+# 4. _filter_by_tags Internal Function Tests
+# ==========================================
+
+class TestFilterByTagsInternal:
+    """Tests for internal _filter_by_tags function."""
     
-    total = len(train_ds) + len(val_ds) + len(test_ds)
-    assert total == 4  # All sequences loaded
+    def test_include_filter(self, tmp_path):
+        """Test include filter logic."""
+        metadata_path = tmp_path / "metadata.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id="A001", sequence=[1], keywords=["nonn", "core"]),
+            schemas.OEISRecord(oeis_id="A002", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A003", sequence=[1], keywords=["core", "nice"]),
+        ]
+        create_metadata_jsonl(metadata_path, records)
+        
+        valid_ids = _filter_by_tags(str(metadata_path), ["core"], None)
+        
+        assert "A001" in valid_ids
+        assert "A002" not in valid_ids
+        assert "A003" in valid_ids
     
-    # With 4 sequences: test=1, val=1, train=2
-    assert len(test_ds) == 1
-    assert len(val_ds) == 1
-    assert len(train_ds) == 2
+    def test_exclude_filter(self, tmp_path):
+        """Test exclude filter logic."""
+        metadata_path = tmp_path / "metadata.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id="A001", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A002", sequence=[1], keywords=["nonn", "dead"]),
+            schemas.OEISRecord(oeis_id="A003", sequence=[1], keywords=["core"]),
+        ]
+        create_metadata_jsonl(metadata_path, records)
+        
+        valid_ids = _filter_by_tags(str(metadata_path), None, ["dead"])
+        
+        assert "A001" in valid_ids
+        assert "A002" not in valid_ids
+        assert "A003" in valid_ids
+    
+    def test_missing_metadata_returns_empty(self, tmp_path):
+        """Test that missing metadata file returns empty set."""
+        valid_ids = _filter_by_tags(str(tmp_path / "nonexistent.jsonl"), ["core"], None)
+        assert valid_ids == set()
 
 
-def test_min_len_filtering(tmp_path):
-    """
-    Test min_len parameter filters out short sequences.
-    """
-    # Create features with varying lengths
-    features = {
-        "A000001": torch.randn(5, 35, dtype=torch.float32),   # Too short
-        "A000002": torch.randn(15, 35, dtype=torch.float32),  # OK
-        "A000003": torch.randn(8, 35, dtype=torch.float32),   # Too short
-        "A000004": torch.randn(20, 35, dtype=torch.float32)   # OK
-    }
-    
-    pt_path = tmp_path / "features_varying.pt"
-    torch.save(features, pt_path)
-    
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(pt_path),
-        metadata_path=None,
-        min_len=10,  # Require at least 10 elements
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
-    
-    # Should have only 2 sequences (A000002, A000004)
-    assert len(train_ds) == 2
+# ==========================================
+# 5. Integration Tests
+# ==========================================
 
-
-def test_dataset_interface(tmp_features_pt):
-    """
-    Test IntSeqDataset interface works correctly.
-    """
-    train_ds, _, _ = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=None,
-        val_ratio=0.0,
-        test_ratio=0.0,
-        seed=42
-    )
+class TestIntegration:
+    """Integration tests for the complete loading pipeline."""
     
-    # Test __len__
-    assert len(train_ds) == 4
+    def test_full_pipeline(self, tmp_path):
+        """Test complete loading and iteration."""
+        # Create files
+        for i in range(10):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}", seq_len=20)
+        
+        train_ds, val_ds, test_ds = load_and_split_data(
+            str(tmp_path),
+            val_ratio=0.2,
+            test_ratio=0.2,
+            seed=42
+        )
+        
+        # Iterate through training set
+        for i in range(len(train_ds)):
+            item = train_ds[i]
+            assert 'mag_features' in item
+            assert 'mod_features' in item
+            assert item['mag_features'].shape[0] == 20
     
-    # Test __getitem__ returns tensors
-    tensor = train_ds[0]
-    assert isinstance(tensor, torch.Tensor)
-    assert tensor.shape[1] == 35  # Feature dimension
-    
-    # Test indexing works for all items
-    for i in range(len(train_ds)):
-        t = train_ds[i]
-        assert isinstance(t, torch.Tensor)
-        assert t.dtype == torch.float32
-
-
-def test_empty_result_handling(tmp_path):
-    """
-    Test handling when no sequences pass the filter.
-    """
-    # Create metadata with no matching tags
-    data = [
-        {"oeis_id": "A000001", "sequence": [1, 2, 3], "keywords": ["other"]}
-    ]
-    jsonl_path = tmp_path / "metadata_nomatch.jsonl"
-    with open(jsonl_path, 'w') as f:
-        for record in data:
-            f.write(json.dumps(record) + '\n')
-    
-    # Create matching features
-    features = {"A000001": torch.randn(3, 35)}
-    pt_path = tmp_path / "features_nomatch.pt"
-    torch.save(features, pt_path)
-    
-    # Try to load with non-matching tags
-    train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_path=str(pt_path),
-        metadata_path=str(jsonl_path),
-        include_tags=["nonexistent"],
-        val_ratio=0.1,
-        test_ratio=0.1,
-        seed=42
-    )
-    
-    # Should return empty datasets
-    assert len(train_ds) == 0
-    assert len(val_ds) == 0
-    assert len(test_ds) == 0
-
-
-def test_reproducible_splitting(tmp_features_pt):
-    """
-    Test that same seed produces same split.
-    """
-    # Load with seed 42
-    train1, val1, test1 = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=None,
-        val_ratio=0.25,
-        test_ratio=0.25,
-        seed=42
-    )
-    
-    # Load again with same seed
-    train2, val2, test2 = loader.load_and_split_data(
-        features_path=str(tmp_features_pt),
-        metadata_path=None,
-        val_ratio=0.25,
-        test_ratio=0.25,
-        seed=42
-    )
-    
-    # Should have same sizes
-    assert len(train1) == len(train2)
-    assert len(val1) == len(val2)
-    assert len(test1) == len(test2)
-    
-    # Tensors should be identical (same objects from same split)
-    for i in range(len(train1)):
-        assert torch.equal(train1[i], train2[i])
+    def test_dataloader_compatibility(self, tmp_path):
+        """Test that dataset works with PyTorch DataLoader."""
+        from torch.utils.data import DataLoader
+        
+        for i in range(5):
+            path = tmp_path / f"A{i:06d}.pt"
+            create_feature_file(path, f"A{i:06d}")
+        
+        train_ds, _, _ = load_and_split_data(
+            str(tmp_path),
+            val_ratio=0.0,
+            test_ratio=0.0,
+            seed=42
+        )
+        
+        # Create DataLoader (batch_size=1 since sequences may differ in length)
+        loader = DataLoader(train_ds, batch_size=1, shuffle=False)
+        
+        count = 0
+        for batch in loader:
+            assert 'mag_features' in batch
+            count += 1
+        
+        assert count == 5

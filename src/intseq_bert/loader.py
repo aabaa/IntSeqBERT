@@ -1,130 +1,127 @@
 """
-Data loader for IntSeqBERT feature tensors with metadata-based filtering.
+Data loading utilities for the Dual Stream architecture.
+Handles directory-based dataset of individual .pt files.
 """
 
-import gc
+import torch
+import json
 import logging
 import random
-import torch
+import gc
 from pathlib import Path
-from typing import List, Optional, Tuple, Set
+from typing import List, Dict, Tuple, Optional, Set
 from torch.utils.data import Dataset
 
+# スキーマはタグフィルタリングのために必要
 from . import schemas
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+class DualStreamDataset(Dataset):
+    """
+    Dataset for loading preprocessed Dual Stream features from individual .pt files.
+    Implements lazy loading to save memory.
+    """
+    def __init__(self, feature_files: List[Path]):
+        self.feature_files = feature_files
 
-class IntSeqDataset(Dataset):
-    """
-    Simple PyTorch Dataset wrapper for pre-loaded feature tensors.
-    
-    Args:
-        tensors: List of feature tensors, each with shape (SeqLen, 35)
-    """
-    
-    def __init__(self, tensors: List[torch.Tensor]):
-        self.tensors = tensors
-    
     def __len__(self) -> int:
-        return len(self.tensors)
-    
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        return self.tensors[idx]
+        return len(self.feature_files)
 
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        """
+        Loads a single .pt file on demand.
+        Returns dict with keys: 'oeis_id', 'mag_features', 'mod_features', 'targets'
+        """
+        path = self.feature_files[idx]
+        try:
+            # map_location='cpu' is crucial to avoid GPU memory leaks in dataloader workers
+            data = torch.load(path, map_location='cpu')
+            
+            # Basic validation
+            if 'mag_features' not in data or 'mod_features' not in data:
+                 raise ValueError(f"Invalid data format in {path}")
+            
+            return data
+            
+        except Exception as e:
+            # In a real training loop, you might want to return None and collate it out,
+            # but raising error helps debug preprocessing issues early.
+            logger.error(f"Error loading {path}: {e}")
+            raise e
 
 def load_and_split_data(
-    features_path: str,
+    features_dir: str,
     metadata_path: Optional[str] = None,
     include_tags: Optional[List[str]] = None,
     exclude_tags: Optional[List[str]] = None,
-    val_ratio: float = 0.1,
-    test_ratio: float = 0.1,
+    val_ratio: float = 0.05,
+    test_ratio: float = 0.05,
     seed: int = 42,
-    min_len: int = 0
-) -> Tuple[IntSeqDataset, IntSeqDataset, IntSeqDataset]:
+    max_samples: Optional[int] = None
+) -> Tuple[DualStreamDataset, DualStreamDataset, DualStreamDataset]:
     """
-    Load feature tensors with optional metadata-based filtering and split into train/val/test.
-    
-    Args:
-        features_path: Path to .pt file containing Dict[oeis_id, Tensor]
-        metadata_path: Optional path to JSONL file for tag filtering
-        include_tags: Keep sequences with ANY of these keywords (OR logic). None = no filtering
-        exclude_tags: Remove sequences with ANY of these keywords
-        val_ratio: Validation set ratio (0.0 to 1.0)
-        test_ratio: Test set ratio (0.0 to 1.0)
-        seed: Random seed for reproducible splitting
-        min_len: Minimum sequence length to include
-    
-    Returns:
-        Tuple of (train_dataset, val_dataset, test_dataset)
+    Scans a directory for .pt files, optionally filters by tags, and splits into Train/Val/Test.
     """
-    
-    # Step 1: Tag filtering (Metadata Loading)
+    features_path = Path(features_dir)
+    if not features_path.exists():
+        raise FileNotFoundError(f"Directory not found: {features_dir}")
+
+    # 1. Tag filtering (Optional)
     valid_ids: Optional[Set[str]] = None
-    
     if metadata_path and (include_tags or exclude_tags):
         logger.info(f"Loading metadata from {metadata_path} for tag filtering...")
         valid_ids = _filter_by_tags(metadata_path, include_tags, exclude_tags)
         logger.info(f"Filtered to {len(valid_ids)} valid IDs based on tags")
-    
-    # Step 2: Feature loading
-    logger.info(f"Loading features from {features_path}...")
-    features_path = Path(features_path)
-    if not features_path.exists():
-        raise FileNotFoundError(f"Features file not found: {features_path}")
-    
-    loaded_dict = torch.load(features_path)
-    logger.info(f"Loaded {len(loaded_dict)} sequences from features file")
-    
-    # Step 3: Intersection (filter by valid_ids and min_len)
-    filtered_tensors: List[torch.Tensor] = []
-    
-    for oeis_id, tensor in loaded_dict.items():
-        # Check if ID is valid (if filtering is enabled)
-        if valid_ids is not None and oeis_id not in valid_ids:
-            continue
-        
-        # Check minimum length
-        if tensor.shape[0] < min_len:
-            continue
-        
-        filtered_tensors.append(tensor)
-    
-    logger.info(f"After filtering: {len(filtered_tensors)} sequences remain")
-    
-    # Step 4: Memory cleanup - delete large dictionary
-    del loaded_dict
-    gc.collect()
-    
-    # Step 5: Splitting
-    random.seed(seed)
-    random.shuffle(filtered_tensors)
-    
-    total = len(filtered_tensors)
-    if total == 0:
-        logger.warning("No sequences remain after filtering!")
-        return IntSeqDataset([]), IntSeqDataset([]), IntSeqDataset([])
-    
-    # Calculate split indices
-    test_size = int(total * test_ratio)
-    val_size = int(total * val_ratio)
-    train_size = total - test_size - val_size
-    
-    train_tensors = filtered_tensors[:train_size]
-    val_tensors = filtered_tensors[train_size:train_size + val_size]
-    test_tensors = filtered_tensors[train_size + val_size:]
-    
-    logger.info(f"Split: Train={len(train_tensors)}, Val={len(val_tensors)}, Test={len(test_tensors)}")
-    
-    # Step 6: Dataset creation
-    train_ds = IntSeqDataset(train_tensors)
-    val_ds = IntSeqDataset(val_tensors)
-    test_ds = IntSeqDataset(test_tensors)
-    
-    return train_ds, val_ds, test_ds
 
+    # 2. Collect all .pt files
+    logger.info(f"Scanning for .pt files in {features_dir}...")
+    # Using glob is faster than os.walk for flat directories
+    all_files = sorted(list(features_path.glob("*.pt")))
+    
+    if len(all_files) == 0:
+        raise ValueError("No .pt files found.")
+        
+    # 3. Apply Filtering
+    final_files = []
+    if valid_ids is not None:
+        for f in all_files:
+            # Assumes filename is "A000001.pt"
+            oeis_id = f.stem 
+            if oeis_id in valid_ids:
+                final_files.append(f)
+        logger.info(f"Retained {len(final_files)} files after tag filtering.")
+    else:
+        final_files = all_files
+
+    if max_samples:
+        final_files = final_files[:max_samples]
+        logger.info(f"Truncating to {max_samples} samples.")
+
+    if len(final_files) == 0:
+        raise ValueError("No files remain after filtering.")
+
+    # 4. Shuffle and Split
+    random.seed(seed)
+    random.shuffle(final_files)
+    
+    n_total = len(final_files)
+    n_test = int(n_total * test_ratio)
+    n_val = int(n_total * val_ratio)
+    n_train = n_total - n_val - n_test
+    
+    train_files = final_files[:n_train]
+    val_files = final_files[n_train:n_train+n_val]
+    test_files = final_files[n_train+n_val:]
+    
+    logger.info(f"Split: Train={len(train_files)}, Val={len(val_files)}, Test={len(test_files)}")
+    
+    return (
+        DualStreamDataset(train_files),
+        DualStreamDataset(val_files),
+        DualStreamDataset(test_files)
+    )
 
 def _filter_by_tags(
     metadata_path: str,
@@ -132,47 +129,33 @@ def _filter_by_tags(
     exclude_tags: Optional[List[str]]
 ) -> Set[str]:
     """
-    Filter OEIS IDs based on keyword tags.
-    
-    Args:
-        metadata_path: Path to JSONL file
-        include_tags: Keep sequences with ANY of these keywords (OR logic)
-        exclude_tags: Remove sequences with ANY of these keywords
-    
-    Returns:
-        Set of valid OEIS IDs that pass the filter
+    Filter OEIS IDs based on keyword tags. Same logic as before.
     """
     valid_ids: Set[str] = set()
-    
     metadata_path = Path(metadata_path)
+    
     if not metadata_path.exists():
         logger.warning(f"Metadata file not found: {metadata_path}")
         return valid_ids
     
     with open(metadata_path, 'r', encoding='utf-8') as f:
         for line in f:
-            if not line.strip():
-                continue
-            
+            if not line.strip(): continue
             try:
                 record = schemas.OEISRecord.from_json_line(line)
                 keywords = record.keywords or []
                 
-                # Exclude filter (takes precedence)
-                if exclude_tags:
-                    if any(tag in keywords for tag in exclude_tags):
-                        continue
+                # Exclude filter
+                if exclude_tags and any(tag in keywords for tag in exclude_tags):
+                    continue
                 
-                # Include filter (if specified, must match at least one)
+                # Include filter
                 if include_tags:
                     if not any(tag in keywords for tag in include_tags):
                         continue
                 
-                # Passed all filters
                 valid_ids.add(record.oeis_id)
-                
-            except Exception as e:
-                logger.warning(f"Error parsing metadata line: {e}")
+            except Exception:
                 continue
-    
+                
     return valid_ids
