@@ -1,227 +1,334 @@
 """
-Tests for the number-theoretic decoder model.
+Tests for IntSeqDecoder module.
+Tests Heteroscedastic Regression heads, Mod Spectrum heads, and Beam Search CRT solver.
 """
 
 import pytest
 import torch
 import math
 
-from intseq_bert.decoder_model import NumberTheoreticDecoder
-from intseq_bert.features import extract_features, log_magnitude
+from intseq_bert.decoder_model import (
+    IntSeqDecoder,
+    extended_gcd,
+    solve_congruence,
+    MOD_RANGE
+)
 
 
-def test_decoder_initialization():
-    """Test decoder can be initialized with default parameters."""
-    decoder = NumberTheoreticDecoder()
-    
-    # Check architecture components exist (Updated for ResNet)
-    # The new model uses input_proj and ResBlocks instead of shared_encoder
-    assert hasattr(decoder, 'input_proj')
-    assert hasattr(decoder, 'input_bn')
-    assert hasattr(decoder, 'fc1')  # ResBlock 1
-    assert hasattr(decoder, 'fc2')  # ResBlock 2
-    
-    assert hasattr(decoder, 'sign_head')
-    assert hasattr(decoder, 'mag_head')
-    
-    # Check all modulo heads
-    assert hasattr(decoder, 'mod3_head')
-    assert hasattr(decoder, 'mod5_head')
-    assert hasattr(decoder, 'mod7_head')   # New
-    assert hasattr(decoder, 'mod8_head')
-    assert hasattr(decoder, 'mod10_head')
-    assert hasattr(decoder, 'mod11_head')  # New
-    assert hasattr(decoder, 'mod13_head')  # New
-    assert hasattr(decoder, 'mod100_head') # New
-    
-    # Check registered buffers for CRT
-    assert hasattr(decoder, 'crt_basis_lut')
-    assert hasattr(decoder, 'crt_lcm_lut')
-    
-    # Check dimensions (Updated defaults)
-    assert decoder.input_dim == 35
-    assert decoder.hidden_dim == 512  # Changed from 256 to 512
-    
-    # Count parameters
-    num_params = sum(p.numel() for p in decoder.parameters() if p.requires_grad)
-    assert num_params > 0
+# ==========================================
+# Helper Functions
+# ==========================================
+
+def create_mock_latent(batch_size: int = 2, d_model: int = 128):
+    """Create mock latent vector input."""
+    return torch.randn(batch_size, d_model)
 
 
-def test_forward_output_structure():
-    """Test forward pass returns correct output structure."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
-    
-    # Single vector input
-    x = torch.randn(35)
-    with torch.no_grad():
-        output = decoder(x)
-    
-    # Check all keys present
-    expected_keys = [
-        "sign", "mag", 
-        "mod3", "mod5", "mod7", "mod8", 
-        "mod10", "mod11", "mod13", "mod100"
-    ]
-    for key in expected_keys:
-        assert key in output
-    
-    # Check shapes
-    assert output["sign"].shape == (1, 3)
-    assert output["mag"].shape == (1, 4096)  # 4096 bins
-    assert output["mod3"].shape == (1, 3)
-    assert output["mod5"].shape == (1, 5)
-    assert output["mod7"].shape == (1, 7)
-    assert output["mod8"].shape == (1, 8)
-    assert output["mod10"].shape == (1, 10)
-    assert output["mod11"].shape == (1, 11)
-    assert output["mod13"].shape == (1, 13)
-    assert output["mod100"].shape == (1, 100)
-    
-    # Batch input
-    x_batch = torch.randn(4, 35)
-    with torch.no_grad():
-        output_batch = decoder(x_batch)
-    
-    assert output_batch["sign"].shape == (4, 3)
-    assert output_batch["mag"].shape == (4, 4096)
+@pytest.fixture
+def sample_decoder():
+    """Create a small decoder for testing."""
+    return IntSeqDecoder(d_model=128, hidden_dim=256, dropout=0.1)
 
 
-def test_batch_reconstruct_simple_numbers():
-    """Test batch reconstruction of simple numbers."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
+# ==========================================
+# 1. Math Utility Tests
+# ==========================================
+
+class TestExtendedGcd:
+    """Tests for extended_gcd function."""
     
-    # Note: Untrained decoder won't give perfect results,
-    # but we test the reconstruction mechanism works (no crashes)
-    test_numbers = [0, 1, -1, 5, -5, 10]
+    def test_gcd_coprime(self):
+        """Test GCD of coprime numbers."""
+        g, x, y = extended_gcd(3, 7)
+        assert g == 1
+        assert 3 * x + 7 * y == g
     
-    # Extract all features at once
-    all_features = [extract_features([num])[0] for num in test_numbers]
-    features_batch = torch.tensor(all_features, dtype=torch.float32)  # (6, 35)
+    def test_gcd_with_common_factor(self):
+        """Test GCD of numbers with common factor."""
+        g, x, y = extended_gcd(12, 18)
+        assert g == 6
+        assert 12 * x + 18 * y == g
     
-    # Batch reconstruct
-    with torch.no_grad():
-        reconstructed, confidences = decoder.batch_reconstruct(features_batch)
+    def test_gcd_with_zero(self):
+        """Test GCD when one number is zero."""
+        g, x, y = extended_gcd(0, 5)
+        assert g == 5
+        assert 0 * x + 5 * y == g
+
+
+class TestSolveCongruence:
+    """Tests for solve_congruence function (CRT solver)."""
     
-    # Check outputs
-    assert len(reconstructed) == len(test_numbers)
-    assert len(confidences) == len(test_numbers)
+    def test_simple_congruence(self):
+        """Test simple CRT problem."""
+        # x = 1 (mod 3), x = 2 (mod 5)
+        # Solution: x = 7 (mod 15)
+        x, lcm = solve_congruence(1, 3, 2, 5)
+        assert lcm == 15
+        assert x == 7
     
-    for i, (recon, conf) in enumerate(zip(reconstructed, confidences)):
-        # Check types - batch_reconstruct returns tensors
-        assert isinstance(recon.item(), int)
-        assert isinstance(conf, (float, torch.Tensor))
+    def test_coprime_moduli(self):
+        """Test with coprime moduli."""
+        # x = 2 (mod 3), x = 3 (mod 7)
+        x, lcm = solve_congruence(2, 3, 3, 7)
+        assert lcm == 21
+        assert x % 3 == 2
+        assert x % 7 == 3
+    
+    def test_inconsistent_system(self):
+        """Test with inconsistent system."""
+        # x = 1 (mod 2), x = 0 (mod 2) -> impossible
+        x, lcm = solve_congruence(1, 2, 0, 2)
+        assert x is None
+        assert lcm == 2
+    
+    def test_non_coprime_moduli_consistent(self):
+        """Test with non-coprime moduli but consistent."""
+        # x = 2 (mod 4), x = 6 (mod 6)
+        # gcd(4,6)=2, (6-2)=4 divisible by 2 -> solvable
+        x, lcm = solve_congruence(2, 4, 6, 6)
+        assert x is not None
+        assert x % 4 == 2
+        assert x % 6 == 6 % 6  # 0
+
+
+# ==========================================
+# 2. Decoder Initialization Tests
+# ==========================================
+
+class TestDecoderInitialization:
+    """Tests for IntSeqDecoder initialization."""
+    
+    def test_default_initialization(self):
+        """Test decoder initializes with default parameters."""
+        decoder = IntSeqDecoder()
+        assert decoder.d_model == 128
+    
+    def test_custom_initialization(self):
+        """Test decoder initializes with custom parameters."""
+        decoder = IntSeqDecoder(d_model=256, hidden_dim=512, dropout=0.2)
+        assert decoder.d_model == 256
+    
+    def test_has_required_components(self, sample_decoder):
+        """Test decoder has all required components."""
+        assert hasattr(sample_decoder, 'trunk')
+        assert hasattr(sample_decoder, 'mag_head')
+        assert hasattr(sample_decoder, 'sign_head')
+        assert hasattr(sample_decoder, 'mod_heads')
+    
+    def test_mod_heads_count(self, sample_decoder):
+        """Test decoder has correct number of mod heads."""
+        # MOD_RANGE is 2..101, so 100 heads
+        assert len(sample_decoder.mod_heads) == 100
+        assert 'mod2' in sample_decoder.mod_heads
+        assert 'mod101' in sample_decoder.mod_heads
+    
+    def test_mod_head_output_dims(self, sample_decoder):
+        """Test each mod head has correct output dimension."""
+        for m in MOD_RANGE:
+            head = sample_decoder.mod_heads[f"mod{m}"]
+            assert head.out_features == m
+
+
+# ==========================================
+# 3. Forward Pass Tests
+# ==========================================
+
+class TestForwardPass:
+    """Tests for forward pass behavior."""
+    
+    def test_output_keys(self, sample_decoder):
+        """Test forward returns correct keys."""
+        x = create_mock_latent()
+        output = sample_decoder(x)
         
-        # Confidence should be a reasonable number
-        conf_val = conf.item() if isinstance(conf, torch.Tensor) else conf
-        assert not math.isnan(conf_val)
-        assert not math.isinf(conf_val)
+        assert 'mag_mu' in output
+        assert 'mag_logvar' in output
+        assert 'sign_logits' in output
+        
+        # Check mod heads
+        for m in MOD_RANGE:
+            assert f"mod{m}" in output
+    
+    def test_output_shapes(self, sample_decoder):
+        """Test output shapes are correct."""
+        batch_size = 4
+        x = create_mock_latent(batch_size=batch_size)
+        output = sample_decoder(x)
+        
+        assert output['mag_mu'].shape == (batch_size, 1)
+        assert output['mag_logvar'].shape == (batch_size, 1)
+        assert output['sign_logits'].shape == (batch_size, 3)
+        
+        # Check some mod head shapes
+        assert output['mod2'].shape == (batch_size, 2)
+        assert output['mod5'].shape == (batch_size, 5)
+        assert output['mod100'].shape == (batch_size, 100)
+        assert output['mod101'].shape == (batch_size, 101)
 
 
-def test_batch_reconstruct_deterministic():
-    """Test that batch reconstruction is deterministic in eval mode."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
+# ==========================================
+# 4. Loss Computation Tests
+# ==========================================
+
+class TestLossComputation:
+    """Tests for compute_loss method."""
     
-    # Test with a batch of numbers
-    test_numbers = [7, 42, 100]
-    all_features = [extract_features([num])[0] for num in test_numbers]
-    features_batch = torch.tensor(all_features, dtype=torch.float32)
+    def test_loss_computation(self, sample_decoder):
+        """Test basic loss computation."""
+        x = create_mock_latent(batch_size=4)
+        predictions = sample_decoder(x)
+        
+        # Create mock targets
+        targets = {
+            'mag': torch.randn(4),  # log10 magnitude
+        }
+        # Add some mod targets
+        for m in [2, 3, 5, 10]:
+            targets[f"mod{m}"] = torch.randint(0, m, (4,))
+        
+        loss = sample_decoder.compute_loss(predictions, targets)
+        
+        assert loss.shape == ()  # Scalar
+        assert not torch.isnan(loss)
+        assert loss.item() >= 0
     
-    # Run reconstruction multiple times
-    with torch.no_grad():
-        reconstructed1, confidences1 = decoder.batch_reconstruct(features_batch)
-        reconstructed2, confidences2 = decoder.batch_reconstruct(features_batch)
-    
-    # Should be deterministic
-    assert torch.equal(reconstructed1, reconstructed2)
-    for c1, c2 in zip(confidences1, confidences2):
-        c1_val = c1.item() if isinstance(c1, torch.Tensor) else c1
-        c2_val = c2.item() if isinstance(c2, torch.Tensor) else c2
-        assert c1_val == pytest.approx(c2_val, abs=1e-5)
+    def test_loss_with_ignore_index(self, sample_decoder):
+        """Test loss ignores padding tokens (-100)."""
+        x = create_mock_latent(batch_size=2)
+        predictions = sample_decoder(x)
+        
+        targets = {
+            'mag': torch.tensor([1.0, 2.0]),
+            'mod3': torch.tensor([1, -100]),  # Second sample is padding
+        }
+        
+        loss = sample_decoder.compute_loss(predictions, targets)
+        
+        # Should not crash and should return valid loss
+        assert not torch.isnan(loss)
 
 
-def test_batch_reconstruct_edge_case_zero():
-    """Test batch reconstruction handles zero correctly."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
+# ==========================================
+# 5. Beam Search Solver Tests
+# ==========================================
+
+class TestBeamSearchSolver:
+    """Tests for beam_search_solve method."""
     
-    features = extract_features([0])
-    features_batch = torch.tensor(features, dtype=torch.float32)  # (1, 35)
+    def test_solver_returns_list(self, sample_decoder):
+        """Test solver returns list of tuples."""
+        sample_decoder.eval()
+        x = create_mock_latent(batch_size=1)
+        
+        with torch.no_grad():
+            predictions = sample_decoder(x)
+            results = sample_decoder.beam_search_solve(predictions, beam_width=5)
+        
+        assert isinstance(results, list)
+        assert all(isinstance(r, tuple) and len(r) == 2 for r in results)
     
-    with torch.no_grad():
-        reconstructed, confidences = decoder.batch_reconstruct(features_batch)
+    def test_solver_handles_zero_sign(self, sample_decoder):
+        """Test solver handles zero prediction correctly."""
+        sample_decoder.eval()
+        x = create_mock_latent(batch_size=1)
+        
+        with torch.no_grad():
+            predictions = sample_decoder(x)
+            # Force sign to be zero
+            predictions['sign_logits'] = torch.tensor([[0.0, 100.0, 0.0]])  # Strong zero
+            
+            results = sample_decoder.beam_search_solve(predictions)
+        
+        # Should return [(0, score)]
+        assert len(results) == 1
+        assert results[0][0] == 0
     
-    # Should return tensor with one integer
-    assert len(reconstructed) == 1
-    assert isinstance(reconstructed[0].item(), int)
-    
-    conf_val = confidences[0].item() if isinstance(confidences[0], torch.Tensor) else confidences[0]
-    assert not math.isnan(conf_val)
+    def test_solver_returns_integers(self, sample_decoder):
+        """Test solver returns integer values."""
+        sample_decoder.eval()
+        x = create_mock_latent(batch_size=1)
+        
+        with torch.no_grad():
+            predictions = sample_decoder(x)
+            # Force positive sign
+            predictions['sign_logits'] = torch.tensor([[0.0, 0.0, 100.0]])
+            results = sample_decoder.beam_search_solve(predictions, beam_width=10)
+        
+        for val, score in results:
+            assert isinstance(val, int)
+            assert isinstance(score, float)
 
 
-def test_batch_reconstruct_with_top_k():
-    """
-    Test batch reconstruction with different top_k values.
-    Note: Dynamic CRT mostly ignores top_k_bins logic inside, but API must support it.
-    """
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
+# ==========================================
+# 6. Gradient Flow Tests
+# ==========================================
+
+class TestGradientFlow:
+    """Tests for gradient flow through the decoder."""
     
-    num = 50
-    features = extract_features([num])
-    features_batch = torch.tensor(features, dtype=torch.float32)
-    
-    # Test with different top_k_bins values (API compatibility check)
-    with torch.no_grad():
-        recon1, conf1 = decoder.batch_reconstruct(features_batch, top_k_bins=5)
-        recon2, conf2 = decoder.batch_reconstruct(features_batch, top_k_bins=20)
-    
-    # Both should complete without error
-    assert len(recon1) == 1
-    assert len(recon2) == 1
-    assert isinstance(recon1[0].item(), int)
-    assert isinstance(recon2[0].item(), int)
+    def test_gradients_flow_through_loss(self, sample_decoder):
+        """Test that gradients flow through loss computation."""
+        x = create_mock_latent(batch_size=2)
+        predictions = sample_decoder(x)
+        
+        targets = {
+            'mag': torch.randn(2),
+            'mod3': torch.randint(0, 3, (2,)),
+            'mod5': torch.randint(0, 5, (2,)),
+        }
+        
+        loss = sample_decoder.compute_loss(predictions, targets)
+        loss.backward()
+        
+        # Check gradients exist
+        assert sample_decoder.trunk[0].weight.grad is not None
+        assert sample_decoder.mag_head.weight.grad is not None
 
 
-def test_batch_reconstruct_eval_mode():
-    """Test that batch reconstruction works regardless of initial model mode."""
-    decoder = NumberTheoreticDecoder()
+# ==========================================
+# 7. Edge Cases
+# ==========================================
+
+class TestEdgeCases:
+    """Tests for edge cases."""
     
-    # Start in train mode
-    decoder.train()
-    assert decoder.training
+    def test_single_item_batch(self, sample_decoder):
+        """Test with batch size of 1."""
+        x = create_mock_latent(batch_size=1)
+        output = sample_decoder(x)
+        
+        assert output['mag_mu'].shape == (1, 1)
     
-    features = torch.randn(2, 35)
+    def test_large_batch(self, sample_decoder):
+        """Test with large batch."""
+        x = create_mock_latent(batch_size=64)
+        output = sample_decoder(x)
+        
+        assert output['mag_mu'].shape == (64, 1)
     
-    # Batch reconstruction should work and switch to eval internally
-    with torch.no_grad():
-        reconstructed, confidences = decoder.batch_reconstruct(features)
-    
-    assert len(reconstructed) == 2
-    assert len(confidences) == 2
-    
-    # Model should still be in train mode after
-    assert decoder.training
+    def test_eval_mode(self, sample_decoder):
+        """Test decoder works in eval mode."""
+        sample_decoder.eval()
+        x = create_mock_latent()
+        
+        with torch.no_grad():
+            output = sample_decoder(x)
+        
+        assert 'mag_mu' in output
 
 
-def test_batch_forward_all_heads():
-    """Test forward pass with batch input for all heads."""
-    decoder = NumberTheoreticDecoder()
-    decoder.eval()
+# ==========================================
+# 8. MOD_RANGE Configuration Tests
+# ==========================================
+
+class TestModRangeConfig:
+    """Tests for MOD_RANGE configuration."""
     
-    batch_size = 8
-    x = torch.randn(batch_size, 35)
-    
-    with torch.no_grad():
-        output = decoder(x)
-    
-    # All outputs should have batch dimension
-    expected_heads = [
-        "sign", "mag", 
-        "mod3", "mod5", "mod7", "mod8", 
-        "mod10", "mod11", "mod13", "mod100"
-    ]
-    for key in expected_heads:
-        assert output[key].shape[0] == batch_size
+    def test_mod_range_coverage(self):
+        """Test that MOD_RANGE covers 2 to 101."""
+        mod_list = list(MOD_RANGE)
+        
+        assert mod_list[0] == 2
+        assert mod_list[-1] == 101
+        assert len(mod_list) == 100
