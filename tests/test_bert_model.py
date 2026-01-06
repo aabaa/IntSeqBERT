@@ -1,351 +1,409 @@
 """
-Tests for IntSeqBERT model.
+Tests for IntSeqBERT Dual Stream model.
+Tests the Transformer encoder with Magnitude + Mod Spectrum fusion.
 """
 
 import pytest
 import torch
 import torch.nn as nn
+import tempfile
+from pathlib import Path
 
 from intseq_bert.bert_model import IntSeqBERT, PositionalEncoding
+
+
+# ==========================================
+# Helper Functions
+# ==========================================
+
+def create_mock_inputs(batch_size: int = 2, seq_len: int = 10):
+    """Create mock inputs for testing."""
+    return {
+        'mag_inputs': torch.randn(batch_size, seq_len, 5),
+        'mod_inputs': torch.randn(batch_size, seq_len, 200),
+        'attention_mask': torch.ones(batch_size, seq_len, dtype=torch.long),
+        'mag_labels': torch.randn(batch_size, seq_len, 5),
+        'mod_labels': torch.randn(batch_size, seq_len, 200),
+        'mask_matrix': torch.zeros(batch_size, seq_len, dtype=torch.bool)
+    }
 
 
 @pytest.fixture
 def sample_model():
     """Create a small IntSeqBERT model for testing."""
     return IntSeqBERT(
-        input_dim=35,
-        d_model=64,  # Smaller for faster tests
+        mag_dim=5,
+        mod_dim=200,
+        d_model=64,
         nhead=4,
-        num_layers=2,  # Fewer layers for faster tests
+        num_layers=2,
         dim_feedforward=128,
-        max_len=100,
         dropout=0.1
     )
 
 
-@pytest.fixture
-def dummy_batch():
-    """Create dummy batch tensors for testing."""
-    batch_size = 2
-    seq_len = 10
-    input_dim = 35
+# ==========================================
+# 1. PositionalEncoding Tests
+# ==========================================
+
+class TestPositionalEncoding:
+    """Tests for PositionalEncoding class."""
     
-    inputs = torch.randn(batch_size, seq_len, input_dim)
-    attention_mask = torch.ones(batch_size, seq_len)  # All valid
-    labels = torch.randn(batch_size, seq_len, input_dim)
-    mask_matrix = torch.zeros(batch_size, seq_len, dtype=torch.bool)
-    mask_matrix[:, 2:5] = True  # Mask positions 2, 3, 4
+    def test_initialization(self):
+        """Test positional encoding can be initialized."""
+        pe = PositionalEncoding(d_model=64)
+        assert pe.pe.shape == (5000, 64)  # Default max_len
     
-    return {
-        "inputs": inputs,
-        "attention_mask": attention_mask,
-        "labels": labels,
-        "mask_matrix": mask_matrix
-    }
+    def test_output_shape(self):
+        """Test output shape matches input."""
+        pe = PositionalEncoding(d_model=64)
+        x = torch.randn(2, 10, 64)
+        
+        output = pe(x)
+        assert output.shape == x.shape
+    
+    def test_long_sequence_truncation(self):
+        """Test that long sequences are handled gracefully."""
+        pe = PositionalEncoding(d_model=64, max_len=100)
+        x = torch.randn(2, 150, 64)  # Longer than max_len
+        
+        output = pe(x)
+        # Should truncate to max_len
+        assert output.shape == (2, 100, 64)
 
 
-def test_positional_encoding():
-    """Test positional encoding module."""
-    d_model = 64
-    max_len = 100
-    pe = PositionalEncoding(d_model, max_len)
+# ==========================================
+# 2. Model Initialization Tests
+# ==========================================
+
+class TestModelInitialization:
+    """Tests for IntSeqBERT initialization."""
     
-    # Test forward pass
-    x = torch.randn(2, 10, d_model)
-    output = pe(x)
+    def test_default_initialization(self):
+        """Test model initializes with default parameters."""
+        model = IntSeqBERT()
+        
+        assert model.mag_dim == 5
+        assert model.mod_dim == 200
+        assert model.d_model == 128
     
-    assert output.shape == x.shape
-    assert output.dtype == x.dtype
+    def test_custom_initialization(self):
+        """Test model initializes with custom parameters."""
+        model = IntSeqBERT(
+            mag_dim=10,
+            mod_dim=300,
+            d_model=256,
+            nhead=8,
+            num_layers=4
+        )
+        
+        assert model.mag_dim == 10
+        assert model.mod_dim == 300
+        assert model.d_model == 256
+    
+    def test_has_required_components(self, sample_model):
+        """Test model has all required components."""
+        model = sample_model
+        
+        # Projection layers
+        assert hasattr(model, 'mag_proj')
+        assert hasattr(model, 'mod_proj')
+        assert hasattr(model, 'fusion_norm')
+        
+        # Transformer components
+        assert hasattr(model, 'pos_encoder')
+        assert hasattr(model, 'encoder')
+        
+        # Prediction heads
+        assert hasattr(model, 'mag_head')
+        assert hasattr(model, 'mod_head')
+    
+    def test_parameter_count(self, sample_model):
+        """Test that model has learnable parameters."""
+        num_params = sum(p.numel() for p in sample_model.parameters() if p.requires_grad)
+        assert num_params > 0
 
 
-def test_model_initialization():
-    """Test that model can be initialized with default parameters."""
-    model = IntSeqBERT()
+# ==========================================
+# 3. Forward Pass Tests
+# ==========================================
+
+class TestForwardPass:
+    """Tests for forward pass behavior."""
     
-    # Check model exists and has expected components
-    assert isinstance(model, nn.Module)
-    assert hasattr(model, 'input_proj')
-    assert hasattr(model, 'pos_encoder')
-    assert hasattr(model, 'encoder')
-    assert hasattr(model, 'prediction_head')
+    def test_output_keys(self, sample_model):
+        """Test forward returns correct keys."""
+        inputs = create_mock_inputs()
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        assert 'encoded_state' in output
+        assert 'pred_mag' in output
+        assert 'pred_mod' in output
+        assert 'loss' in output
     
-    # Check dimensions
-    assert model.input_dim == 35
-    assert model.d_model == 128
+    def test_output_shapes(self, sample_model):
+        """Test output shapes are correct."""
+        batch_size, seq_len = 2, 10
+        inputs = create_mock_inputs(batch_size, seq_len)
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        assert output['encoded_state'].shape == (batch_size, seq_len, 64)  # d_model=64
+        assert output['pred_mag'].shape == (batch_size, seq_len, 5)
+        assert output['pred_mod'].shape == (batch_size, seq_len, 200)
     
-    # Check model can be moved to device (basic sanity check)
-    device = torch.device('cpu')
-    model = model.to(device)
-    assert next(model.parameters()).device.type == 'cpu'
+    def test_loss_none_without_labels(self, sample_model):
+        """Test loss is None when labels not provided."""
+        inputs = create_mock_inputs()
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        assert output['loss'] is None
+    
+    def test_loss_computed_with_labels(self, sample_model):
+        """Test loss is computed when labels are provided."""
+        inputs = create_mock_inputs()
+        # Set some positions as masked
+        inputs['mask_matrix'][:, :3] = True
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask'],
+            inputs['mag_labels'],
+            inputs['mod_labels'],
+            inputs['mask_matrix']
+        )
+        
+        assert output['loss'] is not None
+        assert output['loss'].shape == ()  # Scalar
+        assert output['loss'].item() >= 0
 
 
-def test_forward_inference(sample_model, dummy_batch):
-    """Test forward pass in inference mode (no labels)."""
-    model = sample_model
-    inputs = dummy_batch["inputs"]
-    attention_mask = dummy_batch["attention_mask"]
+# ==========================================
+# 4. Gradient Flow Tests
+# ==========================================
+
+class TestGradientFlow:
+    """Tests for gradient flow through the model."""
     
-    # Forward without labels (inference mode)
-    with torch.no_grad():
-        output = model(inputs, attention_mask)
-    
-    # Check output structure
-    assert "prediction" in output
-    assert "loss" in output
-    
-    # Check prediction shape
-    prediction = output["prediction"]
-    assert prediction.shape == inputs.shape  # (batch, seq_len, input_dim)
-    assert prediction.dtype == torch.float32
-    
-    # Check loss is None in inference mode
-    assert output["loss"] is None
+    def test_gradients_flow(self, sample_model):
+        """Test that gradients flow through all components."""
+        inputs = create_mock_inputs()
+        inputs['mask_matrix'][:, :5] = True
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask'],
+            inputs['mag_labels'],
+            inputs['mod_labels'],
+            inputs['mask_matrix']
+        )
+        
+        output['loss'].backward()
+        
+        # Check gradients exist for key parameters
+        assert sample_model.mag_proj.weight.grad is not None
+        assert sample_model.mod_proj.weight.grad is not None
+        assert sample_model.mag_head[0].weight.grad is not None
+        assert sample_model.mod_head[0].weight.grad is not None
 
 
-def test_forward_training(sample_model, dummy_batch):
-    """Test forward pass in training mode (with labels and loss)."""
-    model = sample_model
-    inputs = dummy_batch["inputs"]
-    attention_mask = dummy_batch["attention_mask"]
-    labels = dummy_batch["labels"]
-    mask_matrix = dummy_batch["mask_matrix"]
+# ==========================================
+# 5. Attention Mask Tests
+# ==========================================
+
+class TestAttentionMask:
+    """Tests for attention mask handling."""
     
-    # Forward with labels (training mode)
-    output = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
-    
-    # Check output structure
-    assert "prediction" in output
-    assert "loss" in output
-    
-    # Check prediction shape
-    prediction = output["prediction"]
-    assert prediction.shape == labels.shape
-    
-    # Check loss is a scalar
-    loss = output["loss"]
-    assert loss is not None
-    assert loss.ndim == 0  # Scalar
-    assert loss.dtype == torch.float32
-    assert loss.item() >= 0  # MSE loss should be non-negative
+    def test_padding_mask_applied(self, sample_model):
+        """Test that padding mask affects output."""
+        batch_size, seq_len = 2, 10
+        inputs = create_mock_inputs(batch_size, seq_len)
+        
+        # Full sequence
+        output1 = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        # Partially padded
+        inputs['attention_mask'][0, 5:] = 0
+        output2 = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        # Encoded states should differ
+        assert not torch.allclose(output1['encoded_state'], output2['encoded_state'])
 
 
-def test_masked_loss_calculation(sample_model):
-    """Test that loss is computed only on masked positions."""
-    model = sample_model
-    batch_size = 2
-    seq_len = 10
-    input_dim = 35
-    
-    # Create inputs where prediction equals labels
-    inputs = torch.randn(batch_size, seq_len, input_dim)
-    attention_mask = torch.ones(batch_size, seq_len)
-    labels = torch.randn(batch_size, seq_len, input_dim)
-    
-    # Create specific mask pattern
-    mask_matrix = torch.zeros(batch_size, seq_len, dtype=torch.bool)
-    mask_matrix[0, 2] = True  # Only one position masked
-    
-    # Forward pass
-    output = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
-    loss = output["loss"]
-    
-    # Loss should be computed (non-zero since prediction != label)
-    assert loss is not None
-    assert loss.item() >= 0
-    
-    # Manual verification: compute expected loss
-    prediction = output["prediction"]
-    masked_pred = prediction[0, 2, :]  # The masked position
-    masked_label = labels[0, 2, :]
-    expected_loss = ((masked_pred - masked_label) ** 2).mean()
-    
-    # Should be close to manually computed loss
-    assert torch.isclose(loss, expected_loss, rtol=1e-4)
+# ==========================================
+# 6. Checkpoint Loading Tests
+# ==========================================
 
-
-def test_edge_case_no_mask(sample_model, dummy_batch):
-    """Test edge case when no positions are masked."""
-    model = sample_model
-    inputs = dummy_batch["inputs"]
-    attention_mask = dummy_batch["attention_mask"]
-    labels = dummy_batch["labels"]
+class TestCheckpointLoading:
+    """Tests for checkpoint save/load functionality."""
     
-    # Create mask with all False (no positions masked)
-    mask_matrix = torch.zeros_like(attention_mask, dtype=torch.bool)
+    def test_save_and_load(self, sample_model, tmp_path):
+        """Test model can be saved and loaded."""
+        # Save checkpoint
+        checkpoint_path = tmp_path / "model.pt"
+        torch.save({
+            'model_state_dict': sample_model.state_dict(),
+            'config': {
+                'mag_dim': 5,
+                'mod_dim': 200,
+                'd_model': 64,
+                'nhead': 4,
+                'num_layers': 2,
+                'dim_feedforward': 128,
+                'dropout': 0.1
+            }
+        }, checkpoint_path)
+        
+        # Load checkpoint
+        loaded_model, checkpoint = IntSeqBERT.load_from_checkpoint(
+            str(checkpoint_path),
+            device='cpu'
+        )
+        
+        # Verify architecture matches
+        assert loaded_model.mag_dim == 5
+        assert loaded_model.mod_dim == 200
+        assert loaded_model.d_model == 64
     
-    # Forward pass
-    output = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
-    loss = output["loss"]
-    
-    # Loss should be 0.0 (not NaN or error)
-    assert loss is not None
-    assert loss.item() == 0.0
-    assert not torch.isnan(loss)
-
-
-def test_gradient_flow(sample_model, dummy_batch):
-    """Test that gradients flow properly through the model."""
-    model = sample_model
-    inputs = dummy_batch["inputs"]
-    attention_mask = dummy_batch["attention_mask"]
-    labels = dummy_batch["labels"]
-    mask_matrix = dummy_batch["mask_matrix"]
-    
-    # Ensure model is in training mode
-    model.train()
-    
-    # Zero gradients
-    model.zero_grad()
-    
-    # Forward pass
-    output = model(inputs, attention_mask, labels=labels, mask_matrix=mask_matrix)
-    loss = output["loss"]
-    
-    # Backward pass
-    loss.backward()
-    
-    # Check that gradients exist for key parameters
-    assert model.input_proj.weight.grad is not None
-    assert model.input_proj.weight.grad.abs().sum() > 0  # Non-zero gradients
-    
-    # Check gradients exist for prediction head
-    for param in model.prediction_head.parameters():
-        if param.requires_grad:
-            assert param.grad is not None
-
-
-def test_attention_mask_handling(sample_model):
-    """Test that attention mask properly handles padding."""
-    model = sample_model
-    batch_size = 2
-    seq_len = 10
-    input_dim = 35
-    
-    inputs = torch.randn(batch_size, seq_len, input_dim)
-    
-    # Create attention mask with padding
-    attention_mask = torch.ones(batch_size, seq_len)
-    attention_mask[0, 7:] = 0  # Pad last 3 positions of first sequence
-    attention_mask[1, 9:] = 0  # Pad last position of second sequence
-    
-    # Forward pass
-    with torch.no_grad():
-        output = model(inputs, attention_mask)
-    
-    # Should complete without errors
-    assert output["prediction"].shape == inputs.shape
-    
-    # Predictions at padded positions should still be computed
-    # (but they won't be used in loss computation)
-    pred = output["prediction"]
-    assert not torch.isnan(pred).any()
-
-
-def test_batch_size_flexibility(sample_model):
-    """Test that model handles different batch sizes."""
-    model = sample_model
-    input_dim = 35
-    
-    # Test with different batch sizes
-    for batch_size in [1, 2, 8]:
-        seq_len = 10
-        inputs = torch.randn(batch_size, seq_len, input_dim)
-        attention_mask = torch.ones(batch_size, seq_len)
+    def test_loaded_model_produces_same_output(self, sample_model, tmp_path):
+        """Test loaded model produces same output as original."""
+        sample_model.eval()
+        
+        # Save
+        checkpoint_path = tmp_path / "model.pt"
+        torch.save({
+            'model_state_dict': sample_model.state_dict(),
+            'config': {
+                'mag_dim': 5,
+                'mod_dim': 200,
+                'd_model': 64,
+                'nhead': 4,
+                'num_layers': 2,
+                'dim_feedforward': 128,
+                'dropout': 0.1
+            }
+        }, checkpoint_path)
+        
+        # Load
+        loaded_model, _ = IntSeqBERT.load_from_checkpoint(str(checkpoint_path), device='cpu')
+        loaded_model.eval()
+        
+        # Compare outputs
+        inputs = create_mock_inputs()
         
         with torch.no_grad():
-            output = model(inputs, attention_mask)
+            output1 = sample_model(inputs['mag_inputs'], inputs['mod_inputs'], inputs['attention_mask'])
+            output2 = loaded_model(inputs['mag_inputs'], inputs['mod_inputs'], inputs['attention_mask'])
         
-        assert output["prediction"].shape == (batch_size, seq_len, input_dim)
+        assert torch.allclose(output1['pred_mag'], output2['pred_mag'])
+        assert torch.allclose(output1['pred_mod'], output2['pred_mod'])
 
 
-def test_sequence_length_flexibility(sample_model):
-    """Test that model handles different sequence lengths."""
-    model = sample_model
-    batch_size = 2
-    input_dim = 35
+# ==========================================
+# 7. Edge Cases
+# ==========================================
+
+class TestEdgeCases:
+    """Tests for edge cases."""
     
-    # Test with different sequence lengths
-    for seq_len in [5, 10, 50]:
-        inputs = torch.randn(batch_size, seq_len, input_dim)
-        attention_mask = torch.ones(batch_size, seq_len)
+    def test_single_item_batch(self, sample_model):
+        """Test with batch size of 1."""
+        inputs = create_mock_inputs(batch_size=1, seq_len=10)
         
-        with torch.no_grad():
-            output = model(inputs, attention_mask)
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
         
-        assert output["prediction"].shape == (batch_size, seq_len, input_dim)
+        assert output['pred_mag'].shape == (1, 10, 5)
+    
+    def test_variable_sequence_lengths(self, sample_model):
+        """Test model handles different sequence lengths."""
+        for seq_len in [5, 10, 50, 100]:
+            inputs = create_mock_inputs(batch_size=2, seq_len=seq_len)
+            
+            output = sample_model(
+                inputs['mag_inputs'],
+                inputs['mod_inputs'],
+                inputs['attention_mask']
+            )
+            
+            assert output['pred_mag'].shape == (2, seq_len, 5)
+    
+    def test_no_masked_positions(self, sample_model):
+        """Test loss computation when no positions are masked."""
+        inputs = create_mock_inputs()
+        # No positions masked (all False)
+        inputs['mask_matrix'] = torch.zeros(2, 10, dtype=torch.bool)
+        
+        output = sample_model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask'],
+            inputs['mag_labels'],
+            inputs['mod_labels'],
+            inputs['mask_matrix']
+        )
+        
+        # Loss should be 0 when no positions are masked
+        assert output['loss'].item() == 0.0
 
 
-def test_load_from_checkpoint(tmp_path):
-    """Test loading a model from checkpoint file."""
-    # Create a model and save a checkpoint
-    model = IntSeqBERT(
-        input_dim=35,
-        d_model=64,
-        nhead=4,
-        num_layers=2
-    )
-    
-    # Create a checkpoint
-    checkpoint_path = tmp_path / "test_checkpoint.pt"
-    checkpoint = {
-        "epoch": 5,
-        "model_state_dict": model.state_dict(),
-        "config": {
-            "input_dim": 35,
-            "d_model": 64,
-            "nhead": 4,
-            "num_layers": 2,
-            "dim_feedforward": 512,
-            "max_len": 5000,
-            "dropout": 0.1
-        },
-        "train_loss": 0.5,
-        "val_loss": 0.6
-    }
-    torch.save(checkpoint, checkpoint_path)
-    
-    # Load the model using classmethod (force CPU for consistent comparison)
-    loaded_model, loaded_checkpoint = IntSeqBERT.load_from_checkpoint(
-        str(checkpoint_path), device='cpu'
-    )
-    
-    # Move original model to CPU for comparison
-    model = model.cpu()
-    
-    # Verify model architecture matches
-    assert loaded_model.input_dim == 35
-    assert loaded_model.d_model == 64
-    
-    # Verify checkpoint data is returned
-    assert loaded_checkpoint["epoch"] == 5
-    assert loaded_checkpoint["train_loss"] == 0.5
-    
-    # Verify state dicts match
-    original_params = model.state_dict()
-    loaded_params = loaded_model.state_dict()
-    
-    for key in original_params.keys():
-        assert torch.allclose(original_params[key], loaded_params[key])
+# ==========================================
+# 8. Device Compatibility Tests
+# ==========================================
 
-
-def test_load_from_checkpoint_with_device(tmp_path):
-    """Test loading with explicit device specification."""
-    model = IntSeqBERT(d_model=32, nhead=2, num_layers=1)
+class TestDeviceCompatibility:
+    """Tests for device compatibility."""
     
-    checkpoint_path = tmp_path / "checkpoint.pt"
-    checkpoint = {
-        "model_state_dict": model.state_dict(),
-        "config": {
-            "d_model": 32,
-            "nhead": 2,
-            "num_layers": 1
-        }
-    }
-    torch.save(checkpoint, checkpoint_path)
+    def test_cpu_execution(self, sample_model):
+        """Test model runs on CPU."""
+        model = sample_model.cpu()
+        inputs = create_mock_inputs()
+        
+        output = model(
+            inputs['mag_inputs'],
+            inputs['mod_inputs'],
+            inputs['attention_mask']
+        )
+        
+        assert output['pred_mag'].device.type == 'cpu'
     
-    # Load with explicit device (cpu always available)
-    loaded_model, _ = IntSeqBERT.load_from_checkpoint(str(checkpoint_path), device='cpu')
-    
-    # Verify model is on CPU
-    assert next(loaded_model.parameters()).device.type == 'cpu'
-
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+    def test_cuda_execution(self, sample_model):
+        """Test model runs on CUDA."""
+        model = sample_model.cuda()
+        inputs = create_mock_inputs()
+        
+        mag = inputs['mag_inputs'].cuda()
+        mod = inputs['mod_inputs'].cuda()
+        attn = inputs['attention_mask'].cuda()
+        
+        output = model(mag, mod, attn)
+        
+        assert output['pred_mag'].device.type == 'cuda'
