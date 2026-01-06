@@ -1,35 +1,50 @@
 # IntSeqBERT
 
-**IntSeqBERT** is a Transformer-based framework designed to learn mathematical representations of integer sequences. Unlike standard language models that treat numbers as text tokens, IntSeqBERT utilizes a **35-dimensional number-theoretic feature vector** and a novel **Probabilistic CRT (Chinese Remainder Theorem) Decoder** to understand the deep structure of sequences.
+**IntSeqBERT** is a neuro-symbolic Transformer framework designed to learn deep mathematical representations of integer sequences.
+
+Unlike standard language models that treat numbers as text tokens, IntSeqBERT utilizes a **Dual Stream Architecture** that simultaneously processes:
+
+1. **Magnitude Stream:** Captures growth rates and approximate values (Continuous).
+2. **Mod Spectrum Stream:** Captures cyclic patterns and divisibility properties across moduli 2 to 101 (Discrete).
+
+Combined with a novel **Beam Search CRT (Chinese Remainder Theorem) Solver**, the system can reconstruct exact integers by solving systems of congruences predicted by the neural network.
 
 ## 🏗 Architecture
 
-The system consists of two main components:
+The system consists of two main stages:
 
-1. **IntSeqBERT (Encoder):**
-   - Compresses integer sequences into dense vector representations.
-   - Input: Sequence of 35-dim feature vectors (Log-magnitude, Prime gaps, Valuation, Algebraic features, etc.).
-   - Objective: Masked Sequence Modeling.
-   - Output: Context-aware feature vectors.
+### 1. IntSeqBERT (Encoder) - *Dual Stream Fusion*
 
-2. **NumberTheoreticDecoder (Decoder):**
-   - Reconstructs integers from the latent vectors produced by IntSeqBERT.
-   - Mechanism: **Multi-Task Learning** + **Probabilistic CRT Search**.
-   - Heads:
-     - **Sign:** Positive / Negative / Zero (3-class classification).
-     - **Magnitude:** 4096-bin classification covering 0 to 10^100.
-     - **Modulo:** Classification of residues for mod 3, 5, 7, 8, 10, 11, 13, 100.
-   - **Uniqueness Period:** LCM(3, 5, 7, 8, 10, 11, 13, 100) = 600,600
+A BERT-style encoder that fuses two distinct feature streams into a unified latent representation.
 
-### Reconstruction Logic: CRT Search
+* **Inputs:**
+  * **Magnitude Stream (5 dims):** Log-magnitude, velocity, acceleration, etc.
+  * **Mod Spectrum Stream (200 dims):** Sin/Cos embeddings for $n \pmod m$ where $m \in [2, 101]$.
+* **Mechanism:** Additive Fusion + Transformer Encoder.
+* **Objective:** Masked Sequence Modeling (Dual Reconstruction Loss).
 
-The decoder doesn't just guess the number. It uses a **"Lattice Search"** approach:
+### 2. IntSeqDecoder (Solver) - *Neuro-Symbolic Reasoning*
 
-1. Estimates the rough range using the **Magnitude** head.
-2. Filters candidates using **Modulo** constraints (Chinese Remainder Theorem).
-3. Even if the magnitude prediction is slightly off, the modulo constraints can "rescue" the prediction and pinpoint the exact integer.
+A decoder that predicts number-theoretic properties and solves for the exact integer.
 
-**Example:** If the magnitude prediction suggests the number is around ±50, but the modulo heads correctly predict (mod 3 = 0, mod 5 = 2, mod 10 = 7), the CRT lattice search can identify the exact value (like 42 or 57) even with imprecise magnitude.
+* **Heads:**
+  * **Magnitude Head:** Heteroscedastic Regression predicting $\mu$ (mean) and $\sigma^2$ (uncertainty) of $\log_{10}|x|$.
+  * **Mod Heads:** 100 separate classification heads predicting $x \pmod m$ for every $m$ from 2 to 101.
+  * **Sign Head:** Classification (-1, 0, 1).
+
+
+
+### Reconstruction Logic: Beam Search CRT
+
+The decoder uses a symbolic solver to find the integer  that best satisfies the predicted constraints:
+
+1. **Entropy Sorting:** Ranks modulo heads by confidence (entropy).
+2. **Beam Search:** Incrementally solves the system of congruences using the **Extended Euclidean Algorithm**, keeping only consistent hypotheses.
+3. **Magnitude Matching:** Selects the candidate that best fits the predicted magnitude distribution $\mathcal{N}(\mu, \sigma^2)$.
+
+This allows the model to "rescue" predictions: even if the magnitude prediction is vague ($1000 \pm 500$), the modulo constraints (e.g., $x \equiv 3 \pmod{101}$) can pinpoint the exact value (e.g., 1215).
+
+---
 
 ## 🚀 Quick Start
 
@@ -38,357 +53,148 @@ The decoder doesn't just guess the number. It uses a **"Lattice Search"** approa
 This project uses `uv` for dependency management.
 
 ```bash
-# Install dependencies
 uv sync
-```
 
-**Requirements:**
-- Python ≥ 3.10
-- PyTorch ≥ 2.0
-- NumPy ≥ 2.4
-- tqdm (progress bars)
+```
 
 ### 2. Data Preparation
 
 **Step 1: Download OEIS Data**
 
 ```bash
-# Download stripped and names file
 mkdir -p data/oeis/raw
 cd data/oeis/raw
 wget http://oeis.org/stripped.gz
 wget http://oeis.org/names.gz
-gunzip stripped.gz
-gunzip names.gz
+# Download sequence metadata (git clone oeisdata/seq...)
+# ... (Standard OEIS data collection steps)
 
-# Download complete OEIS sequence data from GitHub
-cd ../
-git clone https://github.com/oeis/oeisdata/
-mv oeisdata/seq .
-rm -rf oeisdata/
-cd ../..
 ```
 
-**Step 2: Preprocess Raw Data**
-
-Convert raw OEIS format to JSONL:
+**Step 2: Preprocess & Merge Metadata**
 
 ```bash
-uv run python -m intseq_bert.preprocess \
-  stripped \
-  --input data/oeis/raw/stripped \
+# Convert stripped to JSONL
+uv run python -m intseq_bert.preprocess stripped \
+  --input data/oeis/raw/stripped.gz \
   --output data/oeis/data_step1.jsonl
+
+# Merge names and metadata...
+# (Run merge-names and merge-metadata commands)
+
 ```
 
-Merge with sequence names
+**Step 3: Extract Dual Stream Features**
+This step generates individual `.pt` files for each sequence (Lazy Loading ready).
 
 ```bash
-uv run python -m intseq_bert.preprocess \
-  merge-names \
-  --input-jsonl data/oeis/data_step1.jsonl \
-  --input-names data/oeis/raw/names \
-  --output data/oeis/data_step2.jsonl
+uv run python -m intseq_bert.preprocess features \
+  --input data/oeis/data_final.jsonl \
+  --output-dir data/oeis/features \
+  --workers 8
+
 ```
 
-Merge with sequence metadata
-
-```bash
-uv run python -m intseq_bert.preprocess \
-  merge-metadata \
-  --input-jsonl data/oeis/data_step2.jsonl \
-  --seq-dir data/oeis/seq \
-  --output data/oeis/data_step3.jsonl
-```
-
-**Step 3: Extract Features**
-
-Convert JSONL to 35-dimensional feature tensors:
-
-```bash
-uv run python -m intseq_bert.encoder \
-  --input data/oeis/data_step3.jsonl \
-  --output data/oeis/features.pt
-```
-
-This creates a `.pt` file with format: `{oeis_id: Tensor(seq_len, 35)}`
+*Output:* `data/oeis/features/A000001.pt`, `A000002.pt`...
 
 ### 3. Train IntSeqBERT (Encoder)
 
-Train the backbone model to understand sequence contexts.
+Pre-train the encoder using Masked Modeling on both streams.
 
 ```bash
 uv run python -m intseq_bert.train_bert \
-  --features_path data/oeis/features.pt \
-  --output_dir checkpoints/bert
+  --features_dir data/oeis/features \
+  --output_dir checkpoints/bert \
+  --d_model 128 --nhead 4 --num_layers 6 \
+  --epochs 10 --batch_size 32
+
 ```
 
-**Output:**
-- `checkpoints/bert/best_model.pt` - Best model checkpoint
-- `checkpoints/bert/config.json` - Model configuration
-- `checkpoints/bert/train.log` - Training logs
+### 4. Train Decoder (Solver)
 
-### 4. Train Decoder
-
-Train the decoder to map latent vectors back to integers.
-
-> **Important:** Requires both `features.pt` AND original `jsonl` data for ground truth labels.
+Train the decoder to solve for integers using representations from the frozen encoder.
 
 ```bash
 uv run python -m intseq_bert.train_decoder \
-  --bert_checkpoint checkpoints/bert/best_model.pt \
-  --features_path data/oeis/features.pt \
-  --jsonl_path data/oeis/data_step3.jsonl \
-  --output_dir checkpoints/decoder
+  --features_dir data/oeis/features \
+  --encoder_checkpoint checkpoints/bert/best_model.pt \
+  --output_dir checkpoints/decoder \
+  --epochs 10 --lr 5e-4
+
 ```
 
-**Why two data sources?**
-- `features.pt`: Provides input to frozen BERT (35-dim vectors)
-- `jsonl`: Provides ground truth integers for decoder targets (sign, magnitude, modulo)
-
-### 4.1 Bypass Mode (Sanity Check)
-
-For debugging, you can bypass BERT and feed raw features directly to the decoder using `--bypass_bert`:
-
-```bash
-uv run python -m intseq_bert.train_decoder \
-  --bypass_bert \
-  --features_path data/oeis/features.pt \
-  --jsonl_path data/oeis/data_step3.jsonl \
-  --output_dir checkpoints/decoder_bypass \
-  --epochs 5
-```
-
-**Purpose**: This sanity check mode helps isolate whether issues come from:
-- **BERT training** (if bypass mode works but standard mode fails)
-- **Feature quality** (if both modes fail)
-
-In bypass mode, the decoder learns directly from 35-dim features, which already contain modulo information. You should see **mod accuracy reach ~95-100%** within a few epochs, confirming the features are adequate.
+---
 
 ## 📊 Evaluation Metrics
 
-When training the decoder, you will see a **Reconstruction Report**:
+During decoder training, the system evaluates reconstruction capability:
 
-```
+```text
 Evaluation Results:
-  Mag MAE: 0.082
-  Sign Acc: 94.2% | Mod3: 91.8% | Mod10: 87.3%
+  Mag Acc (Bin): 94.2%
+  Mod Accuracies: 3:98% | 7:96% | ... | 100:92%
   Reconstruction (n=500):
-    ✓ Perfect: 356 (71.2%)
-    ✓ Rescued: 78 (15.6%)  ← CRT Success!
-    ✗ Failed: 66 (13.2%)
+    ✓ Perfect: 380 (76.0%)
+    ✓ Rescued: 45 (9.0%)   ← CRT Logic Active
+    ✗ Failed:  75 (15.0%)
+
 ```
 
-**Metrics Explained:**
+* **Rescued:** Cases where the magnitude prediction was imprecise, but the Beam Search CRT solver successfully used modulo constraints to find the correct integer.
 
-- **Perfect:** The model predicted the exact integer correctly from the start.
-- **Rescued (CRT Success):** The magnitude prediction was wrong (error > 0.5), but the Modulo constraints successfully corrected it to the right integer. **This demonstrates the power of the number-theoretic approach.**
-- **Failed:** The model could not recover the integer.
-
-A high "Rescued" count indicates that discrete modulo information is effectively compensating for continuous magnitude errors.
+---
 
 ## 📂 Project Structure
 
-```
-IntSeqBERT/
-├── src/intseq_bert/
-│   ├── bert_model.py         # IntSeqBERT (Encoder) definition
-│   ├── decoder_model.py      # NumberTheoreticDecoder + CRT search
-│   ├── features.py           # 35-dim Feature Extraction logic
-│   ├── encoder.py            # CLI for batch feature encoding
-│   ├── train_bert.py         # Training script for Encoder
-│   ├── train_decoder.py      # Training script for Decoder
-│   ├── loader.py             # Data loading utilities
-│   ├── collator.py           # Batching and masking logic
-│   ├── preprocess.py         # OEIS data preprocessing
-│   └── schemas.py            # Data structures
-├── tests/                    # Comprehensive test suite
-│   ├── test_bert_model.py
-│   ├── test_decoder_model.py
-│   ├── test_train_bert.py
-│   ├── test_train_decoder.py
-│   └── ...
-├── data/                     # Data directory (user-created)
-└── checkpoints/              # Model checkpoints (generated)
+```text
+src/intseq_bert/
+├── bert_model.py       # Dual Stream Encoder (Fusion)
+├── decoder_model.py    # Decoder + Beam Search CRT Solver
+├── features.py         # Feature Extraction (Mag + Mod Spectrum)
+├── preprocess.py       # Data Pipeline Entry Point
+├── train_bert.py       # Encoder Pre-training Script
+├── train_decoder.py    # Decoder Training Script
+├── loader.py           # Lazy Loading Dataset (DualStreamDataset)
+├── collator.py         # Dual Stream Batching & Masking
+├── converters.py       # OEIS Format Parsers
+└── schemas.py          # Data Classes (OEISRecord)
+
+tests/                  # Full Test Suite (148 tests)
+├── test_features.py
+├── test_bert_model.py
+├── test_decoder_model.py
+├── test_train_bert.py
+├── test_train_decoder.py
+└── ...
+
 ```
 
 ## 🧪 Testing
 
-Run the full test suite to ensure system integrity:
+Run the comprehensive test suite to ensure mathematical correctness:
 
 ```bash
 uv run pytest tests/
-```
-
-**Test Coverage:**
-- Feature extraction logic (35 dimensions)
-- BERT model architecture
-- Decoder model with CRT search
-- Data loading and preprocessing
-- Training pipelines (BERT + Decoder)
-- Integration tests
-
-Currently **81 tests**, all passing.
-
-## 🎯 Key Features
-
-### 35-Dimensional Feature Vector
-
-Each integer is represented by:
-- **Log Magnitude** (1 dim): Continuous scale representation
-- **Sign & Direction** (3 dims): Positive/negative/zero classification
-- **Modular Arithmetic** (4 dims): Residues mod 3, 5, 8, 10
-- **Logarithmic Differences** (4 dims): Growth rate indicators
-- **Number-Theoretic Properties** (15 dims): Prime, square, cube, square-free, power-of-2, digit sum, etc.
-
-### Multi-Task Decoder Architecture
 
 ```
-Input (35 dims) → Feature vector from IntSeqBERT
-    ↓
-Shared Encoder
-    Linear(35 → 256) + ReLU + Dropout
-    Linear(256 → 256) + ReLU
-    ↓
-Multi-Task Heads
-    ├─ sign_head: Softmax(256 → 3)
-    ├─ mag_head: Regression(256 → 1)
-    ├─ mod3_head: Softmax(256 → 3)
-    ├─ mod5_head: Softmax(256 → 5)
-    ├─ mod8_head: Softmax(256 → 8)
-    └─ mod10_head: Softmax(256 → 10)
-```
 
-### CRT-Based Integer Reconstruction
+**Coverage:**
 
-The `batch_reconstruct` method implements a fully vectorized bin-based search using GPU acceleration:
+* CRT Solver logic (Extended GCD, Congruence solving)
+* Dual Stream fusion and gradients
+* Heteroscedastic regression loss
+* Lazy loading and batching logic
 
-1. **Top-K Magnitude Bins**: Select top-K most probable magnitude bins (default: K=5) from 4096-bin classification
-2. **Candidate Grid Generation**: For each top bin, generate candidates in range `[bin_center - N, bin_center + N]` where N=neighbors (default: 3)
-3. **Vectorized Scoring**: Score all candidates in parallel using:
-   ```
-   score = Σ log P(c mod k | predictions)  for k ∈ {3,5,7,8,10,11,13,100}
-         + log P(bin(c) | magnitude_prediction)
-   ```
-4. **Batch Selection**: Choose best candidate per sample using argmax over all scores
+## 📝 Advanced Configuration
 
-**Key Advantages:**
-- **50-100x faster** than sequential search through GPU vectorization
-- **Higher precision** through 4096-bin magnitude classification
-- **Stronger constraints** with 8 modulo heads (LCM = 600,600)
-- **Efficient batching** enables fast inference on large datasets
+### Dual Stream Config
 
-This approach leverages both high-resolution magnitude classification and discrete modulo constraints through the Chinese Remainder Theorem.
+The model's capacity to handle modular arithmetic is defined by `mod_dim` (default: 200). This covers sin/cos pairs for all moduli from 2 to 101.
 
-## 📝 Model Checkpoints
+### Decoder Config
 
-### Loading Models
-
-IntSeqBERT models can be loaded using the convenience class method:
-
-```python
-from intseq_bert.bert_model import IntSeqBERT
-
-# Load model with automatic config restoration
-model, checkpoint = IntSeqBERT.load_from_checkpoint(
-    'checkpoints/bert/best_model.pt',
-    device='cuda'
-)
-
-print(f"Loaded model from epoch {checkpoint['epoch']}")
-```
-
-## 🔬 Advanced Usage
-
-Below is a complete list of command-line arguments for training scripts.
-
-### 1. IntSeqBERT Encoder (`train_bert.py`)
-
-Run `python -m intseq_bert.train_bert [options]`
-
-**Data & Output**
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--features_path` | `data/oeis/features.pt` | Path to the feature tensor file. |
-| `--metadata_path` | `None` | Path to metadata JSONL (reserved for filtering). |
-| `--output_dir` | `checkpoints` | Directory to save checkpoints and logs. |
-
-**Model Architecture**
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--d_model` | `128` | Dimension of the Transformer model. |
-| `--nhead` | `4` | Number of attention heads. |
-| `--num_layers` | `6` | Number of encoder layers. |
-| `--dim_feedforward` | `512` | Dimension of the FeedForward Network (FFN). |
-| `--dropout` | `0.1` | Dropout rate. |
-
-**Training Hyperparameters**
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--epochs` | `10` | Total number of training epochs. |
-| `--batch_size` | `32` | Batch size per step. |
-| `--lr` | `1e-4` | Learning rate (AdamW). |
-| `--weight_decay` | `0.01` | Weight decay for regularization. |
-| `--warmup_steps` | `None` | Linear warmup steps (default: 10% of total). |
-| `--max_grad_norm` | `1.0` | Gradient clipping threshold. |
-| `--log_interval` | `100` | Log training metrics every N steps. |
-
-**Data Processing**
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--mask_prob` | `0.15` | Probability of masking tokens (BERT objective). |
-| `--min_len` | `10` | Minimum sequence length to include. |
-| `--val_ratio` | `0.1` | Ratio of data used for validation. |
-| `--test_ratio` | `0.1` | Ratio of data used for testing. |
-| `--seed` | `42` | Random seed for reproducibility. |
-
----
-
-### 2. NumberTheoreticDecoder (`train_decoder.py`)
-
-Run `python -m intseq_bert.train_decoder [options]`
-
-**Required Arguments**
-| Argument | Description |
-| :--- | :--- |
-| `--bert_checkpoint` | Path to the trained IntSeqBERT checkpoint (`.pt`). |
-| `--features_path` | Path to the feature tensor file. |
-| `--jsonl_path` | Path to the original JSONL data (source of ground truth integers). |
-
-**Optional Arguments**
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--output_dir` | `checkpoints/decoder` | Directory to save checkpoints and logs. |
-| `--epochs` | `10` | Total number of training epochs. |
-| `--batch_size` | `32` | Batch size. |
-| `--lr` | `1e-3` | Learning rate. |
-| `--weight_decay` | `0.01` | Weight decay. |
-| `--seed` | `42` | Random seed. |
-| `--bypass_bert` | `False` | **Sanity check mode**: Skip BERT and use raw 35-dim features directly. |
-
-### Example: Training a Large Model
-
-# 1. Train Large Encoder
-```bash
-uv run python -m intseq_bert.train_bert \
-  --features_path data/oeis/features.pt \
-  --output_dir checkpoints/bert_large \
-  --d_model 256 --nhead 8 --num_layers 12 --dim_feedforward 1024 \
-  --epochs 30 --batch_size 64 --lr 5e-5
-```
-
-# 2. Train Decoder on Large Encoder
-```bash
-uv run python -m intseq_bert.train_decoder \
-  --bert_checkpoint checkpoints/bert_large/best_model.pt \
-  --features_path data/oeis/features.pt \
-  --jsonl_path data/oeis/data_step3.jsonl \
-  --output_dir checkpoints/decoder_large \
-  --epochs 20 --lr 5e-4
-```
-
-## 🤝 Contributing
-
-This is a research project exploring neuro-symbolic approaches to integer sequence modeling. Contributions, suggestions, and discussions are welcome!
+* `--hidden_dim`: Size of the decoder's shared trunk layer (default: 512).
+* `--lr`: Learning rate, default 5e-4 for decoder training.
 
 ## 📄 License
 
