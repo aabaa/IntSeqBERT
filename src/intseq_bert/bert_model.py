@@ -1,13 +1,15 @@
 """
 IntSeqBERT: BERT-style Transformer model for integer sequence representation learning.
-Updated for Dual Stream Architecture (Magnitude + Mod Spectrum).
+Updated for Dual Stream Architecture (Magnitude + Mod Spectrum) + Multitask Classification.
 """
 
 import math
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
+# Define MOD_RANGE locally to avoid circular imports with decoder_model
+MOD_RANGE = list(range(2, 102))
 
 class PositionalEncoding(nn.Module):
     """
@@ -28,7 +30,6 @@ class PositionalEncoding(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         seq_len = x.size(1)
-        # Handle cases where input might be longer than max_len during inference (graceful fail or truncate)
         if seq_len > self.pe.size(0):
             seq_len = self.pe.size(0)
             x = x[:, :seq_len, :]
@@ -39,9 +40,14 @@ class PositionalEncoding(nn.Module):
 
 class IntSeqBERT(nn.Module):
     """
-    Dual Stream BERT Model.
-    Fuses Magnitude and Mod Spectrum features, processes them via Transformer,
-    and attempts to reconstruct both streams (masked modeling).
+    Dual Stream BERT Model with Multitask Learning.
+    
+    1. Reconstruction Tasks (MSE):
+       - Reconstruct Magnitude features (dim=5)
+       - Reconstruct Mod Spectrum features (dim=200)
+    
+    2. Classification Tasks (CrossEntropy) [NEW]:
+       - Predict exact residuals for Mod 2 to Mod 101
     
     Args:
         mag_dim: Magnitude feature dimension (default: 5)
@@ -52,6 +58,7 @@ class IntSeqBERT(nn.Module):
         dim_feedforward: FFN hidden dimension (default: 512)
         max_len: Maximum sequence length (default: 5000)
         dropout: Dropout rate (default: 0.1)
+        multitask: Whether to include Mod classification heads (default: True)
     """
     
     def __init__(
@@ -63,20 +70,21 @@ class IntSeqBERT(nn.Module):
         num_layers: int = 6,
         dim_feedforward: int = 512,
         max_len: int = 5000,
-        dropout: float = 0.1
+        dropout: float = 0.1,
+        multitask: bool = True
     ):
         super().__init__()
         
         self.mag_dim = mag_dim
         self.mod_dim = mod_dim
         self.d_model = d_model
+        self.multitask = multitask
         
         # 1. Dual Input Projections
-        # Map disparate feature spaces to common d_model space
         self.mag_proj = nn.Linear(mag_dim, d_model)
         self.mod_proj = nn.Linear(mod_dim, d_model)
         
-        # LayerNorm before transformer is often helpful for fusing streams
+        # Fusion Norm
         self.fusion_norm = nn.LayerNorm(d_model)
         
         # 2. Positional encoding
@@ -94,7 +102,6 @@ class IntSeqBERT(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
         # 4. Dual Prediction Heads (Reconstruction)
-        # Head for Magnitude
         self.mag_head = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.GELU(),
@@ -102,27 +109,31 @@ class IntSeqBERT(nn.Module):
             nn.Linear(d_model, mag_dim)
         )
         
-        # Head for Mod Spectrum
         self.mod_head = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.GELU(),
             nn.LayerNorm(d_model),
             nn.Linear(d_model, mod_dim)
         )
+
+        # 5. Multitask Classification Heads [NEW]
+        if self.multitask:
+            self.mod_cls_heads = nn.ModuleDict({
+                f"mod{m}": nn.Linear(d_model, m) for m in MOD_RANGE
+            })
     
     @classmethod
     def load_from_checkpoint(
         cls,
         checkpoint_path: str,
         device: Optional[str] = None
-    ) -> tuple['IntSeqBERT', Dict]:
+    ) -> Tuple['IntSeqBERT', Dict]:
         if device is None:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         checkpoint = torch.load(checkpoint_path, map_location=device)
         config = checkpoint.get('config', {})
         
-        # Updated args for Dual Stream
         model_args = {
             'mag_dim': config.get('mag_dim', 5),
             'mod_dim': config.get('mod_dim', 200),
@@ -131,15 +142,18 @@ class IntSeqBERT(nn.Module):
             'num_layers': config.get('num_layers', 6),
             'dim_feedforward': config.get('dim_feedforward', 512),
             'max_len': config.get('max_len', 5000),
-            'dropout': config.get('dropout', 0.1)
+            'dropout': config.get('dropout', 0.1),
+            'multitask': config.get('multitask', True) # Default to True for compatibility
         }
         
         model = cls(**model_args)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'], strict=False) 
+        # strict=False allows loading old weights into new multitask architecture 
+        # (missing keys for mod_cls_heads will be ignored initialized randomly)
+        
         model = model.to(device)
         
         return model, checkpoint
-    
     
     def forward(
         self,
@@ -149,24 +163,19 @@ class IntSeqBERT(nn.Module):
         mag_labels: Optional[torch.Tensor] = None,
         mod_labels: Optional[torch.Tensor] = None,
         mask_matrix: Optional[torch.Tensor] = None
-    ) -> Dict[str, Optional[torch.Tensor]]:
+    ) -> Dict[str, Any]:
         """
-        Args:
-            mag_inputs: (B, L, 5) Masked magnitude features
-            mod_inputs: (B, L, 200) Masked mod features
-            attention_mask: (B, L) 1=valid, 0=pad
-            mag_labels: (B, L, 5) Unmasked magnitude features (GT)
-            mod_labels: (B, L, 200) Unmasked mod features (GT)
-            mask_matrix: (B, L) Boolean mask for loss computation
+        Returns dictionary containing:
+          - encoded_state: (B, L, D)
+          - pred_mag: (B, L, 5)
+          - pred_mod: (B, L, 200)
+          - loss: Scalar (Reconstruction Loss only)
+          - mod{N}: (B, L, N) Logits for classification (if multitask)
         """
         
         # Step 1: Embed and Fuse
-        # Project both to d_model
-        x_mag = self.mag_proj(mag_inputs) # (B, L, D)
-        x_mod = self.mod_proj(mod_inputs) # (B, L, D)
-        
-        # Fusion Strategy: Summation (Additive Fusion)
-        # This allows the model to treat Mod info and Mag info as additive attributes of the token
+        x_mag = self.mag_proj(mag_inputs)
+        x_mod = self.mod_proj(mod_inputs)
         x = x_mag + x_mod
         x = self.fusion_norm(x)
         
@@ -181,21 +190,28 @@ class IntSeqBERT(nn.Module):
         pred_mag = self.mag_head(encoded)
         pred_mod = self.mod_head(encoded)
         
-        # Step 5: Compute Loss
+        # Step 5: Compute Reconstruction Loss (Internal convenience)
         loss = None
         if mag_labels is not None and mod_labels is not None and mask_matrix is not None:
             loss_mag = self._compute_masked_loss(pred_mag, mag_labels, mask_matrix, self.mag_dim)
             loss_mod = self._compute_masked_loss(pred_mod, mod_labels, mask_matrix, self.mod_dim)
-            
-            # Joint Loss (Weighted sum could be applied here if needed)
             loss = loss_mag + loss_mod
         
-        return {
-            "encoded_state": encoded,     # Useful for downstream tasks (Decoder)
+        results = {
+            "encoded_state": encoded,
             "pred_mag": pred_mag,
             "pred_mod": pred_mod,
             "loss": loss
         }
+
+        # Step 6: Multitask Heads (Logits)
+        # Note: CE Loss calculation is delegated to the training script
+        if self.multitask:
+            for m in MOD_RANGE:
+                # Reuse the contextualized embeddings to predict residuals
+                results[f"mod{m}"] = self.mod_cls_heads[f"mod{m}"](encoded)
+        
+        return results
     
     def _compute_masked_loss(
         self,
