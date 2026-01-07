@@ -1,6 +1,6 @@
 """
-Tests for IntSeqBERT training script (Dual Stream Architecture).
-Tests LR scheduler, training loop, and CLI.
+Tests for IntSeqBERT training script (Dual Stream + Multitask Learning).
+Tests LR scheduler, training loop with MSE+CE losses, and CLI.
 """
 
 import pytest
@@ -54,11 +54,25 @@ def get_minimal_training_config(features_dir: Path, output_dir: Path) -> dict:
         'num_workers': 0,
         'val_ratio': 0.2,
         'test_ratio': 0.2,
+        'mask_prob': 0.15,
     }
 
 
 # ==========================================
-# 1. LR Scheduler Tests
+# 1. MOD_RANGE Import Tests
+# ==========================================
+
+class TestModRangeImport:
+    """Tests for MOD_RANGE import."""
+    
+    def test_mod_range_imported(self):
+        """Test MOD_RANGE is imported from bert_model."""
+        assert hasattr(train_bert, 'MOD_RANGE')
+        assert len(train_bert.MOD_RANGE) == 100
+
+
+# ==========================================
+# 2. LR Scheduler Tests
 # ==========================================
 
 class TestLRScheduler:
@@ -127,11 +141,11 @@ class TestLRScheduler:
 
 
 # ==========================================
-# 2. Training Smoke Tests
+# 3. Training Smoke Tests
 # ==========================================
 
 class TestTrainingSmoke:
-    """Smoke tests for training loop."""
+    """Smoke tests for training loop with Multitask Learning."""
     
     def test_training_runs_one_epoch(self, tmp_path):
         """Test that training completes without error."""
@@ -154,9 +168,10 @@ class TestTrainingSmoke:
         
         checkpoint = torch.load(tmp_path / "checkpoints" / "best_model.pt")
         
+        # Updated checkpoint structure (simplified)
         assert 'model_state_dict' in checkpoint
-        assert 'optimizer_state_dict' in checkpoint
         assert 'epoch' in checkpoint
+        assert 'global_step' in checkpoint
         assert 'config' in checkpoint
     
     def test_config_saved_to_file(self, tmp_path):
@@ -177,7 +192,7 @@ class TestTrainingSmoke:
 
 
 # ==========================================
-# 3. CLI Tests
+# 4. CLI Tests
 # ==========================================
 
 class TestCLI:
@@ -207,7 +222,7 @@ class TestCLI:
 
 
 # ==========================================
-# 4. Model Loading Tests
+# 5. Model Loading Tests
 # ==========================================
 
 class TestModelLoading:
@@ -228,3 +243,29 @@ class TestModelLoading:
         
         assert model.d_model == 32
         assert checkpoint['epoch'] == 1
+        # Model should have multitask enabled (hardcoded in train_bert.py)
+        assert model.multitask == True
+
+
+# ==========================================
+# 6. Multitask Training Tests
+# ==========================================
+
+class TestMultitaskTraining:
+    """Tests for multitask learning features."""
+    
+    def test_model_has_multitask_heads(self, tmp_path):
+        """Test that trained model has multitask classification heads."""
+        features_dir = create_mock_features_dir(tmp_path, num_files=20)
+        config = get_minimal_training_config(features_dir, tmp_path / "checkpoints")
+        
+        train_bert.train(config)
+        
+        model, _ = bert_model.IntSeqBERT.load_from_checkpoint(
+            str(tmp_path / "checkpoints" / "best_model.pt"),
+            device='cpu'
+        )
+        
+        # Multitask heads should exist
+        assert hasattr(model, 'mod_cls_heads')
+        assert 'mod100' in model.mod_cls_heads

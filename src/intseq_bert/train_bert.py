@@ -1,6 +1,8 @@
 """
-Training script for IntSeqBERT model (Dual Stream Architecture).
-Pretrains the encoder using Masked Modeling on both Magnitude and Mod Spectrum streams.
+Training script for IntSeqBERT model (Dual Stream Architecture) + Multitask Learning.
+Pretrains the encoder using:
+1. Masked Modeling (MSE) on Magnitude and Mod Spectrum streams.
+2. Auxiliary Classification (CrossEntropy) on Modulo residuals.
 """
 
 import argparse
@@ -20,6 +22,7 @@ from tqdm import tqdm
 from . import loader
 from . import collator
 from . import bert_model
+from .bert_model import MOD_RANGE
 
 
 def setup_logging(output_dir: Path) -> logging.Logger:
@@ -62,7 +65,7 @@ def get_cosine_schedule_with_warmup(
 
 
 def train(config: Dict[str, Any]) -> None:
-    """Main training function for Dual Stream BERT."""
+    """Main training function for Dual Stream BERT with Multitask Learning."""
     
     # 1. Setup Output
     output_dir = Path(config.get("output_dir", "checkpoints"))
@@ -70,7 +73,7 @@ def train(config: Dict[str, Any]) -> None:
     
     logger = setup_logging(output_dir)
     logger.info("=" * 50)
-    logger.info("Starting IntSeqBERT Training (Dual Stream)")
+    logger.info("Starting IntSeqBERT Training (Multitask: MSE + CE)")
     logger.info("=" * 50)
     
     # Save config
@@ -93,16 +96,13 @@ def train(config: Dict[str, Any]) -> None:
     # 2. Data Loading
     logger.info("Loading data from directory...")
     
-    # Use the new load_and_split_data for directory-based .pt files
     train_ds, val_ds, test_ds = loader.load_and_split_data(
-        features_dir=config["features_dir"],  # Changed from features_path
+        features_dir=config["features_dir"],
         metadata_path=config.get("metadata_path"),
-        include_tags=config.get("include_tags"),
-        exclude_tags=config.get("exclude_tags"),
         val_ratio=config.get("val_ratio", 0.05),
         test_ratio=config.get("test_ratio", 0.05),
         seed=config.get("seed", 42),
-        max_samples=config.get("max_samples") # Optional debugging limit
+        max_samples=config.get("max_samples")
     )
     
     logger.info(f"Dataset sizes - Train: {len(train_ds)}, Val: {len(val_ds)}, Test: {len(test_ds)}")
@@ -112,8 +112,6 @@ def train(config: Dict[str, Any]) -> None:
         mask_prob=config.get("mask_prob", 0.15)
     )
     
-    # Create DataLoaders
-    # num_workers > 0 is now safe and recommended because Dataset is lazy-loading
     num_workers = config.get("num_workers", 4)
     
     train_loader = DataLoader(
@@ -134,17 +132,8 @@ def train(config: Dict[str, Any]) -> None:
         pin_memory=True
     )
     
-    test_loader = DataLoader(
-        test_ds,
-        batch_size=config.get("batch_size", 32),
-        shuffle=False,
-        collate_fn=data_collator,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-    
     # 3. Model Initialization
-    logger.info("Initializing Dual Stream Model...")
+    logger.info("Initializing Dual Stream Model (Multitask Enabled)...")
     model = bert_model.IntSeqBERT(
         mag_dim=config.get("mag_dim", 5),
         mod_dim=config.get("mod_dim", 200),
@@ -153,7 +142,8 @@ def train(config: Dict[str, Any]) -> None:
         num_layers=config.get("num_layers", 6),
         dim_feedforward=config.get("dim_feedforward", 512),
         max_len=config.get("max_len", 5000),
-        dropout=config.get("dropout", 0.1)
+        dropout=config.get("dropout", 0.1),
+        multitask=True  # Force multitask on
     )
     model = model.to(device)
     
@@ -180,6 +170,9 @@ def train(config: Dict[str, Any]) -> None:
         num_training_steps=num_training_steps
     )
     
+    # Aux Loss Function
+    ce_criterion = nn.CrossEntropyLoss(ignore_index=-100)
+    
     logger.info(f"Training steps: {num_training_steps}, Warmup steps: {num_warmup_steps}")
     
     # 5. Training Loop
@@ -193,14 +186,13 @@ def train(config: Dict[str, Any]) -> None:
         
         # --- Training ---
         model.train()
-        train_loss = 0.0
+        train_loss_total = 0.0
+        train_loss_mse = 0.0
+        train_loss_ce = 0.0
         train_steps = 0
         
         pbar = tqdm(train_loader, desc=f"Training")
         for batch in pbar:
-            # Move batch to device (handle dict keys dynamically)
-            # Keys: mag_inputs, mod_inputs, attention_mask, mask_matrix, mag_labels, mod_labels, targets
-            
             mag_inputs = batch["mag_inputs"].to(device)
             mod_inputs = batch["mod_inputs"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -208,6 +200,9 @@ def train(config: Dict[str, Any]) -> None:
             mag_labels = batch["mag_labels"].to(device)
             mod_labels = batch["mod_labels"].to(device)
             
+            if mask_matrix.sum() == 0:
+                continue
+
             # Forward pass
             outputs = model(
                 mag_inputs=mag_inputs,
@@ -218,39 +213,80 @@ def train(config: Dict[str, Any]) -> None:
                 mask_matrix=mask_matrix
             )
             
-            loss = outputs["loss"]
+            # 1. MSE Loss (Reconstruction) - Calculated inside model
+            loss_mse = outputs["loss"]
+            
+            # 2. CrossEntropy Loss (Multitask Classification)
+            loss_ce = 0.0
+            valid_ce_tasks = 0
+            
+            # Flatten mask for selection
+            flat_mask = mask_matrix.view(-1)
+            
+            # Iterate over all Mod tasks
+            for m in MOD_RANGE:
+                key = f"mod{m}"
+                if key in outputs and "targets" in batch and key in batch["targets"]:
+                    # outputs[key]: (B, L, m) -> Flatten -> Select Masked -> (N_masked, m)
+                    logits = outputs[key].view(-1, m)[flat_mask]
+                    
+                    # targets[key]: (B, L) -> Flatten -> Select Masked -> (N_masked,)
+                    # Note: Collator provides targets with -100 for non-masked, 
+                    # but mask_matrix filtering is safer/cleaner here.
+                    targets = batch["targets"][key].to(device).view(-1)[flat_mask]
+                    
+                    if targets.shape[0] > 0:
+                        l = ce_criterion(logits, targets)
+                        loss_ce += l
+                        valid_ce_tasks += 1
+            
+            if valid_ce_tasks > 0:
+                loss_ce = loss_ce / valid_ce_tasks
+            else:
+                loss_ce = torch.tensor(0.0, device=device)
+
+            # Combined Loss
+            # Weighting CE loss (0.5) to keep balance with MSE
+            loss = loss_mse + 0.5 * loss_ce
             
             # Backward pass
             optimizer.zero_grad()
             loss.backward()
             
-            # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.get("max_grad_norm", 1.0))
             
             optimizer.step()
             scheduler.step()
             
             # Update metrics
-            train_loss += loss.item()
+            train_loss_total += loss.item()
+            train_loss_mse += loss_mse.item()
+            train_loss_ce += loss_ce.item()
             train_steps += 1
             global_step += 1
             
             # Update progress bar
             pbar.set_postfix({
-                "loss": f"{loss.item():.4f}",
+                "loss": f"{loss.item():.3f}",
+                "mse": f"{loss_mse.item():.3f}",
+                "ce": f"{loss_ce.item():.3f}",
                 "lr": f"{scheduler.get_last_lr()[0]:.2e}"
             })
             
-            # Log periodically
             if global_step % config.get("log_interval", 100) == 0:
-                logger.info(f"Step {global_step}: loss={loss.item():.4f}")
+                logger.info(f"Step {global_step}: Total={loss.item():.4f} (MSE={loss_mse.item():.4f}, CE={loss_ce.item():.4f})")
         
-        avg_train_loss = train_loss / train_steps
-        logger.info(f"Average training loss: {avg_train_loss:.4f}")
+        avg_train_loss = train_loss_total / max(1, train_steps)
+        avg_mse = train_loss_mse / max(1, train_steps)
+        avg_ce = train_loss_ce / max(1, train_steps)
+        
+        logger.info(f"Avg Train Loss: {avg_train_loss:.4f} (MSE: {avg_mse:.4f}, CE: {avg_ce:.4f})")
         
         # --- Validation ---
         model.eval()
-        val_loss = 0.0
+        val_loss_total = 0.0
+        val_loss_mse = 0.0
+        val_loss_ce = 0.0
         val_steps = 0
         
         with torch.no_grad():
@@ -262,6 +298,8 @@ def train(config: Dict[str, Any]) -> None:
                 mag_labels = batch["mag_labels"].to(device)
                 mod_labels = batch["mod_labels"].to(device)
                 
+                if mask_matrix.sum() == 0: continue
+
                 outputs = model(
                     mag_inputs=mag_inputs,
                     mod_inputs=mod_inputs,
@@ -271,89 +309,66 @@ def train(config: Dict[str, Any]) -> None:
                     mask_matrix=mask_matrix
                 )
                 
-                loss = outputs["loss"]
-                val_loss += loss.item()
+                l_mse = outputs["loss"]
+                
+                # CE Validation
+                l_ce = 0.0
+                valid_tasks = 0
+                flat_mask = mask_matrix.view(-1)
+                
+                for m in MOD_RANGE:
+                    key = f"mod{m}"
+                    if key in outputs and "targets" in batch and key in batch["targets"]:
+                        logits = outputs[key].view(-1, m)[flat_mask]
+                        targets = batch["targets"][key].to(device).view(-1)[flat_mask]
+                        if targets.shape[0] > 0:
+                            l_ce += ce_criterion(logits, targets)
+                            valid_tasks += 1
+                
+                if valid_tasks > 0:
+                    l_ce = l_ce / valid_tasks
+                else:
+                    l_ce = torch.tensor(0.0, device=device)
+                
+                l_total = l_mse + 0.5 * l_ce
+                
+                val_loss_total += l_total.item()
+                val_loss_mse += l_mse.item()
+                val_loss_ce += l_ce.item()
                 val_steps += 1
         
-        avg_val_loss = val_loss / val_steps if val_steps > 0 else float('inf')
-        logger.info(f"Validation loss: {avg_val_loss:.4f}")
+        avg_val_loss = val_loss_total / max(1, val_steps)
+        logger.info(f"Validation loss: {avg_val_loss:.4f} (MSE: {val_loss_mse/max(1,val_steps):.4f}, CE: {val_loss_ce/max(1,val_steps):.4f})")
         
         # --- Checkpointing ---
         checkpoint = {
             "epoch": epoch,
             "global_step": global_step,
             "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict(),
-            "train_loss": avg_train_loss,
-            "val_loss": avg_val_loss,
             "config": config
         }
         
         # Save last model
-        last_path = output_dir / "last_model.pt"
-        torch.save(checkpoint, last_path)
+        torch.save(checkpoint, output_dir / "last_model.pt")
         
         # Save best model
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            best_path = output_dir / "best_model.pt"
-            torch.save(checkpoint, best_path)
+            torch.save(checkpoint, output_dir / "best_model.pt")
             logger.info(f"✓ New best model! Validation loss: {best_val_loss:.4f}")
-    
-    # 6. Testing (Final Eval)
-    logger.info(f"\n{'=' * 50}")
-    logger.info("Final Evaluation on Test Set")
-    logger.info(f"{'=' * 50}")
-    
-    # Load best model
-    best_checkpoint = torch.load(output_dir / "best_model.pt")
-    model.load_state_dict(best_checkpoint["model_state_dict"])
-    model.eval()
-    
-    test_loss = 0.0
-    test_steps = 0
-    
-    with torch.no_grad():
-        for batch in tqdm(test_loader, desc="Testing"):
-            mag_inputs = batch["mag_inputs"].to(device)
-            mod_inputs = batch["mod_inputs"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            mask_matrix = batch["mask_matrix"].to(device)
-            mag_labels = batch["mag_labels"].to(device)
-            mod_labels = batch["mod_labels"].to(device)
-            
-            outputs = model(
-                mag_inputs=mag_inputs,
-                mod_inputs=mod_inputs,
-                attention_mask=attention_mask,
-                mag_labels=mag_labels,
-                mod_labels=mod_labels,
-                mask_matrix=mask_matrix
-            )
-            test_loss += outputs["loss"].item()
-            test_steps += 1
-    
-    avg_test_loss = test_loss / test_steps if test_steps > 0 else float('inf')
-    logger.info(f"Test loss: {avg_test_loss:.4f}")
     
     logger.info("Training Complete.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train IntSeqBERT model (Dual Stream)")
+    parser = argparse.ArgumentParser(description="Train IntSeqBERT model (Dual Stream + Multitask)")
     
     # Data arguments
-    parser.add_argument("--features_dir", type=str, required=True,
-                        help="Directory containing .pt files (output of preprocess features)")
-    parser.add_argument("--metadata_path", type=str, default=None,
-                        help="Path to metadata JSONL for filtering (optional)")
-    parser.add_argument("--output_dir", type=str, default="checkpoints",
-                        help="Output directory for checkpoints")
-    parser.add_argument("--num_workers", type=int, default=4,
-                        help="Number of dataloader workers")
-    parser.add_argument("--max_samples", type=int, default=None,
-                        help="Limit number of samples for debugging")
+    parser.add_argument("--features_dir", type=str, required=True, help="Directory containing .pt files")
+    parser.add_argument("--metadata_path", type=str, default=None)
+    parser.add_argument("--output_dir", type=str, default="checkpoints")
+    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--max_samples", type=int, default=None)
     
     # Training arguments
     parser.add_argument("--epochs", type=int, default=10)
@@ -372,8 +387,6 @@ def main():
     parser.add_argument("--num_layers", type=int, default=6)
     parser.add_argument("--dim_feedforward", type=int, default=512)
     parser.add_argument("--dropout", type=float, default=0.1)
-    
-    # Masking
     parser.add_argument("--mask_prob", type=float, default=0.15)
     
     args = parser.parse_args()
