@@ -46,6 +46,67 @@ This allows the model to "rescue" predictions: even if the magnitude prediction 
 
 ---
 
+## 📊 Dataset Specifications & Filtering Strategy
+
+This project utilizes the **Online Encyclopedia of Integer Sequences (OEIS)** dataset. To ensure the model learns mathematical reasoning rather than memorization, we strictly classify sequences based on their official OEIS keywords.
+
+We distinguish between **"Solvable"** sequences (governed by mathematical rules such as recurrences or number theory) and **"Noise"** sequences (dependent on external knowledge like language or specific numeral systems).
+
+### 1. Tag Classification
+
+We utilize the [Official OEIS Keywords](https://oeis.org/wiki/Clear-cut_examples_of_keywords) for filtering.
+
+#### ✅ Target Tags (Solvable)
+
+Sequences with these tags are considered to have distinct mathematical properties suitable for neuro-symbolic reasoning.
+
+* **`core`**: Fundamental sequences of central importance.
+* **`easy`**: Sequences where terms can be easily calculated/produced.
+* **`nice`**: Exceptionally interesting or aesthetically pleasing sequences.
+* **`hard`**: Sequences that are well-defined but computationally difficult (included to test model limits).
+* **`nonn`**: Non-negative integers (Base tag for most sequences).
+
+#### 🚫 Excluded Tags (Noise/Unsuitable)
+
+The following categories are excluded from the training set to remove non-mathematical bias.
+
+| Tag | Description | Reason for Exclusion |
+| --- | --- | --- |
+| **`cons`** | Decimal expansions of constants (e.g., , ) | Requires memorization of infinite digits; no local recurrence relation. |
+| **`word`** | Language-dependent (e.g., number of letters in English names) | Depends on linguistic knowledge, not mathematical logic. |
+| **`base`** | Base-dependent (e.g., palindromes, sum of digits) | Depends on the specific numeral system (e.g., base-10), which is arbitrary. |
+| **`fini`** | Finite sequences | Contradicts the "next-token prediction" objective. |
+| **`dead`** | Erroneous or abolished sequences | Low data quality. |
+| **`dumb`** | Unimportant or trivial sequences | Low data quality. |
+| **`unkn`** | Unknown rule | No ground truth logic exists. |
+| **`less`** | Less interesting sequences | Low educational value. |
+
+### 2. Dataset Versions & Extraction Commands
+
+We use standard CLI tools (`grep`) to extract specific subsets from the master dataset (`data_final.jsonl`) generated in the preprocessing step.
+
+#### A. The "Easy" Dataset (PoC)
+
+Used for initial validation. Contains only sequences explicitly tagged as `core`, `easy`, or `nice`.
+
+```bash
+# Extract ~93,000 sequences
+grep -E '"keywords":.*("core"|"easy"|"nice")' data/oeis/data_final.jsonl > data/oeis/data_easy.jsonl
+```
+
+#### B. The "Strict" Dataset (Main Experiment)
+
+Used for final training. This subset excludes all noise tags (`cons`, `base`, `word`, etc.) to focus on mathematically consistent integer sequences.
+
+```bash
+# Extract ~305,000 sequences (Recommended)
+grep -v -E '"keywords":.*("cons"|"fini"|"word"|"dead"|"dumb"|"unkn"|"base"|"less")' data/oeis/data_final.jsonl > data/oeis/data_clean_strict.jsonl
+```
+
+> **Note:** The `grep` pattern matches the JSON structure where keywords are stored as a comma-separated string or list within the `"keywords"` field.
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
