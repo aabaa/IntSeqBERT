@@ -28,18 +28,34 @@ class LinearProbe(nn.Module):
     def forward(self, x):
         return {k: head(x) for k, head in self.heads.items()}
 
-def run_probe(features_dir, encoder_path, max_samples=5000, batch_size=64, epochs=5):
+def run_probe(features_dir, encoder_path, max_samples=5000, batch_size=64, epochs=10, unfreeze=False): # epochs増やし、unfreeze追加
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # 1. Load Frozen Encoder
+    # 1. Load Encoder
     logger.info("Loading Encoder...")
     encoder, _ = bert_model.IntSeqBERT.load_from_checkpoint(encoder_path, device=str(device))
-    encoder.eval()
-    for p in encoder.parameters(): p.requires_grad = False
+    
+    if unfreeze:
+        logger.info("MODE: Encoder Unfrozen (Testing limits)")
+        encoder.train()
+        for p in encoder.parameters(): p.requires_grad = True
+    else:
+        logger.info("MODE: Encoder Frozen (Linear Probe)")
+        encoder.eval()
+        for p in encoder.parameters(): p.requires_grad = False
     
     # 2. Init Linear Probes
     probe = LinearProbe(encoder.d_model).to(device)
-    optimizer = AdamW(probe.parameters(), lr=1e-3)
+    
+    # Optimizer (Encoderも含めるか分岐)
+    if unfreeze:
+        params = list(probe.parameters()) + list(encoder.parameters())
+        lr = 5e-5 # Encoderを壊さないよう低学習率
+    else:
+        params = probe.parameters()
+        lr = 1e-3
+    
+    optimizer = AdamW(params, lr=lr)
     criterion = nn.CrossEntropyLoss()
     
     # 3. Load Data (Subset for quick diagnosis)
@@ -108,5 +124,12 @@ def run_probe(features_dir, encoder_path, max_samples=5000, batch_size=64, epoch
 
 if __name__ == "__main__":
     import sys
-    # Usage: python -m intseq_bert.probe_encoder FEATURES_DIR ENCODER_PATH
-    run_probe(sys.argv[1], sys.argv[2])
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("features_dir")
+    parser.add_argument("encoder_path")
+    parser.add_argument("--unfreeze", action="store_true")
+    args = parser.parse_args()
+    
+    # Usage: python -m intseq_bert.probe_encoder FEATURES_DIR ENCODER_PATH --unfreeze
+    run_probe(args.features_dir, args.encoder_path, unfreeze=args.unfreeze)
