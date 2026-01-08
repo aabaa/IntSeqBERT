@@ -1,9 +1,9 @@
 """
-IntSeqSolver: Bayesian Beam Search Solver with LCM Cap.
+IntSeqSolver: Bayesian Beam Search Solver with Sign Awareness.
 
 Updates:
-- Added 'lcm_limit' to prevent candidate explosion.
-- Stops adding moduli once LCM exceeds the predicted magnitude range.
+- Incorporates Sign prediction (Index 3) to filter candidates.
+- Increased default beam_width for better precision.
 """
 
 import torch
@@ -17,6 +17,7 @@ from .features import extract_features
 
 ALL_MODULI = list(range(2, 102))
 MAG_SIGMA = 0.2
+SIGN_SIGMA = 0.5  # Soft constraint for sign
 
 
 def extended_gcd(a: int, b: int) -> Tuple[int, int, int]:
@@ -39,23 +40,43 @@ def solve_congruence(a1: int, m1: int, a2: int, m2: int) -> Tuple[Optional[int],
     return x, lcm
 
 
-def calculate_magnitude_log_prob(val: int, target_log_mag: float, sigma: float = MAG_SIGMA) -> float:
+def calculate_joint_log_prob(
+    val: int, 
+    target_log_mag: float, 
+    target_sign: float, 
+    mag_sigma: float = MAG_SIGMA
+) -> float:
+    """
+    Calculates joint log probability of Magnitude AND Sign.
+    """
+    # 1. Magnitude Score
     if val == 0:
         log_val = -1.0 
+        val_sign = 0.0
     else:
         log_val = math.log10(abs(val))
-    return -0.5 * ((log_val - target_log_mag) / sigma) ** 2
+        val_sign = 1.0 if val > 0 else -1.0
+    
+    mag_score = -0.5 * ((log_val - target_log_mag) / mag_sigma) ** 2
+    
+    # 2. Sign Score (Regression check)
+    # target_sign is approx 1.0, -1.0, or 0.0
+    # We penalize distance from predicted sign
+    sign_score = -0.5 * ((val_sign - target_sign) / SIGN_SIGMA) ** 2
+    
+    return mag_score + sign_score
 
 
 def beam_search_bayesian(
     mod_probs: Dict[int, np.ndarray],
     pred_log_mag: float,
-    beam_width: int = 20,
+    pred_sign: float,  # NEW: Predicted sign value
+    beam_width: int = 100, # Increased default
     top_per_mod: int = 3,
     prob_threshold: float = 0.01
 ) -> List[Tuple[int, float]]:
     
-    # 1. Sort Moduli by Confidence
+    # 1. Sort Moduli
     mod_order = []
     for m, probs in mod_probs.items():
         max_p = np.max(probs)
@@ -63,32 +84,23 @@ def beam_search_bayesian(
     mod_order.sort(key=lambda x: x[1], reverse=True)
     sorted_moduli = [x[0] for x in mod_order]
 
-    # Calculate LCM Limit based on predicted magnitude
-    # We don't need precision much finer than the target value itself.
-    # Limit LCM to approx 100x the target magnitude to ensure uniqueness.
-    # If pred_log_mag is small (<0), set a minimum limit.
+    # Calculate LCM Limit
     target_mag = 10 ** pred_log_mag
     lcm_limit = max(1000, target_mag * 1000)
 
-    # Beam State: (remainder, lcm, current_log_prob)
+    # Beam State
     beam = [(0, 1, 0.0)]
     
-    # 2. Sequential CRT Application
+    # 2. Sequential CRT
     for m in sorted_moduli:
         probs = mod_probs[m]
         new_beam = []
         
-        # Check top-k probable remainders
         top_rems = np.argsort(probs)[-top_per_mod:][::-1]
         
         for b_rem, b_lcm, b_score in beam:
-            
-            # --- [NEW] LCM Cap Check ---
-            # If current LCM is already large enough to fix the number near target,
-            # we stop adding constraints to avoid overflow/explosion.
-            # However, we allow checking consistency if the new modulus is small/compatible.
+            # LCM Cap
             if b_lcm > lcm_limit:
-                 # Just carry over the candidate (it's precise enough)
                  new_beam.append((b_rem, b_lcm, b_score))
                  continue
 
@@ -103,15 +115,12 @@ def beam_search_bayesian(
                     score_update = np.log(p_new + 1e-12)
                     new_beam.append((new_rem, new_lcm, b_score + score_update))
         
-        # If beam became empty (all conflicts), keep previous beam (trust high confidence mods)
         if not new_beam:
             continue
             
-        # Pruning (Deduplicate by remainder to keep diversity)
-        # Sort by score
         new_beam.sort(key=lambda x: x[2], reverse=True)
         
-        # Simple dedup based on (rem, lcm) to avoid wasting beam width
+        # Deduplicate
         unique_beam = []
         seen = set()
         for item in new_beam:
@@ -128,8 +137,6 @@ def beam_search_bayesian(
     final_candidates = []
     
     for rem, lcm, mod_score in beam:
-        # Find k such that k*lcm + rem is close to target_mag
-        
         k_pos = round((target_mag - rem) / lcm)
         k_neg = round((-target_mag - rem) / lcm)
         
@@ -140,8 +147,9 @@ def beam_search_bayesian(
         for k in search_range:
             val = rem + k * lcm
             
-            mag_score = calculate_magnitude_log_prob(val, pred_log_mag)
-            total_score = mod_score + mag_score
+            # Joint Score with Sign
+            total_score = mod_score + calculate_joint_log_prob(val, pred_log_mag, pred_sign)
+            
             final_candidates.append((val, total_score))
             
     final_candidates.sort(key=lambda x: x[1], reverse=True)
@@ -181,7 +189,7 @@ class IntSeqSolver:
         self,
         input_seq: List[int],
         top_k: int = 5,
-        beam_width: int = 20
+        beam_width: int = 100 # Default increased to 100
     ) -> Dict[str, Any]:
         
         feats = extract_features(input_seq)
@@ -205,7 +213,10 @@ class IntSeqSolver:
         with torch.no_grad():
             outputs = self.model(mag_in, mod_in, mask)
         
+        # Extract LogMag (Index 0) and Sign (Index 3)
         pred_log_mag = outputs['pred_mag'][0, -1, 0].item()
+        pred_sign = outputs['pred_mag'][0, -1, 3].item() # NEW
+        
         pred_magnitude = 10 ** pred_log_mag
         
         mod_probs = {}
@@ -218,6 +229,7 @@ class IntSeqSolver:
         candidates_scored = beam_search_bayesian(
             mod_probs, 
             pred_log_mag, 
+            pred_sign,  # Pass sign
             beam_width=beam_width,
             top_per_mod=5
         )

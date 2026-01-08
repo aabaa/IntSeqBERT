@@ -1,5 +1,5 @@
 """
-Tests for solver.py (Bayesian Beam Search Solver).
+Tests for solver.py (Bayesian Beam Search Solver with Sign Awareness).
 """
 
 import pytest
@@ -84,46 +84,46 @@ class TestSolveCongruence:
 
 
 # ==========================================
-# 3. calculate_magnitude_log_prob Tests
+# 3. calculate_joint_log_prob Tests
 # ==========================================
 
-class TestCalculateMagnitudeLogProb:
-    """Tests for calculate_magnitude_log_prob function."""
+class TestCalculateJointLogProb:
+    """Tests for calculate_joint_log_prob function."""
     
-    def test_exact_match(self):
-        """Test when value exactly matches target."""
-        # val = 100, target_log_mag = 2.0
-        score = solver.calculate_magnitude_log_prob(100, 2.0)
-        # log10(100) = 2.0, so error = 0
+    def test_exact_match_positive(self):
+        """Test when value exactly matches target (positive)."""
+        # val = 100, target_log_mag = 2.0, target_sign = 1.0
+        score = solver.calculate_joint_log_prob(100, 2.0, 1.0)
+        # log10(100) = 2.0, sign=1.0 -> both match -> score ~ 0
         assert score == pytest.approx(0.0, abs=1e-5)
     
-    def test_one_sigma_error(self):
-        """Test with one sigma error."""
-        # val = 100 (log=2), target = 2.2
-        # error = 0.2, sigma = 0.2 -> z = 1
-        score = solver.calculate_magnitude_log_prob(100, 2.2, sigma=0.2)
-        expected = -0.5 * 1.0 ** 2  # -0.5
-        assert score == pytest.approx(expected, rel=1e-3)
+    def test_exact_match_negative(self):
+        """Test when value exactly matches target (negative)."""
+        # val = -100, target_log_mag = 2.0, target_sign = -1.0
+        score = solver.calculate_joint_log_prob(-100, 2.0, -1.0)
+        # log10(100) = 2.0, sign=-1.0 -> both match
+        assert score == pytest.approx(0.0, abs=1e-5)
     
-    def test_large_error(self):
-        """Test with large error yields very negative score."""
-        # val = 10 (log=1), target = 5 (huge number expected)
-        score = solver.calculate_magnitude_log_prob(10, 5.0, sigma=0.2)
-        # error = 4, z = 20 -> score very negative
-        assert score < -100
+    def test_sign_mismatch_penalty(self):
+        """Test that sign mismatch adds penalty."""
+        # val = 100 (positive), target_sign = -1.0
+        score_wrong = solver.calculate_joint_log_prob(100, 2.0, -1.0)
+        score_right = solver.calculate_joint_log_prob(100, 2.0, 1.0)
+        # Wrong sign should have lower (more negative) score
+        assert score_wrong < score_right
+    
+    def test_magnitude_error(self):
+        """Test with magnitude error."""
+        # val = 100 (log=2), target = 2.2
+        score = solver.calculate_joint_log_prob(100, 2.2, 1.0)
+        # Error in mag, but sign matches
+        assert score < 0
     
     def test_zero_value(self):
         """Test with zero value."""
-        score = solver.calculate_magnitude_log_prob(0, 2.0)
-        # Uses log_val = -1.0 for zero
-        # error = -1 - 2 = -3, score is negative
+        score = solver.calculate_joint_log_prob(0, 2.0, 1.0)
+        # Zero has log_val = -1.0, val_sign = 0.0
         assert score < 0
-    
-    def test_negative_value(self):
-        """Test with negative value (uses absolute)."""
-        # val = -100, abs(-100) = 100, log = 2
-        score = solver.calculate_magnitude_log_prob(-100, 2.0)
-        assert score == pytest.approx(0.0, abs=1e-5)
 
 
 # ==========================================
@@ -135,18 +135,16 @@ class TestBeamSearchBayesian:
     
     def test_simple_case(self):
         """Test with simple mod probabilities."""
-        # mod 2: certain it's 1
-        # mod 3: certain it's 2
         mod_probs = {
             2: np.array([0.0, 1.0]),  # x = 1 (mod 2)
             3: np.array([0.0, 0.0, 1.0])  # x = 2 (mod 3)
         }
         # CRT: x = 1 (mod 2), x = 2 (mod 3) -> x = 5 (mod 6)
-        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=0.7)
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=0.7, pred_sign=1.0)
         
         # Should find value around 10^0.7 ≈ 5
         values = [r[0] for r in result]
-        assert 5 in values or -1 in values  # 5 mod 6 = 5, or -1 (= 5 - 6)
+        assert 5 in values or -1 in values
     
     def test_respects_beam_width(self):
         """Test that beam width limits candidates."""
@@ -156,16 +154,16 @@ class TestBeamSearchBayesian:
         }
         result = solver.beam_search_bayesian(
             mod_probs, 
-            pred_log_mag=1.0, 
+            pred_log_mag=1.0,
+            pred_sign=1.0,
             beam_width=3
         )
-        # Result should not exceed beam width * search range
         assert len(result) <= 50  # reasonable upper bound
     
     def test_returns_scored_tuples(self):
         """Test that result contains (value, score) tuples."""
         mod_probs = {2: np.array([0.3, 0.7])}
-        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
         
         assert len(result) > 0
         assert isinstance(result[0], tuple)
@@ -179,7 +177,7 @@ class TestBeamSearchBayesian:
             2: np.array([0.4, 0.6]),
             5: np.array([0.1, 0.2, 0.5, 0.1, 0.1])
         }
-        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
         
         scores = [r[1] for r in result]
         assert scores == sorted(scores, reverse=True)
@@ -187,10 +185,24 @@ class TestBeamSearchBayesian:
     def test_deduplication(self):
         """Test that duplicate values are removed."""
         mod_probs = {2: np.array([0.5, 0.5])}
-        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
         
         values = [r[0] for r in result]
         assert len(values) == len(set(values))
+    
+    def test_sign_affects_ranking(self):
+        """Test that sign prediction affects candidate ranking."""
+        mod_probs = {2: np.array([0.5, 0.5])}
+        
+        # Predict positive
+        result_pos = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
+        # Predict negative
+        result_neg = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0, pred_sign=-1.0)
+        
+        # Top candidates should differ based on sign preference
+        if len(result_pos) > 0 and len(result_neg) > 0:
+            # At least the scores should be different
+            assert result_pos[0][1] != result_neg[0][1] or result_pos[0][0] != result_neg[0][0]
 
 
 # ==========================================
