@@ -25,8 +25,11 @@ from typing import Tuple
 def setup_args():
     parser = argparse.ArgumentParser(description="Final Evaluation for IntSeqBERT (Enc-Dec)")
     
-    # Paths
-    parser.add_argument("--model_path", type=str, required=True, help="Path to checkpoint (contains both enc/dec weights)")
+    # Model Paths
+    parser.add_argument("--model_path", type=str, required=True, help="Path to ENCODER checkpoint (IntSeqBERT)")
+    parser.add_argument("--decoder_path", type=str, default=None, help="Path to DECODER checkpoint (IntSeqDecoder). If None, tries to load from model_path.")
+    
+    # Data paths
     parser.add_argument("--features_dir", type=str, required=True, help="Path to features directory")
     parser.add_argument("--jsonl_path", type=str, required=True, help="Path to raw data_clean_strict.jsonl")
     parser.add_argument("--output_file", type=str, default="evaluation_results.json")
@@ -44,51 +47,57 @@ def setup_args():
     return parser.parse_args()
 
 
-def load_models(model_path: str, device: str) -> Tuple[nn.Module, nn.Module]:
+def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tuple[nn.Module, nn.Module]:
     """
-    Load Encoder and Decoder from a single checkpoint.
+    Load Encoder and Decoder.
+    If decoder_path is provided, loads decoder from there.
+    Otherwise, tries to load both from model_path.
     """
-    print(f"📦 Loading checkpoint from {model_path}...")
-    checkpoint = torch.load(model_path, map_location=device)
-    state_dict = checkpoint['state_dict'] if 'state_dict' in checkpoint else checkpoint
-
-    # Initialize Models (Ensure params match training config)
-    # Assuming standard vocab/dim sizes. Adjust if your config differs.
-    encoder = IntSeqBERT(vocab_size=1000, d_model=512) # Check your d_model dimension!
+    # 1. Initialize Models
+    encoder = IntSeqBERT(vocab_size=1000, d_model=512)
     decoder = IntSeqDecoder(d_model=512, hidden_dim=512)
-
-    # Separate weights
-    enc_state = {}
-    dec_state = {}
     
-    for k, v in state_dict.items():
+    # 2. Load Encoder
+    print(f"📦 Loading Encoder from {model_path}...")
+    enc_checkpoint = torch.load(model_path, map_location=device)
+    enc_state = enc_checkpoint['state_dict'] if 'state_dict' in enc_checkpoint else enc_checkpoint
+    
+    # Filter/Clean keys for encoder
+    clean_enc_state = {}
+    for k, v in enc_state.items():
         if k.startswith("encoder."):
-            enc_state[k.replace("encoder.", "")] = v
-        elif k.startswith("decoder."):
-            dec_state[k.replace("decoder.", "")] = v
-        else:
-            # Fallback for older checkpoints or simple save
-            # Try to assign to encoder if it fits
-            pass
+            clean_enc_state[k.replace("encoder.", "")] = v
+        elif not k.startswith("decoder."): # Assume other keys belong to encoder (e.g. BERT raw keys)
+            clean_enc_state[k] = v
+            
+    encoder.load_state_dict(clean_enc_state, strict=False)
+    
+    # 3. Load Decoder
+    dec_path_to_use = decoder_path if decoder_path else model_path
+    print(f"📦 Loading Decoder from {dec_path_to_use}...")
+    
+    dec_checkpoint = torch.load(dec_path_to_use, map_location=device)
+    dec_state = dec_checkpoint['state_dict'] if 'state_dict' in dec_checkpoint else dec_checkpoint
+    
+    clean_dec_state = {}
+    found_decoder_keys = False
+    for k, v in dec_state.items():
+        if k.startswith("decoder."):
+            clean_dec_state[k.replace("decoder.", "")] = v
+            found_decoder_keys = True
+        elif decoder_path: # If explicit path given, assume all keys are for decoder
+            clean_dec_state[k] = v
+            found_decoder_keys = True
 
-    # Load Weights
-    # strict=False allows loading even if some auxiliary keys are missing
-    if enc_state:
-        encoder.load_state_dict(enc_state, strict=False)
+    if clean_dec_state:
+        decoder.load_state_dict(clean_dec_state, strict=False)
     else:
-        print("⚠️ No specific 'encoder.' keys found. Trying to load entire dict to Encoder.")
-        encoder.load_state_dict(state_dict, strict=False)
-
-    if dec_state:
-        decoder.load_state_dict(dec_state, strict=False)
-    else:
-        print("⚠️ No specific 'decoder.' keys found. Decoder might be uninitialized if weights are missing!")
+        print("⚠️ WARNING: No weights found for Decoder! It will use random initialization.")
 
     encoder.to(device).eval()
     decoder.to(device).eval()
     
     return encoder, decoder
-
 
 def get_test_ids_from_loader(features_dir: str, val_ratio: float, test_ratio: float, seed: int) -> Set[str]:
     """Reproduce test split."""
