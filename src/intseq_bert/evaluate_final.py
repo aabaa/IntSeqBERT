@@ -55,7 +55,7 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     # 1. Initialize Models
     # Ensure d_model matches your training config (usually 512 or 128 depending on your experiments)
     # If your best_model was trained with d_model=512, keep it. If 128, change it here.
-    encoder = IntSeqBERT(vocab_size=1000, d_model=512)
+    encoder = IntSeqBERT(d_model=512)
     decoder = IntSeqDecoder(d_model=512, hidden_dim=512)
     
     # 2. Load Encoder
