@@ -283,7 +283,9 @@ def main():
                     json.dump(results, f, indent=2)
                     
         except Exception as e:
-            # print(f"Error: {e}")
+            print(f"\n🚨 ERROR in sample {i}: {e}")
+            import traceback
+            traceback.print_exc()
             continue
 
     # Final Report
