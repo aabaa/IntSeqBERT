@@ -1,324 +1,217 @@
 """
-Tests for IntSeqSolver (Beam Search + CRT solver).
+Tests for solver.py (Bayesian Beam Search Solver).
 """
 
 import pytest
 import torch
 import numpy as np
 import math
-from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from intseq_bert import solver, bert_model
-
-
-# ==========================================
-# 1. Feature Computation Tests
-# ==========================================
-
-class TestMagnitudeFeatures:
-    """Tests for compute_magnitude_features function."""
-    
-    def test_basic_sequence(self):
-        """Test feature computation for basic sequence."""
-        seq = [1, 2, 3]
-        features = solver.compute_magnitude_features(seq)
-        
-        assert len(features) == 3
-        assert len(features[0]) == 5
-    
-    def test_log_magnitude(self):
-        """Test log magnitude computation."""
-        seq = [10, 100, 1000]
-        features = solver.compute_magnitude_features(seq)
-        
-        # log10(10+1) ≈ 1.04, log10(100+1) ≈ 2.00, log10(1000+1) ≈ 3.00
-        assert features[0][0] == pytest.approx(math.log10(11), rel=1e-5)
-        assert features[1][0] == pytest.approx(math.log10(101), rel=1e-5)
-        assert features[2][0] == pytest.approx(math.log10(1001), rel=1e-5)
-    
-    def test_sign_feature(self):
-        """Test sign computation."""
-        seq = [5, -3, 0]
-        features = solver.compute_magnitude_features(seq)
-        
-        assert features[0][1] == 1   # positive
-        assert features[1][1] == -1  # negative
-        assert features[2][1] == 0   # zero
-    
-    def test_diff_features(self):
-        """Test difference features."""
-        seq = [10, 15, 12]
-        features = solver.compute_magnitude_features(seq)
-        
-        # First element has no diff
-        assert features[0][2] == 0  # diff_log
-        assert features[0][3] == 0  # diff_sign
-        
-        # Second: diff = 15 - 10 = 5 (positive)
-        assert features[1][2] == pytest.approx(math.log10(6), rel=1e-5)
-        assert features[1][3] == 1
-        
-        # Third: diff = 12 - 15 = -3 (negative)
-        assert features[2][2] == pytest.approx(math.log10(4), rel=1e-5)
-        assert features[2][3] == -1
-    
-    def test_position_feature(self):
-        """Test position normalization."""
-        seq = [1, 2, 3, 4, 5]
-        features = solver.compute_magnitude_features(seq)
-        
-        assert features[0][4] == 0.00
-        assert features[1][4] == 0.01
-        assert features[4][4] == 0.04
-
-
-class TestModFeatures:
-    """Tests for compute_mod_features function."""
-    
-    def test_basic_modulo(self):
-        """Test basic modulo computation."""
-        seq = [7]
-        features = solver.compute_mod_features(seq)
-        
-        assert len(features) == 1
-        assert len(features[0]) == 200  # 100 mods duplicated
-        
-        # 7 % 2 = 1, 7 % 3 = 1, 7 % 5 = 2, 7 % 7 = 0
-        assert features[0][0] == 1.0   # mod 2
-        assert features[0][1] == 1.0   # mod 3
-        assert features[0][3] == 2.0   # mod 5
-        assert features[0][5] == 0.0   # mod 7
-    
-    def test_negative_numbers(self):
-        """Test that Python's % works correctly for negatives."""
-        seq = [-7]
-        features = solver.compute_mod_features(seq)
-        
-        # Python: -7 % 3 = 2 (positive result)
-        assert features[0][1] == 2.0  # mod 3
-    
-    def test_large_number(self):
-        """Test with large number."""
-        seq = [12345678]
-        features = solver.compute_mod_features(seq)
-        
-        assert features[0][0] == float(12345678 % 2)
-        assert features[0][99] == float(12345678 % 101)
+from intseq_bert import solver
+from intseq_bert.bert_model import IntSeqBERT
 
 
 # ==========================================
-# 2. Beam Search CRT Tests
+# 1. extended_gcd Tests
 # ==========================================
 
-class TestBeamSearchCRT:
-    """Tests for beam_search_crt function."""
+class TestExtendedGCD:
+    """Tests for extended_gcd function."""
     
-    def test_single_prime_certain(self):
-        """Test with single prime and certain prediction."""
-        # Probability 1.0 for remainder 1 mod 2
-        mod_probs = {2: np.array([0.0, 1.0])}
-        
-        candidates = solver.beam_search_crt(mod_probs, [2])
-        
-        assert len(candidates) >= 1
-        # Should have remainder 1 mod 2
-        assert candidates[0][0] == 1
-        assert candidates[0][1] == 2
+    def test_basic_gcd(self):
+        """Test basic GCD calculation."""
+        d, x, y = solver.extended_gcd(15, 10)
+        assert d == 5  # gcd(15, 10) = 5
     
-    def test_two_primes(self):
-        """Test CRT with two primes."""
-        # x ≡ 1 (mod 2), x ≡ 2 (mod 3) → x ≡ 5 (mod 6)
+    def test_coefficients_satisfy_equation(self):
+        """Test that ax + by = gcd holds."""
+        a, b = 48, 18
+        d, x, y = solver.extended_gcd(a, b)
+        assert d == 6  # gcd(48, 18) = 6
+        assert a * x + b * y == d
+    
+    def test_coprime_numbers(self):
+        """Test with coprime numbers."""
+        d, x, y = solver.extended_gcd(17, 13)
+        assert d == 1
+        assert 17 * x + 13 * y == 1
+    
+    def test_zero_input(self):
+        """Test with zero input."""
+        d, x, y = solver.extended_gcd(0, 5)
+        assert d == 5
+        assert 0 * x + 5 * y == 5
+
+
+# ==========================================
+# 2. solve_congruence Tests
+# ==========================================
+
+class TestSolveCongruence:
+    """Tests for solve_congruence (Generalized CRT)."""
+    
+    def test_coprime_moduli(self):
+        """Test with coprime moduli."""
+        # x = 2 (mod 3), x = 3 (mod 5)
+        x, lcm = solver.solve_congruence(2, 3, 3, 5)
+        assert lcm == 15
+        assert x % 3 == 2
+        assert x % 5 == 3
+    
+    def test_non_coprime_consistent(self):
+        """Test with non-coprime moduli that are consistent."""
+        # x = 2 (mod 6), x = 8 (mod 9)
+        # gcd(6, 9) = 3, and 8 - 2 = 6 is divisible by 3
+        x, lcm = solver.solve_congruence(2, 6, 8, 9)
+        assert lcm == 18
+        assert x % 6 == 2
+        assert x % 9 == 8
+    
+    def test_non_coprime_inconsistent(self):
+        """Test with inconsistent congruences."""
+        # x = 1 (mod 4), x = 2 (mod 6)
+        # gcd(4, 6) = 2, but 2 - 1 = 1 is not divisible by 2
+        x, lcm = solver.solve_congruence(1, 4, 2, 6)
+        assert x is None  # Inconsistent
+    
+    def test_same_modulus(self):
+        """Test with same modulus."""
+        # x = 3 (mod 7), x = 3 (mod 7)
+        x, lcm = solver.solve_congruence(3, 7, 3, 7)
+        assert lcm == 7
+        assert x == 3
+
+
+# ==========================================
+# 3. calculate_magnitude_log_prob Tests
+# ==========================================
+
+class TestCalculateMagnitudeLogProb:
+    """Tests for calculate_magnitude_log_prob function."""
+    
+    def test_exact_match(self):
+        """Test when value exactly matches target."""
+        # val = 100, target_log_mag = 2.0
+        score = solver.calculate_magnitude_log_prob(100, 2.0)
+        # log10(100) = 2.0, so error = 0
+        assert score == pytest.approx(0.0, abs=1e-5)
+    
+    def test_one_sigma_error(self):
+        """Test with one sigma error."""
+        # val = 100 (log=2), target = 2.2
+        # error = 0.2, sigma = 0.2 -> z = 1
+        score = solver.calculate_magnitude_log_prob(100, 2.2, sigma=0.2)
+        expected = -0.5 * 1.0 ** 2  # -0.5
+        assert score == pytest.approx(expected, rel=1e-3)
+    
+    def test_large_error(self):
+        """Test with large error yields very negative score."""
+        # val = 10 (log=1), target = 5 (huge number expected)
+        score = solver.calculate_magnitude_log_prob(10, 5.0, sigma=0.2)
+        # error = 4, z = 20 -> score very negative
+        assert score < -100
+    
+    def test_zero_value(self):
+        """Test with zero value."""
+        score = solver.calculate_magnitude_log_prob(0, 2.0)
+        # Uses log_val = -1.0 for zero
+        # error = -1 - 2 = -3, score is negative
+        assert score < 0
+    
+    def test_negative_value(self):
+        """Test with negative value (uses absolute)."""
+        # val = -100, abs(-100) = 100, log = 2
+        score = solver.calculate_magnitude_log_prob(-100, 2.0)
+        assert score == pytest.approx(0.0, abs=1e-5)
+
+
+# ==========================================
+# 4. beam_search_bayesian Tests
+# ==========================================
+
+class TestBeamSearchBayesian:
+    """Tests for beam_search_bayesian function."""
+    
+    def test_simple_case(self):
+        """Test with simple mod probabilities."""
+        # mod 2: certain it's 1
+        # mod 3: certain it's 2
         mod_probs = {
-            2: np.array([0.0, 1.0]),
-            3: np.array([0.0, 0.0, 1.0])
+            2: np.array([0.0, 1.0]),  # x = 1 (mod 2)
+            3: np.array([0.0, 0.0, 1.0])  # x = 2 (mod 3)
         }
+        # CRT: x = 1 (mod 2), x = 2 (mod 3) -> x = 5 (mod 6)
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=0.7)
         
-        candidates = solver.beam_search_crt(mod_probs, [2, 3])
-        
-        assert len(candidates) >= 1
-        assert candidates[0][0] == 5
-        assert candidates[0][1] == 6
+        # Should find value around 10^0.7 ≈ 5
+        values = [r[0] for r in result]
+        assert 5 in values or -1 in values  # 5 mod 6 = 5, or -1 (= 5 - 6)
     
-    def test_beam_width_limits(self):
+    def test_respects_beam_width(self):
         """Test that beam width limits candidates."""
-        # Uniform probabilities
         mod_probs = {
             2: np.array([0.5, 0.5]),
             3: np.array([0.33, 0.33, 0.34])
         }
-        
-        candidates = solver.beam_search_crt(mod_probs, [2, 3], beam_width=2)
-        
-        assert len(candidates) <= 2
+        result = solver.beam_search_bayesian(
+            mod_probs, 
+            pred_log_mag=1.0, 
+            beam_width=3
+        )
+        # Result should not exceed beam width * search range
+        assert len(result) <= 50  # reasonable upper bound
     
-    def test_probability_threshold(self):
-        """Test probability threshold filtering."""
+    def test_returns_scored_tuples(self):
+        """Test that result contains (value, score) tuples."""
+        mod_probs = {2: np.array([0.3, 0.7])}
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
+        
+        assert len(result) > 0
+        assert isinstance(result[0], tuple)
+        assert len(result[0]) == 2
+        assert isinstance(result[0][0], (int, np.integer))
+        assert isinstance(result[0][1], float)
+    
+    def test_sorted_by_score(self):
+        """Test that results are sorted by score descending."""
         mod_probs = {
-            2: np.array([1e-10, 1.0])  # First is below threshold
+            2: np.array([0.4, 0.6]),
+            5: np.array([0.1, 0.2, 0.5, 0.1, 0.1])
         }
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
         
-        candidates = solver.beam_search_crt(
-            mod_probs, [2], prob_threshold=1e-5
-        )
-        
-        # Only remainder 1 should survive
-        remainders = [c[0] for c in candidates]
-        assert 0 not in remainders
-    
-    def test_empty_primes(self):
-        """Test with no primes."""
-        candidates = solver.beam_search_crt({}, [])
-        
-        # Should return initial candidate (0, 1, 0.0)
-        assert len(candidates) == 1
-        assert candidates[0] == (0, 1, 0.0)
-
-
-# ==========================================
-# 3. Magnitude Matching Tests
-# ==========================================
-
-class TestMagnitudeMatching:
-    """Tests for magnitude_matching function."""
-    
-    def test_exact_match(self):
-        """Test when target matches exactly."""
-        # Candidate: x ≡ 5 (mod 6), target = 5
-        candidates = [(5, 6, 0.0)]
-        
-        results = solver.magnitude_matching(
-            candidates,
-            target_magnitude=5,
-            pred_log_magnitude=math.log10(6),
-            top_k=3
-        )
-        
-        assert 5 in [r[0] for r in results]
-    
-    def test_magnitude_offset(self):
-        """Test finding value with k offset."""
-        # x ≡ 1 (mod 10), target = 31
-        candidates = [(1, 10, 0.0)]
-        
-        results = solver.magnitude_matching(
-            candidates,
-            target_magnitude=31,
-            pred_log_magnitude=math.log10(32),
-            top_k=5
-        )
-        
-        # Should find 31 (= 1 + 3*10)
-        assert 31 in [r[0] for r in results]
+        scores = [r[1] for r in result]
+        assert scores == sorted(scores, reverse=True)
     
     def test_deduplication(self):
         """Test that duplicate values are removed."""
-        # Two candidates that resolve to same value
-        candidates = [
-            (5, 6, -1.0),
-            (5, 6, -2.0),  # Same remainder/modulus, different score
-        ]
+        mod_probs = {2: np.array([0.5, 0.5])}
+        result = solver.beam_search_bayesian(mod_probs, pred_log_mag=1.0)
         
-        results = solver.magnitude_matching(
-            candidates,
-            target_magnitude=5,
-            pred_log_magnitude=math.log10(6),
-            top_k=5
-        )
-        
-        # Value 5 should appear only once
-        values = [r[0] for r in results]
-        assert values.count(5) == 1
-    
-    def test_top_k_limit(self):
-        """Test that top_k limits output."""
-        candidates = [(i, 100, -float(i)) for i in range(10)]
-        
-        results = solver.magnitude_matching(
-            candidates,
-            target_magnitude=50,
-            pred_log_magnitude=math.log10(51),
-            top_k=3
-        )
-        
-        assert len(results) <= 3
+        values = [r[0] for r in result]
+        assert len(values) == len(set(values))
 
 
 # ==========================================
-# 4. IntSeqSolver Class Tests
+# 5. IntSeqSolver Tests
 # ==========================================
 
 class TestIntSeqSolverInit:
     """Tests for IntSeqSolver initialization."""
     
     def test_init_with_model(self):
-        """Test initialization with pre-loaded model."""
-        model = bert_model.IntSeqBERT(
-            d_model=32, num_layers=1, multitask=True
-        )
+        """Test initialization with model object."""
+        model = IntSeqBERT()
+        s = solver.IntSeqSolver(model=model, device="cpu")
         
-        solver_obj = solver.IntSeqSolver(model=model, device='cpu')
-        
-        assert solver_obj.model is not None
-        assert solver_obj.device == 'cpu'
-        assert len(solver_obj.primes) == 26
+        assert s.model is not None
+        assert s.device == "cpu"
     
     def test_init_requires_model(self):
-        """Test that either model or model_path is required."""
+        """Test that initialization requires model or path."""
         with pytest.raises(ValueError):
             solver.IntSeqSolver()
-    
-    def test_custom_primes(self):
-        """Test custom prime list."""
-        model = bert_model.IntSeqBERT(
-            d_model=32, num_layers=1, multitask=True
-        )
-        custom_primes = [2, 3, 5, 7]
-        
-        solver_obj = solver.IntSeqSolver(
-            model=model, device='cpu', primes=custom_primes
-        )
-        
-        assert solver_obj.primes == custom_primes
-
-
-class TestIntSeqSolverPreprocess:
-    """Tests for IntSeqSolver preprocessing."""
-    
-    @pytest.fixture
-    def solver_instance(self):
-        model = bert_model.IntSeqBERT(
-            d_model=32, num_layers=1, multitask=True
-        )
-        return solver.IntSeqSolver(model=model, device='cpu')
-    
-    def test_output_shapes(self, solver_instance):
-        """Test output tensor shapes."""
-        seq = [1, 2, 3, 4, 5]
-        mag, mod, mask = solver_instance.preprocess_sequence(seq, max_len=10)
-        
-        assert mag.shape == (1, 10, 5)
-        assert mod.shape == (1, 10, 200)
-        assert mask.shape == (1, 10)
-    
-    def test_padding(self, solver_instance):
-        """Test sequence padding."""
-        seq = [1, 2, 3]
-        mag, mod, mask = solver_instance.preprocess_sequence(seq, max_len=5)
-        
-        # First 3 positions are valid
-        assert mask[0, 0].item() == 1.0
-        assert mask[0, 2].item() == 1.0
-        # Last 2 are padding
-        assert mask[0, 3].item() == 0.0
-        assert mask[0, 4].item() == 0.0
-    
-    def test_truncation(self, solver_instance):
-        """Test sequence truncation (keep end)."""
-        seq = list(range(20))
-        mag, mod, mask = solver_instance.preprocess_sequence(seq, max_len=10)
-        
-        # All positions should be valid
-        assert mask.sum().item() == 10.0
 
 
 class TestIntSeqSolverSolve:
@@ -326,62 +219,66 @@ class TestIntSeqSolverSolve:
     
     @pytest.fixture
     def solver_instance(self):
-        model = bert_model.IntSeqBERT(
-            d_model=32, num_layers=1, multitask=True
-        )
-        return solver.IntSeqSolver(model=model, device='cpu', primes=[2, 3, 5])
+        """Create solver with mock-like behavior."""
+        model = IntSeqBERT()
+        return solver.IntSeqSolver(model=model, device="cpu")
     
     def test_solve_returns_dict(self, solver_instance):
-        """Test that solve returns expected structure."""
-        seq = [1, 2, 3, 4, 5]
-        result = solver_instance.solve(seq, top_k=3)
+        """Test that solve returns expected dict structure."""
+        result = solver_instance.solve([1, 2, 3, 4, 5])
         
-        assert 'candidates' in result
-        assert 'predicted_magnitude' in result
+        assert "candidates" in result
+        assert "predicted_magnitude" in result
     
     def test_solve_candidates_format(self, solver_instance):
-        """Test candidates format."""
-        seq = [1, 2, 3, 4, 5]
-        result = solver_instance.solve(seq, top_k=3)
+        """Test candidates are list of (value, score) tuples."""
+        result = solver_instance.solve([1, 1, 2, 3, 5])
         
-        candidates = result['candidates']
+        candidates = result["candidates"]
         assert isinstance(candidates, list)
-        
         if len(candidates) > 0:
-            # Each candidate is (value, magnitude_error)
+            assert isinstance(candidates[0], tuple)
             assert len(candidates[0]) == 2
-            assert isinstance(candidates[0][0], (int, float))
-            assert isinstance(candidates[0][1], float)
     
     def test_solve_respects_top_k(self, solver_instance):
-        """Test that top_k limits candidates."""
-        seq = [1, 2, 3, 4, 5]
-        result = solver_instance.solve(seq, top_k=2)
+        """Test that solve returns at most top_k candidates."""
+        result = solver_instance.solve([1, 2, 3, 4, 5], top_k=3)
         
-        assert len(result['candidates']) <= 2
+        assert len(result["candidates"]) <= 3
 
 
 # ==========================================
-# 5. Integration Tests
+# 6. Integration Tests
 # ==========================================
 
 class TestSolverIntegration:
-    """Integration tests with full model."""
+    """Integration tests for the full solver pipeline."""
     
     def test_full_pipeline_smoke(self):
-        """Smoke test for full solver pipeline."""
-        model = bert_model.IntSeqBERT(
-            d_model=32, num_layers=1, multitask=True
-        )
+        """Smoke test for full solving pipeline."""
+        model = IntSeqBERT()
+        s = solver.IntSeqSolver(model=model, device="cpu")
         
-        solver_obj = solver.IntSeqSolver(
-            model=model, device='cpu', primes=[2, 3, 5, 7]
-        )
+        # Test with Fibonacci-like sequence
+        result = s.solve([1, 1, 2, 3, 5, 8, 13], top_k=5)
         
-        # Fibonacci-like sequence
-        seq = [1, 1, 2, 3, 5, 8, 13]
-        result = solver_obj.solve(seq, top_k=5, beam_width=10)
+        assert "candidates" in result
+        assert "predicted_magnitude" in result
+        assert isinstance(result["predicted_magnitude"], float)
+    
+    def test_handles_varied_sequences(self):
+        """Test solver handles different sequence types."""
+        model = IntSeqBERT()
+        s = solver.IntSeqSolver(model=model, device="cpu")
         
-        assert 'candidates' in result
-        assert 'predicted_magnitude' in result
-        assert isinstance(result['predicted_magnitude'], float)
+        # Arithmetic
+        result1 = s.solve([2, 4, 6, 8, 10])
+        assert "candidates" in result1
+        
+        # Powers
+        result2 = s.solve([1, 2, 4, 8, 16])
+        assert "candidates" in result2
+        
+        # Squares
+        result3 = s.solve([1, 4, 9, 16, 25])
+        assert "candidates" in result3

@@ -1,6 +1,15 @@
 """
-IntSeqSolver: Beam Search + CRT solver for integer sequence prediction.
-Uses trained IntSeqBERT encoder to predict the next term in a sequence.
+IntSeqSolver: Bayesian Beam Search Solver.
+
+Algorithm:
+1. Preprocess input using 'extract_features' to match Encoder training.
+2. Predict 'pred_mag' (Log Magnitude) and 'mod_logits' (Mod probabilities).
+3. Sort moduli (2-101) by confidence (max probability).
+4. Apply Generalized CRT sequentially:
+   - Fix "sure bits" first.
+   - Resolve conflicts by prioritizing high-confidence moduli.
+5. Rank candidates by Joint Log-Likelihood:
+   - Score = log P(Mod sequence) + log P(Magnitude | Candidate)
 """
 
 import torch
@@ -8,164 +17,156 @@ import torch.nn.functional as F
 import numpy as np
 import math
 from typing import List, Dict, Tuple, Optional, Any
-from sympy.ntheory.modular import crt
+
 from .bert_model import IntSeqBERT
+from .features import extract_features
+
+# Use ALL moduli (2-101) to maximize information
+ALL_MODULI = list(range(2, 102))
+
+# Heuristic standard deviation for magnitude probability
+# 0.2 in log10 scale allows for approx 1.6x error margin.
+MAG_SIGMA = 0.2
 
 
-# Default prime set for CRT
-DEFAULT_PRIMES = [
-    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
-    59, 61, 67, 71, 73, 79, 83, 89, 97, 101
-]
+def extended_gcd(a: int, b: int) -> Tuple[int, int, int]:
+    """Extended Euclidean Algorithm: ax + by = gcd(a, b)"""
+    if a == 0:
+        return b, 0, 1
+    d, x1, y1 = extended_gcd(b % a, a)
+    x = y1 - (b // a) * x1
+    y = x1
+    return d, x, y
 
 
-def compute_magnitude_features(seq_list: List[int]) -> List[List[float]]:
+def solve_congruence(a1: int, m1: int, a2: int, m2: int) -> Tuple[Optional[int], int]:
     """
-    Compute magnitude features for a sequence.
-    Returns list of [log_magnitude, sign, diff_log, diff_sign, position].
+    Generalized CRT: Solves x = a1 (mod m1), x = a2 (mod m2).
+    Returns (x, lcm) or (None, lcm) if inconsistent.
     """
-    features = []
-    for i, val in enumerate(seq_list):
-        sign = 1 if val > 0 else (-1 if val < 0 else 0)
-        log_val = math.log10(abs(val) + 1)
-        
-        if i > 0:
-            diff = val - seq_list[i - 1]
-            diff_sign = 1 if diff > 0 else (-1 if diff < 0 else 0)
-            diff_log = math.log10(abs(diff) + 1)
-        else:
-            diff_sign = 0
-            diff_log = 0
-        
-        pos = i / 100.0
-        features.append([log_val, sign, diff_log, diff_sign, pos])
+    # Convert to Python int to avoid NumPy overflow
+    a1, m1, a2, m2 = int(a1), int(m1), int(a2), int(m2)
     
-    return features
-
-
-def compute_mod_features(seq_list: List[int]) -> List[List[float]]:
-    """
-    Compute modulo features for a sequence.
-    Returns list of 200-dimensional features (mod residuals for mod 2-101).
+    g, p, q = extended_gcd(m1, m2)
     
-    Note: The model expects 200-dim input where each pair of dimensions
-    represents mod{m} residual information.
+    # Consistency check
+    if (a1 - a2) % g != 0:
+        return None, (m1 * m2) // g
+        
+    lcm = (m1 * m2) // g
+    k = (a2 - a1) // g
+    x = (a1 + m1 * p * k) % lcm
+    return x, lcm
+
+
+def calculate_magnitude_log_prob(val: int, target_log_mag: float, sigma: float = MAG_SIGMA) -> float:
     """
-    features = []
-    for val in seq_list:
-        # Simple: just use residuals directly as floats
-        # Model was trained with this format
-        mods = [float(val % m) for m in range(2, 102)]
-        # Duplicate to get 200 dimensions (matching training data format)
-        mods = mods + mods  # 100 + 100 = 200
-        features.append(mods)
-    return features
+    Calculates log probability of value x given target log-magnitude.
+    Assumes Gaussian distribution in log-space.
+    """
+    if val == 0:
+        # Assign a low probability for 0 if target is large
+        log_val = -1.0 
+    else:
+        log_val = math.log10(abs(val))
+    
+    # Log-Likelihood of Gaussian (ignoring constants)
+    return -0.5 * ((log_val - target_log_mag) / sigma) ** 2
 
 
-def beam_search_crt(
+def beam_search_bayesian(
     mod_probs: Dict[int, np.ndarray],
-    primes: List[int],
+    pred_log_mag: float,
     beam_width: int = 20,
-    top_per_mod: int = 5,
-    prob_threshold: float = 1e-5
-) -> List[Tuple[int, int, float]]:
-    """
-    Perform beam search using Chinese Remainder Theorem.
-    
-    Args:
-        mod_probs: Dictionary mapping prime p to probability array of length p
-        primes: List of primes to use for CRT
-        beam_width: Maximum number of candidates to keep
-        top_per_mod: Number of top remainders to consider per modulus
-        prob_threshold: Minimum probability threshold
-        
-    Returns:
-        List of (remainder, modulus, log_probability) tuples
-    """
-    candidates = [(0, 1, 0.0)]
-    
-    for p in primes:
-        if p not in mod_probs:
-            continue
-            
-        probs = mod_probs[p]
-        new_candidates = []
-        
-        # Get top remainders by probability
-        top_rems = np.argsort(probs)[-top_per_mod:][::-1]
-        
-        for rem, modulus, score in candidates:
-            for r_new in top_rems:
-                prob_new = probs[r_new]
-                if prob_new < prob_threshold:
-                    continue
-                
-                try:
-                    res = crt([modulus, p], [rem, r_new])
-                    if res is None:
-                        continue
-                    
-                    new_rem, new_mod = res
-                    new_score = score + np.log(prob_new + 1e-10)
-                    new_candidates.append((int(new_rem), int(new_mod), new_score))
-                except Exception:
-                    continue
-        
-        # Keep top candidates
-        new_candidates.sort(key=lambda x: x[2], reverse=True)
-        candidates = new_candidates[:beam_width]
-    
-    return candidates
-
-
-def magnitude_matching(
-    candidates: List[Tuple[int, int, float]],
-    target_magnitude: float,
-    pred_log_magnitude: float,
-    top_k: int = 5
+    top_per_mod: int = 3,
+    prob_threshold: float = 0.01
 ) -> List[Tuple[int, float]]:
     """
-    Match CRT candidates to predicted magnitude.
-    
-    Args:
-        candidates: List of (remainder, modulus, score) from beam search
-        target_magnitude: Predicted magnitude (linear scale)
-        pred_log_magnitude: Predicted log magnitude
-        top_k: Number of final candidates to return
-        
-    Returns:
-        List of (value, magnitude_error) tuples
+    Bayesian Beam Search implementation.
     """
-    final_results = []
     
-    for rem, modulus, score in candidates:
-        k_approx = round((target_magnitude - rem) / modulus) if modulus > 0 else 0
+    # 1. Sort Moduli by Confidence
+    mod_order = []
+    for m, probs in mod_probs.items():
+        max_p = np.max(probs)
+        mod_order.append((m, max_p))
+    
+    # Sort descending: process strongest signals first
+    mod_order.sort(key=lambda x: x[1], reverse=True)
+    sorted_moduli = [x[0] for x in mod_order]
+
+    # Beam State: (remainder, lcm, current_log_prob)
+    beam = [(0, 1, 0.0)]
+    
+    # 2. Sequential CRT Application
+    for m in sorted_moduli:
+        probs = mod_probs[m]
+        new_beam = []
         
-        for k in [k_approx, k_approx - 1, k_approx + 1]:
-            val = rem + k * modulus
+        # Check top-k probable remainders for this mod
+        top_rems = np.argsort(probs)[-top_per_mod:][::-1]
+        
+        for b_rem, b_lcm, b_score in beam:
+            # Optimization: If LCM covers huge range, we essentially know the number.
+            # But we continue to accumulate probability scores.
             
-            try:
-                val_log = math.log10(abs(val) + 1)
-                mag_error = abs(val_log - pred_log_magnitude)
-            except Exception:
-                mag_error = 100.0
+            for r_new in top_rems:
+                p_new = probs[r_new]
+                if p_new < prob_threshold:
+                    continue
+                
+                # Attempt to merge
+                new_rem, new_lcm = solve_congruence(b_rem, b_lcm, r_new, m)
+                
+                if new_rem is not None:
+                    # Consistent!
+                    score_update = np.log(p_new + 1e-12)
+                    new_beam.append((new_rem, new_lcm, b_score + score_update))
+        
+        # If no consistent paths found for this mod, skip it (trust previous confident mods)
+        if not new_beam:
+            continue
             
-            final_results.append((val, mag_error, score))
+        # Pruning
+        new_beam.sort(key=lambda x: x[2], reverse=True)
+        beam = new_beam[:beam_width]
     
-    # Sort by score (higher is better)
-    final_results.sort(key=lambda x: x[2], reverse=True)
+    # 3. Final Candidate Generation & Scoring
+    final_candidates = []
+    target_magnitude = 10 ** pred_log_mag
     
-    # Deduplicate and return top_k
-    output = []
+    for rem, lcm, mod_score in beam:
+        # We need to find integer k such that x = k*lcm + rem is close to target_magnitude
+        
+        # Check both positive and negative neighbors
+        k_pos = round((target_magnitude - rem) / lcm)
+        k_neg = round((-target_magnitude - rem) / lcm)
+        
+        search_range = set()
+        for k in range(k_pos - 1, k_pos + 2): search_range.add(k)
+        for k in range(k_neg - 1, k_neg + 2): search_range.add(k)
+        
+        for k in search_range:
+            val = rem + k * lcm
+            
+            # Joint Score = Mod Score + Mag Score
+            mag_score = calculate_magnitude_log_prob(val, pred_log_mag)
+            total_score = mod_score + mag_score
+            
+            final_candidates.append((val, total_score))
+            
+    # Sort by Joint Score
+    final_candidates.sort(key=lambda x: x[1], reverse=True)
+    
+    # Deduplicate
+    unique_results = []
     seen = set()
-    for val, err, _ in final_results:
+    for val, score in final_candidates:
         if val not in seen:
-            output.append((val, err))
+            unique_results.append((val, score))
             seen.add(val)
-        if len(output) >= top_k:
-            break
     
-    return output
+    return unique_results
 
 
 class IntSeqSolver:
@@ -176,19 +177,8 @@ class IntSeqSolver:
         model_path: Optional[str] = None,
         model: Optional[IntSeqBERT] = None,
         device: Optional[str] = None,
-        primes: Optional[List[int]] = None
     ):
-        """
-        Initialize solver with trained encoder.
-        
-        Args:
-            model_path: Path to checkpoint file
-            model: Pre-loaded model (alternative to model_path)
-            device: Device to use ('cuda' or 'cpu')
-            primes: List of primes for CRT (default: 26 primes up to 101)
-        """
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.primes = primes or DEFAULT_PRIMES
         
         if model is not None:
             self.model = model.to(self.device)
@@ -200,42 +190,6 @@ class IntSeqSolver:
         else:
             raise ValueError("Either model_path or model must be provided")
     
-    def preprocess_sequence(
-        self,
-        seq_list: List[int],
-        max_len: int = 128
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Convert integer list to model input tensors.
-        
-        Args:
-            seq_list: Input sequence
-            max_len: Maximum sequence length
-            
-        Returns:
-            Tuple of (mag_tensor, mod_tensor, mask_tensor)
-        """
-        mag_features = compute_magnitude_features(seq_list)
-        mod_features = compute_mod_features(seq_list)
-        
-        curr_len = len(seq_list)
-        
-        if curr_len < max_len:
-            pad_len = max_len - curr_len
-            mag_features += [[0.0] * 5] * pad_len
-            mod_features += [[0] * 200] * pad_len
-            mask = [1.0] * curr_len + [0.0] * pad_len
-        else:
-            mag_features = mag_features[-max_len:]
-            mod_features = mod_features[-max_len:]
-            mask = [1.0] * max_len
-        
-        mag_tensor = torch.tensor([mag_features], dtype=torch.float32).to(self.device)
-        mod_tensor = torch.tensor([mod_features], dtype=torch.float32).to(self.device)
-        mask_tensor = torch.tensor([mask], dtype=torch.float32).to(self.device)
-        
-        return mag_tensor, mod_tensor, mask_tensor
-    
     def solve(
         self,
         input_seq: List[int],
@@ -243,42 +197,53 @@ class IntSeqSolver:
         beam_width: int = 20
     ) -> Dict[str, Any]:
         """
-        Predict next term in sequence.
-        
-        Args:
-            input_seq: Input integer sequence
-            top_k: Number of candidates to return
-            beam_width: Beam search width
-            
-        Returns:
-            Dictionary with 'candidates' and 'predicted_magnitude'
+        Predict next term in sequence using Bayesian Beam Search.
         """
-        # 1. Preprocess and run encoder
-        mag_in, mod_in, mask = self.preprocess_sequence(input_seq)
+        # 1. Preprocess (EXTREMELY IMPORTANT: Use same logic as training)
+        feats = extract_features(input_seq)
         
+        mag_f = feats['mag_features']
+        mod_f = feats['mod_features']
+        seq_len = mag_f.size(0)
+        max_len = 128
+        
+        # Inference Padding
+        if seq_len < max_len:
+            pad = max_len - seq_len
+            mag_in = torch.cat([mag_f, torch.zeros(pad, 5)], dim=0).unsqueeze(0)
+            mod_in = torch.cat([mod_f, torch.zeros(pad, 200)], dim=0).unsqueeze(0)
+            mask = torch.cat([torch.ones(seq_len), torch.zeros(pad)], dim=0).unsqueeze(0)
+        else:
+            mag_in = mag_f[-max_len:].unsqueeze(0)
+            mod_in = mod_f[-max_len:].unsqueeze(0)
+            mask = torch.ones(max_len).unsqueeze(0)
+            
+        mag_in, mod_in, mask = mag_in.to(self.device), mod_in.to(self.device), mask.to(self.device)
+        
+        # 2. Forward Pass
         with torch.no_grad():
             outputs = self.model(mag_in, mod_in, mask)
         
-        # 2. Extract predictions
+        # 3. Extract Predictions
         pred_log_mag = outputs['pred_mag'][0, -1, 0].item()
-        pred_magnitude = 10 ** pred_log_mag - 1
+        pred_magnitude = 10 ** pred_log_mag
         
-        # 3. Get mod probabilities
         mod_probs = {}
-        for p in self.primes:
-            logits = outputs[f'mod{p}'][0, -1, :]
-            probs = F.softmax(logits, dim=-1)
-            mod_probs[p] = probs.cpu().numpy()
+        for m in ALL_MODULI:
+            key = f"mod{m}"
+            if key in outputs:
+                logits = outputs[key][0, -1, :]
+                mod_probs[m] = F.softmax(logits, dim=-1).cpu().numpy()
         
-        # 4. Beam search with CRT
-        candidates = beam_search_crt(mod_probs, self.primes, beam_width)
-        
-        # 5. Magnitude matching
-        final_candidates = magnitude_matching(
-            candidates, pred_magnitude, pred_log_mag, top_k
+        # 4. Bayesian Beam Search
+        candidates_scored = beam_search_bayesian(
+            mod_probs, 
+            pred_log_mag, 
+            beam_width=beam_width,
+            top_per_mod=5 # Check top 5 probabilities for each mod
         )
         
         return {
-            "candidates": final_candidates,
+            "candidates": candidates_scored[:top_k],
             "predicted_magnitude": pred_magnitude
         }
