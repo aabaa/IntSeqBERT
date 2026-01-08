@@ -11,7 +11,7 @@ import time
 import torch
 import torch.nn as nn
 from pathlib import Path
-from typing import List, Dict, Any, Set, Optional
+from typing import List, Dict, Any, Set, Optional, Tuple
 from tqdm import tqdm
 
 # Import models directly
@@ -19,7 +19,6 @@ from intseq_bert.bert_model import IntSeqBERT
 from intseq_bert.decoder_model import IntSeqDecoder
 from intseq_bert import loader
 from intseq_bert.features import extract_features
-from typing import Tuple
 
 
 def setup_args():
@@ -54,6 +53,8 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     Otherwise, tries to load both from model_path.
     """
     # 1. Initialize Models
+    # Ensure d_model matches your training config (usually 512 or 128 depending on your experiments)
+    # If your best_model was trained with d_model=512, keep it. If 128, change it here.
     encoder = IntSeqBERT(vocab_size=1000, d_model=512)
     decoder = IntSeqDecoder(d_model=512, hidden_dim=512)
     
@@ -67,7 +68,7 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     for k, v in enc_state.items():
         if k.startswith("encoder."):
             clean_enc_state[k.replace("encoder.", "")] = v
-        elif not k.startswith("decoder."): # Assume other keys belong to encoder (e.g. BERT raw keys)
+        elif not k.startswith("decoder."): # Assume other keys belong to encoder
             clean_enc_state[k] = v
             
     encoder.load_state_dict(clean_enc_state, strict=False)
@@ -80,14 +81,11 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     dec_state = dec_checkpoint['state_dict'] if 'state_dict' in dec_checkpoint else dec_checkpoint
     
     clean_dec_state = {}
-    found_decoder_keys = False
     for k, v in dec_state.items():
         if k.startswith("decoder."):
             clean_dec_state[k.replace("decoder.", "")] = v
-            found_decoder_keys = True
         elif decoder_path: # If explicit path given, assume all keys are for decoder
             clean_dec_state[k] = v
-            found_decoder_keys = True
 
     if clean_dec_state:
         decoder.load_state_dict(clean_dec_state, strict=False)
@@ -98,6 +96,7 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     decoder.to(device).eval()
     
     return encoder, decoder
+
 
 def get_test_ids_from_loader(features_dir: str, val_ratio: float, test_ratio: float, seed: int) -> Set[str]:
     """Reproduce test split."""
@@ -161,18 +160,14 @@ def run_inference(
         # Encoder
         enc_out = encoder(mag_in, mod_in, mask)
         
-        # Get Latent Vector (Use 'last_hidden_state' from BERT)
-        # Assuming IntSeqBERT returns a dict with 'last_hidden_state'
-        # If not, you might need to adjust based on bert_model.py
+        # Get Latent Vector
         if isinstance(enc_out, dict) and 'last_hidden_state' in enc_out:
             last_hidden = enc_out['last_hidden_state']
         else:
-            # Fallback: if encoder returns just tensor or tuple
+            # Fallback
             last_hidden = enc_out[0] if isinstance(enc_out, tuple) else enc_out
             
         # Extract embedding of the last valid token
-        # (Since we padded, we need the last real token, not the last pad)
-        # Simple approach: take index [curr_len - 1] if no truncation
         idx = min(curr_len, max_len) - 1
         latent = last_hidden[:, idx, :] 
 
@@ -206,7 +201,8 @@ def main():
 
     # 2. Load Models
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    encoder, decoder = load_models(args.model_path, device)
+    # 【修正箇所】ここで args.decoder_path を渡すように修正しました
+    encoder, decoder = load_models(args.model_path, args.decoder_path, device)
     
     # 3. Evaluation Loop
     results = {
