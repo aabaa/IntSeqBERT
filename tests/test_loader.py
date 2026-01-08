@@ -1,19 +1,18 @@
 """
-Tests for the Dual Stream data loader module.
-Tests directory-based dataset loading with lazy loading and tag filtering.
+Tests for the OEIS data loader module.
+
+Covers:
+1. OEISDataset - Dataset class for loading .pt files
+2. create_splits - Admin function for generating static split files
+3. load_dataset - Runtime function for loading datasets from split files
+4. Integration tests
 """
 
 import pytest
 import torch
-import json
 from pathlib import Path
 
-from intseq_bert.loader import (
-    DualStreamDataset,
-    load_and_split_data,
-    _filter_by_tags
-)
-from intseq_bert import schemas
+from intseq_bert import loader, schemas, config
 
 
 # ==========================================
@@ -21,362 +20,364 @@ from intseq_bert import schemas
 # ==========================================
 
 def create_feature_file(path: Path, oeis_id: str, seq_len: int = 10):
-    """Create a mock .pt feature file."""
+    """Create a mock .pt feature file with required keys."""
     data = {
-        'oeis_id': oeis_id,
-        'mag_features': torch.randn(seq_len, 5),
-        'mod_features': torch.randn(seq_len, 200),
-        'targets': {
+        config.KEY_OEIS_ID: oeis_id,
+        config.KEY_MAG_FEATURES: torch.randn(seq_len, 5),
+        config.KEY_MOD_FEATURES: torch.randn(seq_len, 200),
+        config.KEY_TARGETS: {
             'mag': torch.randn(seq_len),
             'mod3': torch.randint(0, 3, (seq_len,)),
-            'mod5': torch.randint(0, 5, (seq_len,)),
         }
     }
     torch.save(data, path)
     return data
 
 
-def create_metadata_jsonl(path: Path, records: list):
-    """Create a metadata JSONL file."""
-    with open(path, 'w') as f:
+def create_jsonl_file(path: Path, records: list):
+    """Create a JSONL file from OEISRecord list."""
+    with open(path, 'w', encoding='utf-8') as f:
         for rec in records:
             f.write(rec.to_json_line() + '\n')
 
 
+def setup_test_data_root(tmp_path: Path, oeis_ids: list, seq_len: int = 10):
+    """
+    Create a complete test data structure matching config layout:
+    tmp_path/
+      features/
+        A000001.pt, A000002.pt, ...
+    """
+    features_dir = tmp_path / config.FEATURES_DIR_NAME
+    features_dir.mkdir(parents=True)
+    
+    for oid in oeis_ids:
+        create_feature_file(features_dir / f"{oid}.pt", oid, seq_len)
+    
+    return tmp_path
+
+
 # ==========================================
-# 1. DualStreamDataset Tests
+# 1. OEISDataset Tests
 # ==========================================
 
-class TestDualStreamDataset:
-    """Tests for DualStreamDataset class."""
+class TestOEISDataset:
+    """Tests for OEISDataset class."""
     
     def test_initialization(self, tmp_path):
-        """Test dataset can be initialized with file list."""
-        # Create test files
-        files = []
-        for i in range(3):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
-            files.append(path)
+        """Test dataset can be initialized with ID list."""
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
         
-        dataset = DualStreamDataset(files)
+        ids = ["A000001", "A000002", "A000003"]
+        for oid in ids:
+            create_feature_file(features_dir / f"{oid}.pt", oid)
+        
+        dataset = loader.OEISDataset(ids, features_dir)
         assert len(dataset) == 3
     
     def test_getitem_returns_correct_structure(self, tmp_path):
         """Test __getitem__ returns dict with correct keys."""
-        path = tmp_path / "A000001.pt"
-        create_feature_file(path, "A000001", seq_len=15)
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
+        create_feature_file(features_dir / "A000001.pt", "A000001", seq_len=15)
         
-        dataset = DualStreamDataset([path])
+        dataset = loader.OEISDataset(["A000001"], features_dir)
         item = dataset[0]
         
-        assert 'oeis_id' in item
-        assert 'mag_features' in item
-        assert 'mod_features' in item
-        assert 'targets' in item
+        # Check required keys
+        assert config.KEY_OEIS_ID in item
+        assert config.KEY_MAG_FEATURES in item
+        assert config.KEY_MOD_FEATURES in item
         
-        assert item['oeis_id'] == 'A000001'
-        assert item['mag_features'].shape == (15, 5)
-        assert item['mod_features'].shape == (15, 200)
+        # Check values
+        assert item[config.KEY_OEIS_ID] == "A000001"
+        assert item[config.KEY_MAG_FEATURES].shape == (15, 5)
+        assert item[config.KEY_MOD_FEATURES].shape == (15, 200)
     
-    def test_lazy_loading(self, tmp_path):
-        """Test that files are loaded on demand (lazy loading)."""
-        # Create files
-        files = []
-        for i in range(5):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
-            files.append(path)
+    def test_missing_file_raises_error(self, tmp_path):
+        """Test Fail Fast: missing file raises FileNotFoundError."""
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
         
-        dataset = DualStreamDataset(files)
+        dataset = loader.OEISDataset(["A999999"], features_dir)
         
-        # Dataset should not load anything until __getitem__ is called
-        # We can't directly test this, but we can verify behavior
-        item = dataset[2]
-        assert item['oeis_id'] == 'A000002'
+        with pytest.raises(FileNotFoundError, match="Feature file missing"):
+            _ = dataset[0]
     
-    def test_invalid_file_raises_error(self, tmp_path):
-        """Test that loading invalid file raises error."""
-        # Create invalid file
-        path = tmp_path / "invalid.pt"
-        torch.save({'bad': 'data'}, path)
+    def test_missing_required_key_raises_error(self, tmp_path):
+        """Test that missing required keys raise ValueError."""
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
         
-        dataset = DualStreamDataset([path])
+        # Create file with missing required key
+        bad_data = {"bad_key": torch.randn(10, 5)}
+        torch.save(bad_data, features_dir / "A000001.pt")
         
-        with pytest.raises(ValueError):
+        dataset = loader.OEISDataset(["A000001"], features_dir)
+        
+        with pytest.raises(ValueError, match="Missing required key"):
             _ = dataset[0]
 
 
 # ==========================================
-# 2. load_and_split_data Tests
+# 2. create_splits Tests (Admin Function)
 # ==========================================
 
-class TestLoadAndSplitData:
-    """Tests for load_and_split_data function."""
+class TestCreateSplits:
+    """Tests for create_splits function (Admin/Setup)."""
     
-    def test_basic_loading(self, tmp_path):
-        """Test basic loading without filtering."""
-        # Create 20 feature files
-        for i in range(20):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+    def test_creates_split_files(self, tmp_path):
+        """Test that split files are created correctly."""
+        # Setup
+        data_root = setup_test_data_root(tmp_path, [f"A{i:06d}" for i in range(20)])
         
-        train_ds, val_ds, test_ds = load_and_split_data(
-            str(tmp_path),
-            val_ratio=0.1,
-            test_ratio=0.1,
-            seed=42
+        jsonl_path = tmp_path / "data.jsonl"
+        records = [schemas.OEISRecord(f"A{i:06d}", [i]) for i in range(20)]
+        create_jsonl_file(jsonl_path, records)
+        
+        # Execute
+        loader.create_splits(
+            source_jsonl=str(jsonl_path),
+            output_split_type="test_split",
+            data_root=str(data_root)
         )
         
-        # Check sizes (20 * 0.1 = 2 for val and test each)
-        assert len(train_ds) == 16
-        assert len(val_ds) == 2
-        assert len(test_ds) == 2
-    
-    def test_reproducible_split(self, tmp_path):
-        """Test that splitting is reproducible with same seed."""
-        for i in range(10):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+        # Verify
+        split_dir = data_root / config.SPLIT_DIR_NAME / "test_split"
+        assert (split_dir / "train.txt").exists()
+        assert (split_dir / "val.txt").exists()
+        assert (split_dir / "test.txt").exists()
         
-        train1, _, _ = load_and_split_data(str(tmp_path), seed=123)
-        train2, _, _ = load_and_split_data(str(tmp_path), seed=123)
-        
-        # Same seed should give same files
-        ids1 = [train1[i]['oeis_id'] for i in range(len(train1))]
-        ids2 = [train2[i]['oeis_id'] for i in range(len(train2))]
-        assert ids1 == ids2
-    
-    def test_different_seed_different_split(self, tmp_path):
-        """Test that different seeds give different splits."""
-        for i in range(10):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
-        
-        train1, _, _ = load_and_split_data(str(tmp_path), seed=1)
-        train2, _, _ = load_and_split_data(str(tmp_path), seed=2)
-        
-        ids1 = sorted([train1[i]['oeis_id'] for i in range(len(train1))])
-        ids2 = sorted([train2[i]['oeis_id'] for i in range(len(train2))])
-        # While technically could be same, very unlikely with different seeds
-        # We just check they are valid
-        assert len(ids1) == len(ids2)
-    
-    def test_max_samples_limit(self, tmp_path):
-        """Test max_samples parameter."""
-        for i in range(100):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
-        
-        train_ds, val_ds, test_ds = load_and_split_data(
-            str(tmp_path),
-            max_samples=20,
-            seed=42
-        )
-        
-        total = len(train_ds) + len(val_ds) + len(test_ds)
+        # Check total count matches
+        total = 0
+        for name in ["train.txt", "val.txt", "test.txt"]:
+            with open(split_dir / name) as f:
+                total += len([line for line in f if line.strip()])
         assert total == 20
     
-    def test_empty_directory_raises(self, tmp_path):
-        """Test that empty directory raises error."""
-        with pytest.raises(ValueError, match="No .pt files found"):
-            load_and_split_data(str(tmp_path))
-    
-    def test_nonexistent_directory_raises(self, tmp_path):
-        """Test that nonexistent directory raises error."""
-        fake_path = tmp_path / "nonexistent"
-        with pytest.raises(FileNotFoundError):
-            load_and_split_data(str(fake_path))
-
-
-# ==========================================
-# 3. Tag Filtering Tests
-# ==========================================
-
-class TestTagFiltering:
-    """Tests for tag-based filtering."""
-    
-    def test_include_tags(self, tmp_path):
-        """Test filtering with include_tags."""
-        # Create feature files
-        for i in range(10):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+    def test_deterministic_shuffle(self, tmp_path):
+        """Test that same seed produces same split (via config.SEED)."""
+        # Setup two identical data roots
+        ids = [f"A{i:06d}" for i in range(50)]
         
-        # Create metadata
-        metadata_path = tmp_path / "metadata.jsonl"
+        for trial in ["trial1", "trial2"]:
+            trial_root = tmp_path / trial
+            setup_test_data_root(trial_root, ids)
+            
+            jsonl_path = trial_root / "data.jsonl"
+            records = [schemas.OEISRecord(oid, [1]) for oid in ids]
+            create_jsonl_file(jsonl_path, records)
+            
+            loader.create_splits(
+                source_jsonl=str(jsonl_path),
+                output_split_type="strict",
+                data_root=str(trial_root)
+            )
+        
+        # Compare results
+        for split_name in ["train.txt", "val.txt", "test.txt"]:
+            path1 = tmp_path / "trial1" / config.SPLIT_DIR_NAME / "strict" / split_name
+            path2 = tmp_path / "trial2" / config.SPLIT_DIR_NAME / "strict" / split_name
+            
+            with open(path1) as f1, open(path2) as f2:
+                assert f1.read() == f2.read(), f"Split {split_name} differs between runs"
+    
+    def test_tag_filtering_include(self, tmp_path):
+        """Test include_tags filtering."""
+        data_root = setup_test_data_root(tmp_path, ["A000001", "A000002", "A000003"])
+        
+        jsonl_path = tmp_path / "data.jsonl"
         records = [
-            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn", "core"]),
-            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["sign"]),
-            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["nonn", "core"]),
+            schemas.OEISRecord("A000001", [1], keywords=["core", "nonn"]),
+            schemas.OEISRecord("A000002", [2], keywords=["nonn"]),
+            schemas.OEISRecord("A000003", [3], keywords=["core"]),
         ]
-        create_metadata_jsonl(metadata_path, records)
+        create_jsonl_file(jsonl_path, records)
         
-        train_ds, val_ds, test_ds = load_and_split_data(
-            str(tmp_path),
-            metadata_path=str(metadata_path),
+        loader.create_splits(
+            source_jsonl=str(jsonl_path),
+            output_split_type="filtered",
             include_tags=["core"],
-            val_ratio=0.0,
-            test_ratio=0.0,
-            seed=42
+            data_root=str(data_root)
         )
         
-        # Only A000000 and A000003 have "core" tag
-        assert len(train_ds) == 2
+        # Only A000001 and A000003 should be included
+        split_dir = data_root / config.SPLIT_DIR_NAME / "filtered"
+        total = 0
+        for name in ["train.txt", "val.txt", "test.txt"]:
+            with open(split_dir / name) as f:
+                total += len([line for line in f if line.strip()])
+        assert total == 2
     
-    def test_exclude_tags(self, tmp_path):
-        """Test filtering with exclude_tags."""
-        for i in range(5):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+    def test_tag_filtering_exclude(self, tmp_path):
+        """Test exclude_tags filtering."""
+        data_root = setup_test_data_root(tmp_path, ["A000001", "A000002", "A000003"])
         
-        metadata_path = tmp_path / "metadata.jsonl"
+        jsonl_path = tmp_path / "data.jsonl"
         records = [
-            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn", "dead"]),
-            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["dead"]),
-            schemas.OEISRecord(oeis_id="A000004", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord("A000001", [1], keywords=["nonn"]),
+            schemas.OEISRecord("A000002", [2], keywords=["nonn", "dead"]),
+            schemas.OEISRecord("A000003", [3], keywords=["nonn"]),
         ]
-        create_metadata_jsonl(metadata_path, records)
+        create_jsonl_file(jsonl_path, records)
         
-        train_ds, _, _ = load_and_split_data(
-            str(tmp_path),
-            metadata_path=str(metadata_path),
+        loader.create_splits(
+            source_jsonl=str(jsonl_path),
+            output_split_type="filtered",
             exclude_tags=["dead"],
-            val_ratio=0.0,
-            test_ratio=0.0,
-            seed=42
+            data_root=str(data_root)
         )
         
-        # A000001 and A000003 should be excluded
-        assert len(train_ds) == 3
+        # A000002 should be excluded
+        split_dir = data_root / config.SPLIT_DIR_NAME / "filtered"
+        total = 0
+        for name in ["train.txt", "val.txt", "test.txt"]:
+            with open(split_dir / name) as f:
+                total += len([line for line in f if line.strip()])
+        assert total == 2
     
-    def test_include_and_exclude_combined(self, tmp_path):
-        """Test filtering with both include and exclude tags."""
-        for i in range(5):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+    def test_skips_missing_feature_files(self, tmp_path):
+        """Test that IDs without feature files are skipped."""
+        # Only create features for some IDs
+        data_root = setup_test_data_root(tmp_path, ["A000001", "A000002"])
         
-        metadata_path = tmp_path / "metadata.jsonl"
+        jsonl_path = tmp_path / "data.jsonl"
         records = [
-            schemas.OEISRecord(oeis_id="A000000", sequence=[1], keywords=["nonn", "core"]),
-            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn", "core", "dead"]),
-            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["core"]),
-            schemas.OEISRecord(oeis_id="A000004", sequence=[1], keywords=["sign"]),
+            schemas.OEISRecord("A000001", [1]),
+            schemas.OEISRecord("A000002", [2]),
+            schemas.OEISRecord("A000003", [3]),  # No feature file
+            schemas.OEISRecord("A000004", [4]),  # No feature file
         ]
-        create_metadata_jsonl(metadata_path, records)
+        create_jsonl_file(jsonl_path, records)
         
-        train_ds, _, _ = load_and_split_data(
-            str(tmp_path),
-            metadata_path=str(metadata_path),
-            include_tags=["core"],
-            exclude_tags=["dead"],
-            val_ratio=0.0,
-            test_ratio=0.0,
-            seed=42
+        loader.create_splits(
+            source_jsonl=str(jsonl_path),
+            output_split_type="partial",
+            data_root=str(data_root)
         )
         
-        # Only A000000 and A000003 (have core, no dead)
-        assert len(train_ds) == 2
+        # Only 2 IDs should be in splits
+        split_dir = data_root / config.SPLIT_DIR_NAME / "partial"
+        total = 0
+        for name in ["train.txt", "val.txt", "test.txt"]:
+            with open(split_dir / name) as f:
+                total += len([line for line in f if line.strip()])
+        assert total == 2
 
 
 # ==========================================
-# 4. _filter_by_tags Internal Function Tests
+# 3. load_dataset Tests (Runtime Function)
 # ==========================================
 
-class TestFilterByTagsInternal:
-    """Tests for internal _filter_by_tags function."""
+class TestLoadDataset:
+    """Tests for load_dataset function (Runtime)."""
     
-    def test_include_filter(self, tmp_path):
-        """Test include filter logic."""
-        metadata_path = tmp_path / "metadata.jsonl"
-        records = [
-            schemas.OEISRecord(oeis_id="A001", sequence=[1], keywords=["nonn", "core"]),
-            schemas.OEISRecord(oeis_id="A002", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A003", sequence=[1], keywords=["core", "nice"]),
-        ]
-        create_metadata_jsonl(metadata_path, records)
+    def test_loads_from_split_file(self, tmp_path):
+        """Test loading dataset from pre-existing split file."""
+        # Setup data root with features
+        ids = ["A000001", "A000002", "A000003"]
+        data_root = setup_test_data_root(tmp_path, ids)
         
-        valid_ids = _filter_by_tags(str(metadata_path), ["core"], None)
+        # Create split file manually
+        split_dir = data_root / config.SPLIT_DIR_NAME / "strict"
+        split_dir.mkdir(parents=True)
+        with open(split_dir / "train.txt", 'w') as f:
+            for oid in ids:
+                f.write(oid + '\n')
         
-        assert "A001" in valid_ids
-        assert "A002" not in valid_ids
-        assert "A003" in valid_ids
+        # Load
+        dataset = loader.load_dataset("strict", "train", data_root=str(data_root))
+        
+        assert len(dataset) == 3
+        item = dataset[0]
+        assert config.KEY_MAG_FEATURES in item
     
-    def test_exclude_filter(self, tmp_path):
-        """Test exclude filter logic."""
-        metadata_path = tmp_path / "metadata.jsonl"
-        records = [
-            schemas.OEISRecord(oeis_id="A001", sequence=[1], keywords=["nonn"]),
-            schemas.OEISRecord(oeis_id="A002", sequence=[1], keywords=["nonn", "dead"]),
-            schemas.OEISRecord(oeis_id="A003", sequence=[1], keywords=["core"]),
-        ]
-        create_metadata_jsonl(metadata_path, records)
+    def test_missing_split_file_raises_error(self, tmp_path):
+        """Test that missing split file raises FileNotFoundError."""
+        data_root = setup_test_data_root(tmp_path, ["A000001"])
         
-        valid_ids = _filter_by_tags(str(metadata_path), None, ["dead"])
-        
-        assert "A001" in valid_ids
-        assert "A002" not in valid_ids
-        assert "A003" in valid_ids
+        with pytest.raises(FileNotFoundError, match="Split file not found"):
+            loader.load_dataset("nonexistent", "train", data_root=str(data_root))
     
-    def test_missing_metadata_returns_empty(self, tmp_path):
-        """Test that missing metadata file returns empty set."""
-        valid_ids = _filter_by_tags(str(tmp_path / "nonexistent.jsonl"), ["core"], None)
-        assert valid_ids == set()
+    def test_no_shuffle_during_load(self, tmp_path):
+        """
+        CRITICAL: Test that load_dataset does NOT shuffle.
+        Order must be preserved from split file.
+        """
+        ids = [f"A{i:06d}" for i in range(10)]
+        data_root = setup_test_data_root(tmp_path, ids)
+        
+        # Create split file with specific order
+        split_dir = data_root / config.SPLIT_DIR_NAME / "strict"
+        split_dir.mkdir(parents=True)
+        with open(split_dir / "train.txt", 'w') as f:
+            for oid in ids:
+                f.write(oid + '\n')
+        
+        # Load multiple times and verify order is preserved
+        for _ in range(3):
+            dataset = loader.load_dataset("strict", "train", data_root=str(data_root))
+            loaded_ids = [dataset[i][config.KEY_OEIS_ID] for i in range(len(dataset))]
+            assert loaded_ids == ids, "Order should be preserved from split file"
 
 
 # ==========================================
-# 5. Integration Tests
+# 4. Integration Tests
 # ==========================================
 
 class TestIntegration:
-    """Integration tests for the complete loading pipeline."""
+    """End-to-end integration tests."""
     
-    def test_full_pipeline(self, tmp_path):
-        """Test complete loading and iteration."""
-        # Create files
-        for i in range(10):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}", seq_len=20)
+    def test_create_then_load_pipeline(self, tmp_path):
+        """Test the complete Admin -> Runtime workflow."""
+        # Admin phase: create splits
+        ids = [f"A{i:06d}" for i in range(30)]
+        data_root = setup_test_data_root(tmp_path, ids, seq_len=20)
         
-        train_ds, val_ds, test_ds = load_and_split_data(
-            str(tmp_path),
-            val_ratio=0.2,
-            test_ratio=0.2,
-            seed=42
+        jsonl_path = tmp_path / "data.jsonl"
+        records = [schemas.OEISRecord(oid, [1, 2, 3]) for oid in ids]
+        create_jsonl_file(jsonl_path, records)
+        
+        loader.create_splits(
+            source_jsonl=str(jsonl_path),
+            output_split_type="strict",
+            data_root=str(data_root)
         )
         
-        # Iterate through training set
-        for i in range(len(train_ds)):
-            item = train_ds[i]
-            assert 'mag_features' in item
-            assert 'mod_features' in item
-            assert item['mag_features'].shape[0] == 20
+        # Runtime phase: load datasets
+        train_ds = loader.load_dataset("strict", "train", data_root=str(data_root))
+        val_ds = loader.load_dataset("strict", "val", data_root=str(data_root))
+        test_ds = loader.load_dataset("strict", "test", data_root=str(data_root))
+        
+        # Verify we can iterate and access data
+        assert len(train_ds) + len(val_ds) + len(test_ds) == 30
+        
+        item = train_ds[0]
+        assert item[config.KEY_MAG_FEATURES].shape[0] == 20
     
     def test_dataloader_compatibility(self, tmp_path):
-        """Test that dataset works with PyTorch DataLoader."""
+        """Test that OEISDataset works with PyTorch DataLoader."""
         from torch.utils.data import DataLoader
         
-        for i in range(5):
-            path = tmp_path / f"A{i:06d}.pt"
-            create_feature_file(path, f"A{i:06d}")
+        ids = ["A000001", "A000002", "A000003", "A000004", "A000005"]
+        data_root = setup_test_data_root(tmp_path, ids)
         
-        train_ds, _, _ = load_and_split_data(
-            str(tmp_path),
-            val_ratio=0.0,
-            test_ratio=0.0,
-            seed=42
-        )
+        # Create split
+        split_dir = data_root / config.SPLIT_DIR_NAME / "strict"
+        split_dir.mkdir(parents=True)
+        with open(split_dir / "train.txt", 'w') as f:
+            for oid in ids:
+                f.write(oid + '\n')
         
-        # Create DataLoader (batch_size=1 since sequences may differ in length)
-        loader = DataLoader(train_ds, batch_size=1, shuffle=False)
+        dataset = loader.load_dataset("strict", "train", data_root=str(data_root))
+        
+        # Use DataLoader with shuffle=True (this is where shuffling should happen)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
         
         count = 0
-        for batch in loader:
-            assert 'mag_features' in batch
+        for batch in dataloader:
+            assert config.KEY_MAG_FEATURES in batch
             count += 1
         
         assert count == 5

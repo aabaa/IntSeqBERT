@@ -43,3 +43,11 @@ D_MODEL_DEFAULT = 512
 
 # Maximum sequence length for input features
 MAX_SEQUENCE_LENGTH = 128
+
+# ==========================================
+# 4. Data Keys (for .pt files)
+# ==========================================
+KEY_OEIS_ID = "oeis_id"
+KEY_MAG_FEATURES = "mag_features"
+KEY_MOD_FEATURES = "mod_features"
+KEY_TARGETS = "targets"
