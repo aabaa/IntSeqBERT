@@ -1,11 +1,11 @@
 """
 Tests for evaluate_final.py (Encoder-Decoder Evaluation Script).
 
-Note: The new evaluate_final.py removes many standalone helper functions
-and integrates them into the main evaluation loop. We focus on testing:
-1. get_test_ids_from_loader (still exported)
-2. run_inference (the main inference pipeline)
-3. Integration with mock encoder/decoder
+Tests the key functions:
+1. normalize_id
+2. run_inference with proper encoder output (encoded_state)
+3. load_models
+4. setup_args
 """
 
 import pytest
@@ -23,45 +23,27 @@ from intseq_bert.decoder_model import IntSeqDecoder
 
 
 # ==========================================
-# 1. get_test_ids_from_loader Tests
+# 1. normalize_id Tests
 # ==========================================
 
-class TestGetTestIdsFromLoader:
-    """Tests for get_test_ids_from_loader function."""
+class TestNormalizeId:
+    """Tests for normalize_id function."""
     
-    def test_returns_set(self, tmp_path):
-        """Test that function returns a set."""
-        # Create minimal feature files
-        features_dir = tmp_path / "features"
-        features_dir.mkdir()
-        
-        for i in range(10):
-            (features_dir / f"A{i:06d}.pt").touch()
-        
-        with patch.object(evaluate_final.loader, 'load_and_split_data') as mock_load:
-            # Mock return value
-            class MockDataset:
-                def __init__(self, files):
-                    self.feature_files = files
-            
-            train_files = [features_dir / f"A{i:06d}.pt" for i in range(7)]
-            val_files = [features_dir / f"A000007.pt"]
-            test_files = [features_dir / f"A000008.pt", features_dir / f"A000009.pt"]
-            
-            mock_load.return_value = (
-                MockDataset(train_files),
-                MockDataset(val_files),
-                MockDataset(test_files)
-            )
-            
-            result = evaluate_final.get_test_ids_from_loader(
-                str(features_dir), 0.05, 0.05, 42
-            )
-            
-            assert isinstance(result, set)
-            assert len(result) == 2
-            assert "A000008" in result
-            assert "A000009" in result
+    def test_already_normalized(self):
+        """Test ID that's already in correct format."""
+        assert evaluate_final.normalize_id("A000001") == "A000001"
+    
+    def test_without_prefix(self):
+        """Test ID without A prefix."""
+        assert evaluate_final.normalize_id("123") == "A000123"
+    
+    def test_with_prefix_short(self):
+        """Test ID with A prefix but short number."""
+        assert evaluate_final.normalize_id("A1") == "A000001"
+    
+    def test_integer_input(self):
+        """Test integer input."""
+        assert evaluate_final.normalize_id(42) == "A000042"
 
 
 # ==========================================
@@ -73,12 +55,12 @@ class TestRunInference:
     
     @pytest.fixture
     def mock_encoder(self):
-        """Create mock encoder that returns proper structure."""
+        """Create mock encoder that returns proper structure with encoded_state."""
         encoder = MagicMock()
         
-        # Mock output: dict with last_hidden_state
+        # Mock output: dict with 'encoded_state' (key used by IntSeqBERT)
         mock_output = {
-            'last_hidden_state': torch.randn(1, 128, 512),
+            'encoded_state': torch.randn(1, 128, 512),
             'pred_mag': torch.randn(1, 128, 5)
         }
         encoder.return_value = mock_output
@@ -159,44 +141,13 @@ class TestRunInference:
 
 
 # ==========================================
-# 3. load_models Tests
+# 3. setup_args Tests
 # ==========================================
 
-class TestLoadModels:
-    """Tests for load_models function."""
+class TestSetupArgs:
+    """Tests for setup_args function."""
     
-    def test_returns_encoder_decoder_tuple(self, tmp_path):
-        """Test that load_models returns encoder and decoder."""
-        # Create a minimal checkpoint
-        checkpoint_path = tmp_path / "test_checkpoint.pt"
-        
-        # Create state dict with encoder and decoder keys
-        state_dict = {
-            "encoder.embedding.weight": torch.randn(100, 512),
-            "decoder.fc1.weight": torch.randn(512, 512),
-        }
-        torch.save({"state_dict": state_dict}, checkpoint_path)
-        
-        with patch.object(evaluate_final.IntSeqBERT, '__init__', return_value=None):
-            with patch.object(evaluate_final.IntSeqDecoder, '__init__', return_value=None):
-                with patch.object(evaluate_final.IntSeqBERT, 'load_state_dict'):
-                    with patch.object(evaluate_final.IntSeqDecoder, 'load_state_dict'):
-                        with patch.object(evaluate_final.IntSeqBERT, 'to', return_value=MagicMock()):
-                            with patch.object(evaluate_final.IntSeqDecoder, 'to', return_value=MagicMock()):
-                                with patch.object(evaluate_final.IntSeqBERT, 'eval'):
-                                    with patch.object(evaluate_final.IntSeqDecoder, 'eval'):
-                                        # Skip actual loading for unit test
-                                        pass
-
-
-# ==========================================
-# 4. Integration Tests
-# ==========================================
-
-class TestEvaluationIntegration:
-    """Integration tests for evaluation workflow."""
-    
-    def test_setup_args_has_required_arguments(self):
+    def test_has_required_arguments(self):
         """Test that setup_args defines expected arguments."""
         with patch('sys.argv', ['evaluate_final.py', 
                                 '--model_path', 'test.pt',
@@ -205,7 +156,55 @@ class TestEvaluationIntegration:
             args = evaluate_final.setup_args()
             
             assert hasattr(args, 'model_path')
+            assert hasattr(args, 'decoder_path')
             assert hasattr(args, 'features_dir')
             assert hasattr(args, 'jsonl_path')
             assert hasattr(args, 'beam_width')
             assert hasattr(args, 'top_k')
+            assert hasattr(args, 'device')
+    
+    def test_decoder_path_optional(self):
+        """Test that decoder_path is optional (defaults to None)."""
+        with patch('sys.argv', ['evaluate_final.py', 
+                                '--model_path', 'test.pt',
+                                '--features_dir', '/tmp/features',
+                                '--jsonl_path', '/tmp/data.jsonl']):
+            args = evaluate_final.setup_args()
+            assert args.decoder_path is None
+
+
+# ==========================================
+# 4. load_test_sequences_direct Tests
+# ==========================================
+
+class TestLoadTestSequencesDirect:
+    """Tests for load_test_sequences_direct function."""
+    
+    def test_loads_sequences_with_matching_features(self, tmp_path):
+        """Test that only sequences with matching .pt files are loaded."""
+        # Create features dir with some .pt files
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
+        (features_dir / "A000001.pt").touch()
+        (features_dir / "A000003.pt").touch()
+        
+        # Create JSONL with 3 records (only 2 have matching features)
+        jsonl_path = tmp_path / "test.jsonl"
+        with open(jsonl_path, 'w') as f:
+            f.write('{"oeis_id": "A000001", "sequence": [1, 2, 3]}\n')
+            f.write('{"oeis_id": "A000002", "sequence": [2, 4, 6]}\n')  # No matching .pt
+            f.write('{"oeis_id": "A000003", "sequence": [3, 6, 9]}\n')
+        
+        # Create mock args
+        class MockArgs:
+            pass
+        args = MockArgs()
+        args.features_dir = str(features_dir)
+        args.jsonl_path = str(jsonl_path)
+        args.limit = None
+        
+        result = evaluate_final.load_test_sequences_direct(args)
+        
+        assert len(result) == 2
+        ids = {r['oeis_id'] for r in result}
+        assert ids == {"A000001", "A000003"}
