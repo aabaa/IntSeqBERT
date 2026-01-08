@@ -1,5 +1,5 @@
 """
-Tests for solver.py (Robust Bayesian Beam Search Solver).
+Tests for solver.py (Encoder-Decoder Hybrid Solver).
 """
 
 import pytest
@@ -77,115 +77,7 @@ class TestSolveCongruence:
 
 
 # ==========================================
-# 3. calculate_magnitude_log_prob Tests
-# ==========================================
-
-class TestCalculateMagnitudeLogProb:
-    """Tests for calculate_magnitude_log_prob function."""
-    
-    def test_exact_match(self):
-        """Test when value exactly matches target."""
-        score = solver.calculate_magnitude_log_prob(100, 2.0)
-        assert score == pytest.approx(0.0, abs=1e-5)
-    
-    def test_one_sigma_error(self):
-        """Test with one sigma error."""
-        score = solver.calculate_magnitude_log_prob(100, 2.2, sigma=0.2)
-        expected = -0.5 * 1.0 ** 2
-        assert score == pytest.approx(expected, rel=1e-3)
-    
-    def test_large_error(self):
-        """Test with large error yields very negative score."""
-        score = solver.calculate_magnitude_log_prob(10, 5.0, sigma=0.2)
-        assert score < -100
-    
-    def test_zero_value(self):
-        """Test with zero value."""
-        score = solver.calculate_magnitude_log_prob(0, 2.0)
-        assert score < 0
-    
-    def test_negative_value(self):
-        """Test with negative value (uses absolute)."""
-        score = solver.calculate_magnitude_log_prob(-100, 2.0)
-        assert score == pytest.approx(0.0, abs=1e-5)
-
-
-# ==========================================
-# 4. beam_search_robust Tests
-# ==========================================
-
-class TestBeamSearchRobust:
-    """Tests for beam_search_robust function."""
-    
-    def test_simple_case(self):
-        """Test with simple mod probabilities."""
-        mod_probs = {
-            2: np.array([0.0, 1.0]),  # x = 1 (mod 2), high confidence
-            3: np.array([0.0, 0.0, 1.0])  # x = 2 (mod 3), high confidence
-        }
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=0.7, pred_sign=1.0)
-        
-        values = [r[0] for r in result]
-        assert 5 in values or -1 in values
-    
-    def test_filters_low_confidence(self):
-        """Test that low confidence moduli are filtered out."""
-        mod_probs = {
-            2: np.array([0.5, 0.5]),  # max=0.5, above threshold
-            3: np.array([0.35, 0.35, 0.30]),  # max=0.35, below threshold (0.4)
-        }
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
-        # Should still produce results (mod 2 is used)
-        assert len(result) > 0
-    
-    def test_returns_scored_tuples(self):
-        """Test that result contains (value, score) tuples."""
-        mod_probs = {2: np.array([0.1, 0.9])}  # high confidence
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
-        
-        assert len(result) > 0
-        assert isinstance(result[0], tuple)
-        assert len(result[0]) == 2
-    
-    def test_sorted_by_score(self):
-        """Test that results are sorted by score descending."""
-        mod_probs = {
-            2: np.array([0.2, 0.8]),
-            5: np.array([0.1, 0.1, 0.6, 0.1, 0.1])
-        }
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
-        
-        scores = [r[1] for r in result]
-        assert scores == sorted(scores, reverse=True)
-    
-    def test_deduplication(self):
-        """Test that duplicate values are removed."""
-        mod_probs = {2: np.array([0.3, 0.7])}  # above threshold
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=1.0)
-        
-        values = [r[0] for r in result]
-        assert len(values) == len(set(values))
-    
-    def test_sign_filtering_positive(self):
-        """Test that positive sign filters out negative values."""
-        mod_probs = {2: np.array([0.1, 0.9])}
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=0.5)  # > 0.2 → positive
-        
-        values = [r[0] for r in result]
-        # All values should be positive
-        assert all(v > 0 for v in values)
-    
-    def test_sign_filtering_negative(self):
-        """Test that negative sign filters out positive values."""
-        mod_probs = {2: np.array([0.1, 0.9])}
-        result = solver.beam_search_robust(mod_probs, pred_log_mag=1.0, pred_sign=-0.5)  # < -0.2 → negative
-        
-        values = [r[0] for r in result]
-        assert all(v < 0 for v in values)
-
-
-# ==========================================
-# 5. IntSeqSolver Tests
+# 3. IntSeqSolver Tests
 # ==========================================
 
 class TestIntSeqSolverInit:
@@ -239,7 +131,96 @@ class TestIntSeqSolverSolve:
 
 
 # ==========================================
-# 6. Integration Tests
+# 4. _decoder_beam_search Tests
+# ==========================================
+
+class TestDecoderBeamSearch:
+    """Tests for _decoder_beam_search internal method."""
+    
+    @pytest.fixture
+    def solver_instance(self):
+        model = IntSeqBERT()
+        return solver.IntSeqSolver(model=model, device="cpu")
+    
+    def test_returns_list_of_tuples(self, solver_instance):
+        """Test that _decoder_beam_search returns list of (value, score) tuples."""
+        # Create minimal predictions dict
+        predictions = {
+            "mag_mu": 1.0,
+            "mag_logvar": math.log(0.2**2),
+            "sign_logits": np.array([-10.0, -10.0, 10.0])  # Positive
+        }
+        # Add mod probs (high confidence)
+        for m in range(2, 102):
+            probs = np.zeros(m)
+            probs[1 % m] = 0.9
+            probs[0] = 0.1 / (m - 1) if m > 1 else 0.1
+            predictions[f"mod{m}"] = probs
+        
+        result = solver_instance._decoder_beam_search(predictions)
+        
+        assert isinstance(result, list)
+        if len(result) > 0:
+            assert isinstance(result[0], tuple)
+            assert len(result[0]) == 2
+    
+    def test_handles_zero_sign(self, solver_instance):
+        """Test that zero sign returns [(0, 0.0)]."""
+        predictions = {
+            "mag_mu": 1.0,
+            "mag_logvar": math.log(0.2**2),
+            "sign_logits": np.array([-10.0, 10.0, -10.0])  # Zero (index 1)
+        }
+        for m in range(2, 102):
+            predictions[f"mod{m}"] = np.ones(m) / m
+        
+        result = solver_instance._decoder_beam_search(predictions)
+        
+        assert result == [(0, 0.0)]
+    
+    def test_positive_sign_returns_positive_values(self, solver_instance):
+        """Test that positive sign produces positive candidate values."""
+        predictions = {
+            "mag_mu": 1.0,
+            "mag_logvar": math.log(0.2**2),
+            "sign_logits": np.array([-10.0, -10.0, 10.0])  # Positive
+        }
+        for m in range(2, 102):
+            probs = np.zeros(m)
+            probs[1 % m] = 0.9
+            for i in range(m):
+                if i != 1 % m:
+                    probs[i] = 0.1 / (m - 1)
+            predictions[f"mod{m}"] = probs
+        
+        result = solver_instance._decoder_beam_search(predictions)
+        
+        values = [r[0] for r in result]
+        assert all(v > 0 for v in values if v != 0)
+    
+    def test_negative_sign_returns_negative_values(self, solver_instance):
+        """Test that negative sign produces negative candidate values."""
+        predictions = {
+            "mag_mu": 1.0,
+            "mag_logvar": math.log(0.2**2),
+            "sign_logits": np.array([10.0, -10.0, -10.0])  # Negative
+        }
+        for m in range(2, 102):
+            probs = np.zeros(m)
+            probs[1 % m] = 0.9
+            for i in range(m):
+                if i != 1 % m:
+                    probs[i] = 0.1 / (m - 1)
+            predictions[f"mod{m}"] = probs
+        
+        result = solver_instance._decoder_beam_search(predictions)
+        
+        values = [r[0] for r in result]
+        assert all(v < 0 for v in values if v != 0)
+
+
+# ==========================================
+# 5. Integration Tests
 # ==========================================
 
 class TestSolverIntegration:
