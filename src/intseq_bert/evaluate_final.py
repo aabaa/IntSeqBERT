@@ -1,7 +1,6 @@
 """
 evaluate_final.py:
 Final evaluation script for IntSeqBERT on the strict dataset.
-Ensures consistency with training data by using the loader module to identify the test set.
 """
 
 import json
@@ -24,10 +23,10 @@ def setup_args():
     # Model & Data paths
     parser.add_argument("--model_path", type=str, required=True, help="Path to best_model.pt")
     parser.add_argument("--features_dir", type=str, required=True, help="Path to features directory (for splitting)")
-    parser.add_argument("--jsonl_path", type=str, required=True, help="Path to raw data_clean_strict.jsonl (for raw sequences)")
+    parser.add_argument("--jsonl_path", type=str, required=True, help="Path to raw data_clean_strict.jsonl")
     parser.add_argument("--output_file", type=str, default="evaluation_results.json")
     
-    # Splitting parameters (Must match training config!)
+    # Splitting parameters
     parser.add_argument("--seed", type=int, default=42, help="Random seed used in training")
     parser.add_argument("--val_ratio", type=float, default=0.05)
     parser.add_argument("--test_ratio", type=float, default=0.05)
@@ -48,7 +47,7 @@ def get_test_ids_from_loader(
 ) -> Set[str]:
     """
     Use loader.py to reproduce the exact test split used during training.
-    Returns set of OEIS IDs in the test set.
+    Returns set of OEIS IDs (e.g. "A000001") in the test set.
     """
     _, _, test_ds = loader.load_and_split_data(
         features_dir=features_dir,
@@ -56,22 +55,14 @@ def get_test_ids_from_loader(
         test_ratio=test_ratio,
         seed=seed
     )
-    
-    # Extract OEIS IDs from filenames (e.g., "data/features/A000045.pt" -> "A000045")
+    # feature files are named "A000001.pt" -> stem is "A000001"
     return {p.stem for p in test_ds.feature_files}
 
 
 def load_sequences_by_ids(jsonl_path: str, target_ids: Set[str], verbose: bool = True) -> List[Dict]:
     """
     Load raw sequences from JSONL for specific IDs.
-    
-    Args:
-        jsonl_path: Path to JSONL file
-        target_ids: Set of OEIS IDs to extract
-        verbose: Whether to show progress bar
-        
-    Returns:
-        List of records matching target_ids
+    Strictly follows JSONL format: {"oeis_id": "...", "sequence": [...]}
     """
     data = []
     
@@ -83,10 +74,15 @@ def load_sequences_by_ids(jsonl_path: str, target_ids: Set[str], verbose: bool =
         for line in file_iter:
             try:
                 record = json.loads(line)
-                oeis_id = record.get('id')
                 
-                if oeis_id in target_ids:
+                # Use strict keys from JSONL
+                oid = record.get('oeis_id')
+                
+                if oid and oid in target_ids:
+                    # Keep the record as is (or filter keys if memory is tight)
+                    # We assume record has 'sequence' as per schema
                     data.append(record)
+                    
             except json.JSONDecodeError:
                 continue
     finally:
@@ -97,12 +93,8 @@ def load_sequences_by_ids(jsonl_path: str, target_ids: Set[str], verbose: bool =
 
 
 def load_test_sequences(args) -> List[Dict]:
-    """
-    1. Use loader.py to reproduce the exact test split used during training.
-    2. Load raw sequences from JSONL for those specific IDs.
-    """
+    """Load matching test sequences."""
     print(f"🔍 Reproducing test split using loader...")
-    
     test_ids = get_test_ids_from_loader(
         args.features_dir,
         args.val_ratio,
@@ -115,25 +107,11 @@ def load_test_sequences(args) -> List[Dict]:
     test_data = load_sequences_by_ids(args.jsonl_path, test_ids)
     print(f"✅ Loaded {len(test_data)} raw sequences matching the test set.")
     
-    if len(test_data) != len(test_ids):
-        print(f"⚠️ Warning: Found {len(test_data)} records but expected {len(test_ids)}.")
-        print("   Some feature files might not have matching JSONL entries (or ID mismatch).")
-    
     return test_data
 
 
 def calculate_metrics(target: int, candidates: List[Any], pred_mag: float) -> Dict[str, Any]:
-    """
-    Check if target is in candidates and calculate magnitude error.
-    
-    Args:
-        target: The correct target value
-        candidates: List of (value, error) tuples from solver
-        pred_mag: Predicted magnitude from solver
-        
-    Returns:
-        Dictionary with top1, top5, top10, mag_error, target_log_mag
-    """
+    """Calculate evaluation metrics."""
     cand_values = [c[0] for c in candidates] if candidates else []
     
     metrics = {
@@ -170,24 +148,12 @@ def update_results(
     output: Dict,
     log_sample: bool = False
 ) -> None:
-    """
-    Update results dictionary with metrics from a single evaluation.
-    
-    Args:
-        results: Results dictionary to update
-        metrics: Metrics from calculate_metrics
-        record: Original record from JSONL
-        output: Output from solver
-        log_sample: Whether to add this sample to logs
-    """
-    # Update summary
+    """Update results dictionary."""
+    # Summary stats
     results["summary"]["total"] += 1
-    if metrics["top1"]:
-        results["summary"]["correct_top1"] += 1
-    if metrics["top5"]:
-        results["summary"]["correct_top5"] += 1
-    if metrics["top10"]:
-        results["summary"]["correct_top10"] += 1
+    if metrics["top1"]: results["summary"]["correct_top1"] += 1
+    if metrics["top5"]: results["summary"]["correct_top5"] += 1
+    if metrics["top10"]: results["summary"]["correct_top10"] += 1
     results["summary"]["total_mag_error"] += metrics["mag_error"]
     
     # Bucket analysis
@@ -200,10 +166,10 @@ def update_results(
     
     # Logging
     if log_sample:
-        target = int(record['seq'].split(',')[-1])
+        # Use JSONL key 'oeis_id' for logging
         log_entry = {
-            "id": record.get("id"),
-            "target": target,
+            "oeis_id": record.get("oeis_id"),
+            "target": record.get("sequence")[-1],
             "pred_top1": output['candidates'][0][0] if output['candidates'] else None,
             "candidates": [c[0] for c in output['candidates'][:3]],
             "correct": metrics["top1"],
@@ -213,7 +179,6 @@ def update_results(
 
 
 def create_empty_results(config: Optional[Dict] = None) -> Dict[str, Any]:
-    """Create an empty results dictionary."""
     return {
         "config": config or {},
         "summary": {
@@ -231,7 +196,7 @@ def create_empty_results(config: Optional[Dict] = None) -> Dict[str, Any]:
 def main():
     args = setup_args()
     
-    # 1. Load Data (Strict consistency check)
+    # 1. Load Data
     test_data = load_test_sequences(args)
     
     if args.limit:
@@ -251,10 +216,10 @@ def main():
     
     for i, record in enumerate(tqdm(test_data)):
         try:
-            seq_str = record['seq'].split(',')
-            full_seq = [int(x) for x in seq_str]
+            # Use 'sequence' directly (list of ints)
+            full_seq = record.get('sequence')
             
-            if len(full_seq) < 5:
+            if not full_seq or len(full_seq) < 5:
                 continue
             
             input_seq = full_seq[:-1]
@@ -270,7 +235,7 @@ def main():
             # Metrics
             metrics = calculate_metrics(target, output['candidates'], output['predicted_magnitude'])
             
-            # Update results
+            # Update
             log_sample = not metrics["top1"] or (i % 100 == 0)
             update_results(results, metrics, record, output, log_sample)
             
@@ -280,6 +245,7 @@ def main():
                     json.dump(results, f, indent=2)
 
         except Exception as e:
+            # print(f"Error processing {record.get('oeis_id')}: {e}")
             continue
 
     # Final Report

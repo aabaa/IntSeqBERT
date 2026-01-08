@@ -147,7 +147,7 @@ class TestUpdateResults:
         results = evaluate_final.create_empty_results()
         metrics = {"top1": False, "top5": False, "top10": False, 
                    "mag_error": 0.5, "target_log_mag": 2.0}
-        record = {"id": "A000001", "seq": "1,2,3"}
+        record = {"oeis_id": "A000001", "sequence": [1, 2, 3]}
         output = {"candidates": [], "predicted_magnitude": 100}
         
         evaluate_final.update_results(results, metrics, record, output, log_sample=False)
@@ -159,7 +159,7 @@ class TestUpdateResults:
         results = evaluate_final.create_empty_results()
         metrics = {"top1": True, "top5": True, "top10": True, 
                    "mag_error": 0.1, "target_log_mag": 2.0}
-        record = {"id": "A000001", "seq": "1,2,3"}
+        record = {"oeis_id": "A000001", "sequence": [1, 2, 3]}
         output = {"candidates": [(3, 0.1)], "predicted_magnitude": 3}
         
         evaluate_final.update_results(results, metrics, record, output, log_sample=False)
@@ -173,7 +173,7 @@ class TestUpdateResults:
         results = evaluate_final.create_empty_results()
         metrics = {"top1": True, "top5": True, "top10": True, 
                    "mag_error": 0.1, "target_log_mag": 2.5}  # bucket = 2
-        record = {"id": "A000001", "seq": "1,2,100"}
+        record = {"oeis_id": "A000001", "sequence": [1, 2, 100]}
         output = {"candidates": [(100, 0.1)], "predicted_magnitude": 100}
         
         evaluate_final.update_results(results, metrics, record, output, log_sample=False)
@@ -187,13 +187,13 @@ class TestUpdateResults:
         results = evaluate_final.create_empty_results()
         metrics = {"top1": False, "top5": False, "top10": False, 
                    "mag_error": 1.5, "target_log_mag": 2.0}
-        record = {"id": "A000001", "seq": "1,2,100"}
+        record = {"oeis_id": "A000001", "sequence": [1, 2, 100]}
         output = {"candidates": [(50, 0.1), (60, 0.2)], "predicted_magnitude": 50}
         
         evaluate_final.update_results(results, metrics, record, output, log_sample=True)
         
         assert len(results["logs"]) == 1
-        assert results["logs"][0]["id"] == "A000001"
+        assert results["logs"][0]["oeis_id"] == "A000001"
         assert results["logs"][0]["target"] == 100
         assert results["logs"][0]["correct"] == False
     
@@ -202,7 +202,7 @@ class TestUpdateResults:
         results = evaluate_final.create_empty_results()
         metrics = {"top1": True, "top5": True, "top10": True, 
                    "mag_error": 0.1, "target_log_mag": 2.0}
-        record = {"id": "A000001", "seq": "1,2,100"}
+        record = {"oeis_id": "A000001", "sequence": [1, 2, 100]}
         output = {"candidates": [(100, 0.1)], "predicted_magnitude": 100}
         
         evaluate_final.update_results(results, metrics, record, output, log_sample=False)
@@ -222,9 +222,9 @@ class TestLoadSequencesByIds:
         jsonl_path = tmp_path / "test.jsonl"
         
         with open(jsonl_path, 'w') as f:
-            f.write('{"id": "A000001", "seq": "1,2,3"}\n')
-            f.write('{"id": "A000002", "seq": "2,4,6"}\n')
-            f.write('{"id": "A000003", "seq": "3,6,9"}\n')
+            f.write('{"oeis_id": "A000001", "sequence": [1, 2, 3]}\n')
+            f.write('{"oeis_id": "A000002", "sequence": [2, 4, 6]}\n')
+            f.write('{"oeis_id": "A000003", "sequence": [3, 6, 9]}\n')
         
         target_ids = {"A000001", "A000003"}
         result = evaluate_final.load_sequences_by_ids(
@@ -232,7 +232,7 @@ class TestLoadSequencesByIds:
         )
         
         assert len(result) == 2
-        ids = {r["id"] for r in result}
+        ids = {r["oeis_id"] for r in result}
         assert ids == {"A000001", "A000003"}
     
     def test_empty_target_ids(self, tmp_path):
@@ -240,7 +240,7 @@ class TestLoadSequencesByIds:
         jsonl_path = tmp_path / "test.jsonl"
         
         with open(jsonl_path, 'w') as f:
-            f.write('{"id": "A000001", "seq": "1,2,3"}\n')
+            f.write('{"oeis_id": "A000001", "sequence": [1, 2, 3]}\n')
         
         result = evaluate_final.load_sequences_by_ids(
             str(jsonl_path), set(), verbose=False
@@ -253,9 +253,9 @@ class TestLoadSequencesByIds:
         jsonl_path = tmp_path / "test.jsonl"
         
         with open(jsonl_path, 'w') as f:
-            f.write('{"id": "A000001", "seq": "1,2,3"}\n')
+            f.write('{"oeis_id": "A000001", "sequence": [1, 2, 3]}\n')
             f.write('invalid json line\n')
-            f.write('{"id": "A000002", "seq": "2,4,6"}\n')
+            f.write('{"oeis_id": "A000002", "sequence": [2, 4, 6]}\n')
         
         target_ids = {"A000001", "A000002"}
         result = evaluate_final.load_sequences_by_ids(
@@ -287,7 +287,7 @@ class TestEvaluationIntegration:
             metrics = evaluate_final.calculate_metrics(
                 tc["target"], tc["candidates"], tc["pred_mag"]
             )
-            record = {"id": f"A{i:06d}", "seq": f"1,2,{tc['target']}"}
+            record = {"oeis_id": f"A{i:06d}", "sequence": [1, 2, tc['target']]}
             output = {"candidates": tc["candidates"], "predicted_magnitude": tc["pred_mag"]}
             evaluate_final.update_results(results, metrics, record, output, log_sample=True)
         
