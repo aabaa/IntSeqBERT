@@ -2,6 +2,7 @@
 evaluate_final.py:
 Evaluation script for the Encoder-Decoder architecture.
 Replaces 'solver.py' by directly orchestrating IntSeqBERT (Encoder) and IntSeqDecoder.
+[DEBUG MODE ENABLED]
 """
 
 import json
@@ -49,29 +50,29 @@ def setup_args():
 def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tuple[nn.Module, nn.Module]:
     """
     Load Encoder and Decoder.
-    If decoder_path is provided, loads decoder from there.
-    Otherwise, tries to load both from model_path.
     """
     # 1. Initialize Models
-    # Ensure d_model matches your training config (usually 512 or 128 depending on your experiments)
-    # If your best_model was trained with d_model=512, keep it. If 128, change it here.
     encoder = IntSeqBERT(d_model=512)
     decoder = IntSeqDecoder(d_model=512, hidden_dim=512)
     
     # 2. Load Encoder
     print(f"📦 Loading Encoder from {model_path}...")
-    enc_checkpoint = torch.load(model_path, map_location=device)
-    enc_state = enc_checkpoint['state_dict'] if 'state_dict' in enc_checkpoint else enc_checkpoint
-    
-    # Filter/Clean keys for encoder
-    clean_enc_state = {}
-    for k, v in enc_state.items():
-        if k.startswith("encoder."):
-            clean_enc_state[k.replace("encoder.", "")] = v
-        elif not k.startswith("decoder."): # Assume other keys belong to encoder
-            clean_enc_state[k] = v
-            
-    encoder.load_state_dict(clean_enc_state, strict=False)
+    try:
+        # Try Lightning auto-load first
+        loaded = IntSeqBERT.load_from_checkpoint(model_path, map_location=device)
+        encoder = loaded[0] if isinstance(loaded, tuple) else loaded
+    except Exception as e:
+        print(f"⚠️ Lightning load failed: {e}. Trying manual load...")
+        enc_checkpoint = torch.load(model_path, map_location=device)
+        enc_state = enc_checkpoint['state_dict'] if 'state_dict' in enc_checkpoint else enc_checkpoint
+        
+        clean_enc_state = {}
+        for k, v in enc_state.items():
+            if k.startswith("encoder."):
+                clean_enc_state[k.replace("encoder.", "")] = v
+            elif not k.startswith("decoder."):
+                clean_enc_state[k] = v
+        encoder.load_state_dict(clean_enc_state, strict=False)
     
     # 3. Load Decoder
     dec_path_to_use = decoder_path if decoder_path else model_path
@@ -84,7 +85,7 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
     for k, v in dec_state.items():
         if k.startswith("decoder."):
             clean_dec_state[k.replace("decoder.", "")] = v
-        elif decoder_path: # If explicit path given, assume all keys are for decoder
+        elif decoder_path:
             clean_dec_state[k] = v
 
     if clean_dec_state:
@@ -100,10 +101,19 @@ def load_models(model_path: str, decoder_path: Optional[str], device: str) -> Tu
 
 def get_test_ids_from_loader(features_dir: str, val_ratio: float, test_ratio: float, seed: int) -> Set[str]:
     """Reproduce test split."""
+    print("🔍 [DEBUG] Loading dataset split...")
     _, _, test_ds = loader.load_and_split_data(
         features_dir=features_dir, val_ratio=val_ratio, test_ratio=test_ratio, seed=seed
     )
-    return {p.stem for p in test_ds.feature_files}
+    
+    # === DEBUG PRINT ===
+    feature_files = [p.stem for p in test_ds.feature_files]
+    print(f"🔍 [DEBUG] Total Test IDs found in loader: {len(feature_files)}")
+    if len(feature_files) > 0:
+        print(f"🔍 [DEBUG] Sample Test IDs (Loader): {feature_files[:3]}") # e.g. ['A000001', 'A000005']
+    # ===================
+    
+    return set(feature_files)
 
 
 def load_test_sequences(args) -> List[Dict]:
@@ -113,14 +123,29 @@ def load_test_sequences(args) -> List[Dict]:
     
     data = []
     print(f"📖 Scanning {args.jsonl_path}...")
+    
     with open(args.jsonl_path, 'r', encoding='utf-8') as f:
-        for line in tqdm(f):
+        for i, line in enumerate(tqdm(f)):
             try:
                 rec = json.loads(line)
-                if rec.get('oeis_id') in test_ids:
+                
+                # === DEBUG PRINT (First record only) ===
+                if i == 0:
+                    print(f"\n🔍 [DEBUG] First Record Keys: {list(rec.keys())}")
+                    sample_id = rec.get('oeis_id') or rec.get('id')
+                    print(f"🔍 [DEBUG] First Record ID value: '{sample_id}'")
+                    if 'sequence' in rec:
+                         print(f"🔍 [DEBUG] Sequence type: {type(rec['sequence'])}")
+                # =======================================
+
+                # Try matching
+                oid = rec.get('oeis_id')
+                
+                if oid in test_ids:
                     data.append(rec)
             except: continue
             
+    print(f"\n✅ [DEBUG] Total matches found: {len(data)}")
     return data
 
 
@@ -195,6 +220,10 @@ def main():
     
     # 1. Load Data
     test_data = load_test_sequences(args)
+    if not test_data:
+        print("❌ [ERROR] No test data found. Check the DEBUG logs above!")
+        return
+
     if args.limit:
         test_data = test_data[:args.limit]
         print(f"⚠️ Limiting to {args.limit} samples")
