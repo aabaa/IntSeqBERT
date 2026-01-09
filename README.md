@@ -27,13 +27,16 @@ A BERT-style encoder that fuses two distinct feature streams into a unified late
 
 This project uses the **Online Encyclopedia of Integer Sequences (OEIS)**.
 
-### Tag Filtering
+### Tag Filtering Strategy
 
-We use [Official OEIS Keywords](https://oeis.org/wiki/Clear-cut_examples_of_keywords) to filter sequences.
+We use [Official OEIS Keywords](https://oeis.org/wiki/Clear-cut_examples_of_keywords) to define dataset subsets.
 
-| Include | Exclude |
-|---------|---------|
-| `core`, `easy`, `nice`, `nonn` | `cons`, `base`, `word`, `fini`, `dead`, `dumb`, `unkn`, `less` |
+| Subset | Type | Strategy | Tags |
+|--------|------|----------|------|
+| **`easy`** | PoC | **Include** | `core`, `easy`, `nice` |
+| **`std`** | Main | **Exclude** | `cons`, `base`, `word`, `fini`, `dead`, `dumb`, `unkn`, `less` |
+| **`all`** | Test | **None** | (All sequences) |
+| **`number_theory`** | Test | **Include** | `mult`, `cofr`, `tabl`, `frac` |
 
 ---
 
