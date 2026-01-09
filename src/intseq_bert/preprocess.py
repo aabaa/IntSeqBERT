@@ -294,47 +294,89 @@ def cmd_extract_features(args):
 def cmd_split_dataset(args):
     """
     Command: split-dataset
-    Splits data into train/val/test lists.
+    Splits data into train/val/test lists with optional tag filtering.
+    Uses JSONL for tag info and verifies .pt file existence.
     """
-    input_dir = Path(args.input_dir)
+    jsonl_path = Path(args.jsonl)
+    features_dir = Path(args.features_dir)
     output_dir = Path(args.output_dir)
+    
+    # Parse tag arguments
+    include_tags = None
+    exclude_tags = None
+    if args.include_tags:
+        include_tags = [t.strip() for t in args.include_tags.split(",")]
+    if args.exclude_tags:
+        exclude_tags = [t.strip() for t in args.exclude_tags.split(",")]
+    
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    logger.info(f"Scanning .pt files in {input_dir}...")
+    logger.info(f"Reading JSONL: {jsonl_path}")
+    logger.info(f"Features dir: {features_dir}")
+    if include_tags:
+        logger.info(f"Include tags: {include_tags}")
+    if exclude_tags:
+        logger.info(f"Exclude tags: {exclude_tags}")
     
-    # 1. Collect IDs
-    all_ids = []
-    for f in input_dir.glob("*.pt"):
-        all_ids.append(f.stem) # "A000001.pt" -> "A000001"
-        
-    total = len(all_ids)
-    logger.info(f"Found {total} files.")
+    # 1. Collect IDs from JSONL with tag filtering
+    valid_ids = []
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in tqdm(f, desc="Filtering JSONL"):
+            if not line.strip():
+                continue
+            try:
+                record = schemas.OEISRecord.from_json_line(line)
+                keywords = record.keywords or []
+                
+                # Tag filtering
+                if exclude_tags and any(t in keywords for t in exclude_tags):
+                    continue
+                if include_tags and not any(t in keywords for t in include_tags):
+                    continue
+                
+                valid_ids.append(record.oeis_id)
+            except Exception:
+                continue
     
-    if total == 0:
-        logger.warning("No files found. Exiting.")
+    logger.info(f"Found {len(valid_ids)} IDs after tag filtering.")
+    
+    if not valid_ids:
+        logger.warning("No IDs found matching criteria. Exiting.")
         return
-
-    # 2. Shuffle
+    
+    # 2. Verify feature file existence
+    existing_ids = []
+    for oid in valid_ids:
+        if (features_dir / f"{oid}.pt").exists():
+            existing_ids.append(oid)
+    
+    logger.info(f"{len(existing_ids)} IDs have corresponding .pt files.")
+    
+    if not existing_ids:
+        logger.warning("No matching feature files found. Exiting.")
+        return
+    
+    # 3. Deterministic shuffle
     random.seed(config.SEED)
-    random.shuffle(all_ids)
+    random.shuffle(existing_ids)
     
-    # 3. Split
-    # Config defines ratios like 0.05
-    n_test = int(total * config.TEST_RATIO)
-    n_val = int(total * config.VAL_RATIO)
+    # 4. Split
+    n_total = len(existing_ids)
+    n_test = int(n_total * config.TEST_RATIO)
+    n_val = int(n_total * config.VAL_RATIO)
     
-    test_ids = all_ids[:n_test]
-    val_ids = all_ids[n_test : n_test + n_val]
-    train_ids = all_ids[n_test + n_val:]
+    test_ids = existing_ids[:n_test]
+    val_ids = existing_ids[n_test : n_test + n_val]
+    train_ids = existing_ids[n_test + n_val:]
     
-    # 4. Save
+    # 5. Save
     def _save_list(name, ids):
         path = output_dir / name
         with open(path, 'w') as f:
             for oid in ids:
                 f.write(oid + '\n')
         logger.info(f"Saved {name}: {len(ids)} IDs")
-        
+    
     _save_list("test.txt", test_ids)
     _save_list("val.txt", val_ids)
     _save_list("train.txt", train_ids)
@@ -367,9 +409,12 @@ def main():
     p_feat.set_defaults(func=cmd_extract_features)
     
     # 3. split-dataset
-    p_split = subparsers.add_parser("split-dataset", help="Split data into train/val/test")
-    p_split.add_argument("-i", "--input-dir", required=True, help="Directory with .pt files")
+    p_split = subparsers.add_parser("split-dataset", help="Split data into train/val/test with tag filtering")
+    p_split.add_argument("-j", "--jsonl", required=True, help="Path to data.jsonl (for tag info)")
+    p_split.add_argument("-f", "--features-dir", required=True, help="Directory with .pt files")
     p_split.add_argument("-o", "--output-dir", required=True, help="Output directory for split lists")
+    p_split.add_argument("--include-tags", help="Comma-separated tags to include (OR logic)")
+    p_split.add_argument("--exclude-tags", help="Comma-separated tags to exclude (OR logic)")
     p_split.set_defaults(func=cmd_split_dataset)
     
     args = parser.parse_args()

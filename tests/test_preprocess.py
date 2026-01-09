@@ -366,18 +366,27 @@ class TestCmdSplitDataset:
     
     def test_split_creation(self, tmp_path):
         """Test train/val/test split creation."""
-        # Create dummy .pt files
-        input_dir = tmp_path / "features"
-        input_dir.mkdir()
+        # Create JSONL with records
+        jsonl_path = tmp_path / "data.jsonl"
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
         
+        records = []
         for i in range(100):
-            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+            rec = schemas.OEISRecord(oeis_id=f"A{i:06d}", sequence=[1, 2, 3])
+            records.append(rec)
+            (features_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+        
+        create_jsonl_file(jsonl_path, records)
         
         output_dir = tmp_path / "splits"
         
         args = argparse.Namespace(
-            input_dir=str(input_dir),
-            output_dir=str(output_dir)
+            jsonl=str(jsonl_path),
+            features_dir=str(features_dir),
+            output_dir=str(output_dir),
+            include_tags=None,
+            exclude_tags=None
         )
         
         preprocess.cmd_split_dataset(args)
@@ -395,22 +404,119 @@ class TestCmdSplitDataset:
         
         assert len(all_ids) == 100
     
+    def test_include_tags_filter(self, tmp_path):
+        """Test filtering by include tags."""
+        jsonl_path = tmp_path / "data.jsonl"
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
+        
+        # Create records with different tags
+        records = [
+            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["core", "easy"]),
+            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["core"]),
+        ]
+        for rec in records:
+            (features_dir / f"{rec.oeis_id}.pt").write_bytes(b"dummy")
+        
+        create_jsonl_file(jsonl_path, records)
+        
+        output_dir = tmp_path / "splits"
+        
+        args = argparse.Namespace(
+            jsonl=str(jsonl_path),
+            features_dir=str(features_dir),
+            output_dir=str(output_dir),
+            include_tags="core",
+            exclude_tags=None
+        )
+        
+        preprocess.cmd_split_dataset(args)
+        
+        # Only A000001 and A000003 should be included (have 'core')
+        all_ids = set()
+        for split_file in ["train.txt", "val.txt", "test.txt"]:
+            with open(output_dir / split_file) as f:
+                ids = [line.strip() for line in f if line.strip()]
+                all_ids.update(ids)
+        
+        assert len(all_ids) == 2
+        assert "A000001" in all_ids
+        assert "A000003" in all_ids
+        assert "A000002" not in all_ids
+    
+    def test_exclude_tags_filter(self, tmp_path):
+        """Test filtering by exclude tags."""
+        jsonl_path = tmp_path / "data.jsonl"
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
+        
+        records = [
+            schemas.OEISRecord(oeis_id="A000001", sequence=[1], keywords=["nonn"]),
+            schemas.OEISRecord(oeis_id="A000002", sequence=[1], keywords=["base"]),
+            schemas.OEISRecord(oeis_id="A000003", sequence=[1], keywords=["cons"]),
+        ]
+        for rec in records:
+            (features_dir / f"{rec.oeis_id}.pt").write_bytes(b"dummy")
+        
+        create_jsonl_file(jsonl_path, records)
+        
+        output_dir = tmp_path / "splits"
+        
+        args = argparse.Namespace(
+            jsonl=str(jsonl_path),
+            features_dir=str(features_dir),
+            output_dir=str(output_dir),
+            include_tags=None,
+            exclude_tags="base,cons"
+        )
+        
+        preprocess.cmd_split_dataset(args)
+        
+        # Only A000001 should remain
+        all_ids = set()
+        for split_file in ["train.txt", "val.txt", "test.txt"]:
+            with open(output_dir / split_file) as f:
+                ids = [line.strip() for line in f if line.strip()]
+                all_ids.update(ids)
+        
+        assert len(all_ids) == 1
+        assert "A000001" in all_ids
+    
     def test_deterministic_split(self, tmp_path):
         """Test that splits are deterministic with same seed."""
-        input_dir = tmp_path / "features"
-        input_dir.mkdir()
+        jsonl_path = tmp_path / "data.jsonl"
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
         
+        records = []
         for i in range(50):
-            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+            rec = schemas.OEISRecord(oeis_id=f"A{i:06d}", sequence=[1, 2, 3])
+            records.append(rec)
+            (features_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+        
+        create_jsonl_file(jsonl_path, records)
         
         # First split
         output1 = tmp_path / "split1"
-        args1 = argparse.Namespace(input_dir=str(input_dir), output_dir=str(output1))
+        args1 = argparse.Namespace(
+            jsonl=str(jsonl_path),
+            features_dir=str(features_dir),
+            output_dir=str(output1),
+            include_tags=None,
+            exclude_tags=None
+        )
         preprocess.cmd_split_dataset(args1)
         
         # Second split
         output2 = tmp_path / "split2"
-        args2 = argparse.Namespace(input_dir=str(input_dir), output_dir=str(output2))
+        args2 = argparse.Namespace(
+            jsonl=str(jsonl_path),
+            features_dir=str(features_dir),
+            output_dir=str(output2),
+            include_tags=None,
+            exclude_tags=None
+        )
         preprocess.cmd_split_dataset(args2)
         
         # Compare
@@ -463,19 +569,29 @@ class TestCLI:
     
     def test_split_dataset_cli(self, tmp_path, monkeypatch):
         """Test split-dataset command via CLI."""
-        input_dir = tmp_path / "features"
-        input_dir.mkdir()
+        jsonl_path = tmp_path / "data.jsonl"
+        features_dir = tmp_path / "features"
+        features_dir.mkdir()
+        
+        records = []
         for i in range(20):
-            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+            rec = schemas.OEISRecord(oeis_id=f"A{i:06d}", sequence=[1, 2, 3])
+            records.append(rec)
+            (features_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+        
+        create_jsonl_file(jsonl_path, records)
         
         output_dir = tmp_path / "splits"
         
         monkeypatch.setattr("sys.argv", [
             "preprocess.py", "split-dataset",
-            "-i", str(input_dir),
+            "-j", str(jsonl_path),
+            "-f", str(features_dir),
             "-o", str(output_dir)
         ])
         
         preprocess.main()
         
+        assert (output_dir / "train.txt").exists()
+
         assert (output_dir / "train.txt").exists()
