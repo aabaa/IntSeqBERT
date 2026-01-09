@@ -50,4 +50,32 @@ MAX_SEQUENCE_LENGTH = 128
 KEY_OEIS_ID = "oeis_id"
 KEY_MAG_FEATURES = "mag_features"
 KEY_MOD_FEATURES = "mod_features"
+KEY_MOD_INTEGERS = "mod_integers"
 KEY_TARGETS = "targets"
+
+# ==========================================
+# 5. Input/Output Dimensions
+# ==========================================
+# Magnitude Stream Dimensions
+# Raw input: [log_abs, sign+, sign-, sign0]
+MAG_RAW_DIM = 4
+# Model input (Expanded): [log_abs, sign+, sign-, sign0, is_masked]
+MAG_EXTENDED_DIM = 5
+
+# Modulo Stream Dimensions
+# Calculated dynamically: len(MOD_RANGE) -> 100
+NUM_MODULI = len(MOD_RANGE)
+# Input features: (sin, cos) pair for each modulus -> 200
+MOD_FEATURE_DIM = NUM_MODULI * 2
+
+# ==========================================
+# 6. Training / Collator Constants
+# ==========================================
+# Masking probability for dynamic masking (BERT standard is 0.15)
+MASK_PROB = 0.15
+
+# Value to ignore in CrossEntropyLoss (PyTorch standard)
+IGNORE_INDEX = -100
+
+# Padding value for floating point feature tensors
+PAD_VALUE_FEATURE = 0.0
