@@ -55,8 +55,8 @@ def _parse_stripped_line(line: str) -> Optional[Tuple[str, List[int]]]:
         return None
         
     try:
-        # Parse sequence
-        sequence = [int(x) for x in seq_str.split(",")]
+        # Parse sequence (filter empty strings from trailing commas)
+        sequence = [int(x) for x in seq_str.split(",") if x]
         return oeis_id, sequence
     except ValueError:
         # Non-integer values in sequence
