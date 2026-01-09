@@ -101,3 +101,25 @@ NUM_SIGN_CLASSES = 3
 SIGN_POSITIVE = 0  # sign+ column in features
 SIGN_NEGATIVE = 1  # sign- column in features
 SIGN_ZERO = 2      # sign0 column in features
+
+# ==========================================
+# 8. Training Hyperparameters
+# ==========================================
+# Magnitude accuracy threshold (log10 scale)
+# 0.5 means predictions within sqrt(10) ≈ 3.16x of actual value
+MAG_ACC_THRESHOLD = 0.5
+
+# AdamW optimizer betas
+ADAMW_BETAS = (0.9, 0.98)
+
+# Gradient clipping norm
+GRAD_CLIP_NORM = 1.0
+
+# Default training parameters
+DEFAULT_BATCH_SIZE = 32
+DEFAULT_LR = 1e-4
+DEFAULT_WEIGHT_DECAY = 0.01
+DEFAULT_WARMUP_RATIO = 0.1
+DEFAULT_PATIENCE = 5
+DEFAULT_NUM_WORKERS = 4
+DEFAULT_EPOCHS = 20
