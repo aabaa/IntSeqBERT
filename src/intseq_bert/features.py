@@ -1,153 +1,130 @@
 """
-Feature extraction logic for IntSeqBERT (Dual Model Architecture).
-Separates features into 'Mod Spectrum' and 'Magnitude' streams.
-Designed for easy unit testing of individual feature components.
+features.py:
+Core logic for converting raw integer sequences into model-ready tensors.
+Handles Magnitude (Log10-Scale) and Modulo (Sin/Cos) transformations based on Rev.4 specification.
 """
 
 import math
 import torch
-import numpy as np
-from typing import List, Dict, Tuple
+from typing import List, Dict
+from . import config
 
-# ==========================================
-# Configuration
-# ==========================================
-# Mod Spectrum covers cycles from 2 to 101 (100 distinct moduli)
-MOD_RANGE = range(2, 102)
-
-# ==========================================
-# 1. Magnitude Features (Atomic Functions)
-# ==========================================
-
-def compute_log_magnitude(seq: List[int]) -> List[float]:
+def compute_magnitude_features(sequence: List[int]) -> torch.Tensor:
     """
-    Computes log10(|x|). Returns 0.0 for x=0.
-    Used as the base for velocity/acceleration and regression targets.
-    """
-    # Using log10 for easier interpretation (number of digits)
-    return [math.log10(abs(x)) if x != 0 else 0.0 for x in seq]
-
-def compute_sign(seq: List[int]) -> List[float]:
-    """Computes sign of x: 1.0, -1.0, or 0.0."""
-    return [1.0 if x > 0 else (-1.0 if x < 0 else 0.0) for x in seq]
-
-def compute_velocity(seq: List[int]) -> List[float]:
-    """
-    Computes 1st order difference of Log Magnitude (Growth Rate).
-    Pads the first element with 0.0.
-    """
-    logs = compute_log_magnitude(seq)
-    if not logs:
-        return []
+    Converts a list of integers into Magnitude features.
     
-    velocity = [0.0] * len(seq)
-    for i in range(1, len(seq)):
-        velocity[i] = logs[i] - logs[i-1]
-    return velocity
+    Format per number: [log_val, sign_plus, sign_minus, sign_zero]
+    - log_val: 1.0 + log10(|x|) if x != 0, else 0.0
+    - signs: One-hot-ish encoding for >0, <0, ==0
+    
+    Returns:
+        Tensor of shape (L, config.MAG_RAW_DIM)
+    """
+    features = []
+    
+    for x in sequence:
+        # 1. Log-Scale Absolute Value (Base-10)
+        if x == 0:
+            log_val = 0.0
+            signs = [0.0, 0.0, 1.0] # Zero
+        else:
+            val_abs = abs(x)
+            
+            # Sign Encoding
+            if x > 0:
+                signs = [1.0, 0.0, 0.0] # Plus
+            else:
+                signs = [0.0, 1.0, 0.0] # Minus
+            
+            # Log calculation with overflow protection
+            try:
+                # Formula: 1.0 + log10(|x|)
+                log_val = 1.0 + math.log10(val_abs)
+            except OverflowError:
+                # Fallback for extremely large integers that exceed float64 range
+                # Approx: log10(|x|) ≈ len(str(|x|)) - 1
+                # Formula: 1.0 + (len - 1) = len
+                log_val = float(len(str(val_abs)))
 
-def compute_acceleration(seq: List[int]) -> List[float]:
-    """
-    Computes 2nd order difference of Log Magnitude (Curvature).
-    Distinguishes Exponential (acc=0) vs Factorial (acc>0) vs Polynomial (acc<0).
-    Pads the first two elements with 0.0.
-    """
-    vel = compute_velocity(seq)
-    if not vel:
-        return []
+        # Combine: [Value, S+, S-, S0]
+        # Note: config.MAG_RAW_DIM is expected to be 4
+        features.append([log_val] + signs)
         
-    acc = [0.0] * len(seq)
-    for i in range(2, len(seq)):
-        acc[i] = vel[i] - vel[i-1]
-    return acc
+    if not features:
+        return torch.zeros((0, config.MAG_RAW_DIM), dtype=torch.float32)
+        
+    return torch.tensor(features, dtype=torch.float32)
 
-def compute_normalized_index(seq: List[int]) -> List[float]:
+def compute_modulo_features(sequence: List[int]) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Computes normalized position index [0.0, 1.0].
-    Useful for position-dependent sequences (e.g., n^2).
-    """
-    length = len(seq)
-    if length <= 1:
-        return [0.0] * length
-    return [i / (length - 1) for i in range(length)]
-
-# ==========================================
-# 2. Mod Spectrum Features (Atomic Functions)
-# ==========================================
-
-def compute_mod_residues(seq: List[int], m: int) -> List[int]:
-    """Computes x % m. Used for generating training targets."""
-    # Python's % operator handles negative numbers correctly for math mods
-    # e.g., -1 % 3 -> 2
-    return [x % m for x in seq]
-
-def compute_mod_sin(seq: List[int], m: int) -> List[float]:
-    """Computes sin(2*pi * (x % m) / m)."""
-    scale = 2 * math.pi / m
-    # Optimization: compute residues once if calling both sin/cos, 
-    # but kept separate here for unit test independence.
-    return [math.sin((x % m) * scale) for x in seq]
-
-def compute_mod_cos(seq: List[int], m: int) -> List[float]:
-    """Computes cos(2*pi * (x % m) / m)."""
-    scale = 2 * math.pi / m
-    return [math.cos((x % m) * scale) for x in seq]
-
-# ==========================================
-# 3. Main Extractor
-# ==========================================
-
-def extract_features(sequence: List[int]) -> Dict[str, torch.Tensor]:
-    """
-    Extracts all features for a given sequence using the atomic functions.
+    Converts a list of integers into Modulo features and Integer labels.
     
     Args:
-        sequence: List of integers
+        sequence: List of integers.
         
     Returns:
-        Dict containing:
-        - 'mag_features': (SeqLen, 5) FloatTensor
-        - 'mod_features': (SeqLen, 200) FloatTensor (sin/cos pairs for mod 2..101)
-        - 'targets': Dict[str, LongTensor] containing true residues for training
+        mod_features: (L, MOD_FEATURE_DIM) -> [sin(t1), cos(t1), ...] flattened
+        mod_integers: (L, NUM_MODULI)      -> [r1, r2, ...] Raw remainders
     """
-    seq_len = len(sequence)
-    if seq_len == 0:
-        raise ValueError("Sequence cannot be empty")
-
-    # --- 1. Magnitude Features (5 dim) ---
-    f_log = compute_log_magnitude(sequence)
-    f_vel = compute_velocity(sequence)
-    f_acc = compute_acceleration(sequence)
-    f_sgn = compute_sign(sequence)
-    f_idx = compute_normalized_index(sequence)
+    mod_feats_list = []
+    mod_ints_list = []
     
-    # Stack: (SeqLen, 5)
-    mag_data = [f_log, f_vel, f_acc, f_sgn, f_idx]
-    # Transpose to (SeqLen, 5)
-    mag_features = torch.tensor(mag_data, dtype=torch.float32).t()
-
-    # --- 2. Mod Spectrum Features (200 dim) & Targets ---
-    mod_data = []
-    targets = {}
+    # Constant factor for angle calculation: theta = (2 * pi * r) / m
+    two_pi = 2.0 * math.pi
     
-    for m in MOD_RANGE:
-        # Features
-        mod_data.append(compute_mod_sin(sequence, m))
-        mod_data.append(compute_mod_cos(sequence, m))
+    for x in sequence:
+        seq_feats = []
+        seq_ints = []
         
-        # Targets (for loss calculation)
-        targets[f"mod{m}"] = torch.tensor(
-            compute_mod_residues(sequence, m), 
-            dtype=torch.long
+        # Iterate over all defined moduli (e.g., 2 to 101)
+        for m in config.MOD_RANGE:
+            # 1. Compute Remainder
+            # Python % returns positive remainder for positive divisor
+            # Example: -5 % 3 = 1 (mathematically correct)
+            r = x % m
+            seq_ints.append(r)
+            
+            # 2. Compute Continuous Embedding (Sin/Cos)
+            angle = (two_pi * r) / m
+            seq_feats.append(math.sin(angle))
+            seq_feats.append(math.cos(angle))
+            
+        mod_feats_list.append(seq_feats)
+        mod_ints_list.append(seq_ints)
+        
+    if not mod_feats_list:
+        return (
+            torch.zeros((0, config.MOD_FEATURE_DIM), dtype=torch.float32),
+            torch.zeros((0, config.NUM_MODULI), dtype=torch.long)
         )
-    
-    # Stack features: (SeqLen, 200)
-    mod_features = torch.tensor(mod_data, dtype=torch.float32).t()
-    
-    # Add magnitude regression target (same as f_log but separated for clarity)
-    targets["mag"] = torch.tensor(f_log, dtype=torch.float32)
+        
+    return (
+        torch.tensor(mod_feats_list, dtype=torch.float32),
+        torch.tensor(mod_ints_list, dtype=torch.long)
+    )
 
+def process_sequence(sequence: List[int]) -> Dict[str, torch.Tensor]:
+    """
+    Main entry point for processing a single sequence.
+    Applies truncation (but NO padding) and converts to tensors.
+    
+    Args:
+        sequence: Raw integer list from OEIS.
+        
+    Returns:
+        Dict containing inputs and labels defined in config keys.
+    """
+    # 1. Truncation (Handle length limit)
+    if len(sequence) > config.MAX_SEQUENCE_LENGTH:
+        sequence = sequence[:config.MAX_SEQUENCE_LENGTH]
+
+    # 2. Compute Features
+    mag_features = compute_magnitude_features(sequence)
+    mod_features, mod_integers = compute_modulo_features(sequence)
+    
+    # 3. Pack into Dictionary
     return {
-        "mag_features": mag_features,
-        "mod_features": mod_features,
-        "targets": targets
+        config.KEY_MAG_FEATURES: mag_features,   # (L, 4)
+        config.KEY_MOD_FEATURES: mod_features,   # (L, 200)
+        config.KEY_MOD_INTEGERS: mod_integers    # (L, 100)
     }
