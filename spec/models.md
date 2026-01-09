@@ -229,7 +229,15 @@ L_sign = CrossEntropyLoss(sign_logits, sign_targets)
 ### 4.3. Modulo Loss
 
 ```python
-L_mod = mean([CrossEntropy(logits_m, targets[:, m]) for m in range(100)])
+# 各法の損失を、その法の最大エントロピー log(m) で正規化する
+# これにより、ランダム予測時の損失が全ての法で 1.0 に揃う
+L_mod_list = []
+for m in MOD_RANGE:
+    loss_m = CrossEntropy(logits_m, targets[:, m])
+    norm_loss_m = loss_m / log(m)  # normalize by natural log
+    L_mod_list.append(norm_loss_m)
+
+L_mod = mean(L_mod_list)
 ```
 
 `mod_head` 出力を `_split_mod_logits()` で各法にスライス。
@@ -278,5 +286,4 @@ def _generate_sinusoidal_encoding(max_len, d_model):
 | 項目 | 内容 | 優先度 |
 |------|------|--------|
 | Relative Positional Encoding | 隣接項関係の学習強化 (RoPE 等) | 中 |
-| Modulo Loss 正規化 | クラス数不均衡への対応 (`CE_m / log(m)`) | 低 |
 | Gradient Checkpointing | メモリ効率化 | 低 |

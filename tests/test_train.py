@@ -296,6 +296,7 @@ class TestEvaluate:
         assert "mag_acc" in metrics
         assert "sign_acc" in metrics
         assert "mod_acc" in metrics
+        assert "mod_loss" in metrics
     
     def test_accuracy_ranges(self, small_model, mock_collator_output, device):
         """Test that accuracy metrics are in valid percentage range."""

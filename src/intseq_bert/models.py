@@ -230,7 +230,8 @@ class IntSeqForPreTraining(nn.Module):
             pred_sign = sign_logits[mask_map]
             loss_sign = nn.functional.cross_entropy(pred_sign, target_sign)
             
-            # --- C. Modulo Loss (Mean CrossEntropy across all moduli) ---
+            # --- C. Modulo Loss (Normalized Mean CrossEntropy across all moduli) ---
+            # Each modulus's loss is normalized by log(m) so random prediction loss = 1.0
             target_mods = labels["mod_targets"][mask_map] # (N_masked, 100)
             pred_mods_flat = unified_mod_logits[mask_map] # (N_masked, SumMods)
             
@@ -241,7 +242,11 @@ class IntSeqForPreTraining(nn.Module):
             for i, mod_logits in enumerate(pred_mods_split):
                 # mod_logits: (N_masked, m)
                 # target_mods[:, i]: (N_masked,)
-                total_mod_loss += nn.functional.cross_entropy(mod_logits, target_mods[:, i])
+                m = config.MOD_RANGE[i]
+                loss_m = nn.functional.cross_entropy(mod_logits, target_mods[:, i])
+                # Normalize by log(m) - random prediction CE is log(m)
+                norm_loss_m = loss_m / math.log(m)
+                total_mod_loss += norm_loss_m
                 
             loss_mod = total_mod_loss / len(config.MOD_RANGE)
             

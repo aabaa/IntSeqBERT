@@ -135,9 +135,10 @@ def evaluate(
     total_mod_mask_count = 0 # mask_count * num_moduli
     
     correct_sign = 0
-    correct_mag_thresh = 0 # |diff| < 0.5
+    correct_mag_thresh = 0 # |diff| < threshold
     sum_mag_mse = 0.0
     correct_mod = 0 # Sum of correct predictions across all moduli
+    sum_mod_loss = 0.0  # Accumulated normalized mod loss
     
     with torch.no_grad():
         for raw_batch in tqdm(dataloader, desc="Validating", leave=False):
@@ -196,6 +197,10 @@ def evaluate(
                 
                 correct_mod += (m_pred == m_target).sum().item()
             
+            # Get normalized mod loss from model output
+            if "loss_breakdown" in outputs:
+                sum_mod_loss += outputs["loss_breakdown"]["raw_mod"].item()
+            
             # Update counts
             n_masked = mask_map.sum().item()
             total_mask_count += n_masked
@@ -209,15 +214,17 @@ def evaluate(
         mag_acc = (correct_mag_thresh / total_mask_count) * 100
         sign_acc = (correct_sign / total_mask_count) * 100
         mod_acc = (correct_mod / total_mod_mask_count) * 100
+        mod_loss = sum_mod_loss / num_batches if num_batches > 0 else 0.0
     else:
-        mag_mse, mag_acc, sign_acc, mod_acc = 0.0, 0.0, 0.0, 0.0
+        mag_mse, mag_acc, sign_acc, mod_acc, mod_loss = 0.0, 0.0, 0.0, 0.0, 0.0
         
     return {
         "val_loss": avg_loss,
         "mag_mse": mag_mse,
         "mag_acc": mag_acc,
         "sign_acc": sign_acc,
-        "mod_acc": mod_acc
+        "mod_acc": mod_acc,
+        "mod_loss": mod_loss  # Normalized mod loss (1.0 = random prediction)
     }
 
 
@@ -376,7 +383,7 @@ def train(args):
         logger.info(f"  Val Loss:   {val_metrics['val_loss']:.4f}")
         logger.info(f"  Mag Acc:    {val_metrics['mag_acc']:.2f}% (MSE: {val_metrics['mag_mse']:.4f})")
         logger.info(f"  Sign Acc:   {val_metrics['sign_acc']:.2f}%")
-        logger.info(f"  Mod Acc:    {val_metrics['mod_acc']:.2f}%")
+        logger.info(f"  Mod Acc:    {val_metrics['mod_acc']:.2f}% (Loss: {val_metrics['mod_loss']:.4f})")
         
         # --- Checkpointing ---
         state = {
