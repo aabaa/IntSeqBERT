@@ -83,3 +83,21 @@ IGNORE_INDEX = -100
 
 # Padding value for floating point feature tensors
 PAD_VALUE_FEATURE = 0.0
+
+# ==========================================
+# 7. Model Hyperparameters
+# ==========================================
+# Default model architecture parameters
+D_MODEL = 128
+NHEAD = 4
+NUM_LAYERS = 6
+DROPOUT = 0.1
+
+# Feedforward layer hidden dim multiplier (d_model * this value)
+FEEDFORWARD_MULTIPLIER = 4
+
+# Sign classification classes
+NUM_SIGN_CLASSES = 3
+SIGN_POSITIVE = 0  # sign+ column in features
+SIGN_NEGATIVE = 1  # sign- column in features
+SIGN_ZERO = 2      # sign0 column in features

@@ -192,8 +192,16 @@ Automatic Weighted Loss (Kendall et al., 2018) 用のノイズレベルパラメ
   "predictions": {
     "mag_mu": (B, L),
     "mag_log_var": (B, L),
-    "sign_logits": (B, L, 3),
+    "sign_logits": (B, L, NUM_SIGN_CLASSES),
     "mod_logits": (B, L, ~5150)
+  },
+  "loss_breakdown": {  # 学習時のみ、モニタリング用
+    "raw_mag": Tensor (scalar),   # Magnitude 損失
+    "raw_sign": Tensor (scalar),  # Sign 損失
+    "raw_mod": Tensor (scalar),   # Modulo 損失
+    "s_mag": Tensor (scalar),     # Mag の学習済み重み
+    "s_sign": Tensor (scalar),    # Sign の学習済み重み
+    "s_mod": Tensor (scalar)      # Mod の学習済み重み
   }
 }
 ```
