@@ -44,6 +44,10 @@ D_MODEL_DEFAULT = 512
 # Maximum sequence length for input features
 MAX_SEQUENCE_LENGTH = 128
 
+# Minimum sequence length to process. 
+# Sequences shorter than this will be skipped during feature extraction.
+MIN_SEQUENCE_LENGTH = 10
+
 # ==========================================
 # 4. Data Keys (for .pt files)
 # ==========================================

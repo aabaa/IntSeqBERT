@@ -1,276 +1,350 @@
 """
-Tests for the OEIS preprocessing module.
-Tests all pipeline steps including the new feature extraction.
+Tests for preprocess.py module.
+
+Covers:
+1. Layer 1: Pure parsing functions
+2. Layer 2: Worker and helper functions
+3. Layer 3: Command handlers
+4. CLI integration
 """
 
 import pytest
 import gzip
-import json
 import argparse
 import torch
 from pathlib import Path
 
-# Modules to be tested
-from intseq_bert import preprocess, schemas, converters
+from intseq_bert import preprocess, schemas, config
 
+
+# ==========================================
+# Helper Functions
+# ==========================================
 
 def create_gzipped_file(path: Path, content: str):
-    """Helper function: Write string to a file with gzip compression."""
+    """Write string to a gzip file."""
     with gzip.open(path, 'wt', encoding='utf-8') as f:
         f.write(content)
 
 
+def create_jsonl_file(path: Path, records: list):
+    """Create a JSONL file from OEISRecord list."""
+    with open(path, 'w', encoding='utf-8') as f:
+        for rec in records:
+            f.write(rec.to_json_line() + '\n')
+
+
 # ==========================================
-# 1. Test process_stripped
+# Layer 1: Pure Parsing Functions
 # ==========================================
 
-class TestProcessStripped:
-    """Tests for stripped.gz -> JSONL conversion."""
+class TestParseStrippedLine:
+    """Tests for _parse_stripped_line."""
     
-    def test_end_to_end(self, tmp_path):
-        """Test full conversion flow from stripped.gz to jsonl."""
-        stripped_data = """
-# OEIS Stripped Data
-A000001 ,1,2,3,4,5
-A000002 ,1,2
-A000003 ,10,20,30,40,50
-        """.strip()
+    def test_valid_line(self):
+        """Test parsing a valid stripped line."""
+        line = "A000045 ,0,1,1,2,3,5,8"
+        result = preprocess._parse_stripped_line(line)
         
-        input_gz = tmp_path / "stripped.gz"
-        output_jsonl = tmp_path / "stripped.jsonl"
-        create_gzipped_file(input_gz, stripped_data)
-        
-        args = argparse.Namespace(
-            input=str(input_gz),
-            output=str(output_jsonl),
-            min_len=3  # Excludes A000002 (len=2)
-        )
-        
-        preprocess.process_stripped(args)
-        
-        assert output_jsonl.exists()
-        records = schemas.load_records(str(output_jsonl))
-        assert len(records) == 2
-        
-        ids = [r.oeis_id for r in records]
-        assert "A000001" in ids
-        assert "A000003" in ids
-        assert "A000002" not in ids
-        
-        rec1 = next(r for r in records if r.oeis_id == "A000001")
-        assert rec1.sequence == [1, 2, 3, 4, 5]
-
-
-# ==========================================
-# 2. Test process_merge_names
-# ==========================================
-
-class TestProcessMergeNames:
-    """Tests for merging names.gz into JSONL."""
+        assert result is not None
+        oeis_id, sequence = result
+        assert oeis_id == "A000045"
+        assert sequence == [0, 1, 1, 2, 3, 5, 8]
     
-    def test_end_to_end(self, tmp_path):
-        """Test name merging flow."""
-        records = [
-            schemas.OEISRecord(oeis_id="A000001", sequence=[1, 2, 3]),
-            schemas.OEISRecord(oeis_id="A000002", sequence=[4, 5, 6]),
-            schemas.OEISRecord(oeis_id="A999999", sequence=[0])  # No name exists
+    def test_empty_line(self):
+        """Test that empty line returns None."""
+        assert preprocess._parse_stripped_line("") is None
+    
+    def test_comment_line(self):
+        """Test that comment-like lines are handled."""
+        # Note: comment lines don't have " ," so they fail validation
+        result = preprocess._parse_stripped_line("# This is a comment")
+        assert result is None
+    
+    def test_invalid_format(self):
+        """Test that malformed lines return None."""
+        assert preprocess._parse_stripped_line("A000001,1,2,3") is None  # Missing space
+        assert preprocess._parse_stripped_line("B000001 ,1,2,3") is None  # Wrong prefix
+    
+    def test_non_integer_values(self):
+        """Test that non-integer values return None."""
+        result = preprocess._parse_stripped_line("A000001 ,1,abc,3")
+        assert result is None
+    
+    def test_negative_numbers(self):
+        """Test that negative numbers are parsed correctly."""
+        line = "A000001 ,1,-2,3,-4"
+        result = preprocess._parse_stripped_line(line)
+        
+        assert result is not None
+        _, sequence = result
+        assert sequence == [1, -2, 3, -4]
+
+
+class TestParseNamesLine:
+    """Tests for _parse_names_line."""
+    
+    def test_valid_line(self):
+        """Test parsing a valid names line."""
+        line = "A000045 Fibonacci numbers"
+        result = preprocess._parse_names_line(line)
+        
+        assert result is not None
+        oeis_id, name = result
+        assert oeis_id == "A000045"
+        assert name == "Fibonacci numbers"
+    
+    def test_empty_line(self):
+        """Test that empty line returns None."""
+        assert preprocess._parse_names_line("") is None
+    
+    def test_comment_line(self):
+        """Test that comment lines return None."""
+        assert preprocess._parse_names_line("# Comment line") is None
+    
+    def test_invalid_prefix(self):
+        """Test that non-A lines return None."""
+        assert preprocess._parse_names_line("B000001 Some name") is None
+    
+    def test_name_with_spaces(self):
+        """Test that multi-word names are preserved."""
+        line = "A000001 This is a long sequence name with many words"
+        result = preprocess._parse_names_line(line)
+        
+        assert result is not None
+        _, name = result
+        assert name == "This is a long sequence name with many words"
+
+
+class TestParseSeqContent:
+    """Tests for _parse_seq_content."""
+    
+    def test_keywords_extraction(self):
+        """Test extracting keywords from %K line."""
+        lines = [
+            "%I A000045",
+            "%K A000045 nonn,core,easy",
+            "%O A000045 0,2"
         ]
-        input_jsonl = tmp_path / "input.jsonl"
-        schemas.save_records(records, str(input_jsonl))
+        result = preprocess._parse_seq_content(lines)
         
-        names_data = """
-# OEIS Names
-A000001 Name for Sequence One
-A000002 Name for Sequence Two
-        """.strip()
+        assert result["keywords"] == ["nonn", "core", "easy"]
+    
+    def test_offset_extraction(self):
+        """Test extracting offset from %O line."""
+        lines = ["%O A000045 1,5"]
+        result = preprocess._parse_seq_content(lines)
+        
+        assert result["offset_a"] == 1
+    
+    def test_empty_lines(self):
+        """Test with empty input."""
+        result = preprocess._parse_seq_content([])
+        
+        assert result["keywords"] == []
+        assert result["offset_a"] == 0
+    
+    def test_partial_data(self):
+        """Test with only some fields present."""
+        lines = ["%K A000001 nonn"]
+        result = preprocess._parse_seq_content(lines)
+        
+        assert result["keywords"] == ["nonn"]
+        assert result["offset_a"] == 0  # Default
+
+
+# ==========================================
+# Layer 2: Worker & Helper Functions
+# ==========================================
+
+class TestLoadNamesMap:
+    """Tests for _load_names_map."""
+    
+    def test_loads_names(self, tmp_path):
+        """Test loading names from gzipped file."""
+        names_data = """# OEIS Names
+A000001 Name One
+A000002 Name Two
+A000003 Name Three
+"""
         names_gz = tmp_path / "names.gz"
         create_gzipped_file(names_gz, names_data)
         
-        output_jsonl = tmp_path / "merged.jsonl"
+        result = preprocess._load_names_map(names_gz)
         
-        args = argparse.Namespace(
-            input_jsonl=str(input_jsonl),
-            input_names=str(names_gz),
-            output=str(output_jsonl)
-        )
-        
-        preprocess.process_merge_names(args)
-        
-        assert output_jsonl.exists()
-        merged_records = schemas.load_records(str(output_jsonl))
-        assert len(merged_records) == 3
-        
-        rec1 = next(r for r in merged_records if r.oeis_id == "A000001")
-        assert rec1.name == "Name for Sequence One"
-        
-        rec2 = next(r for r in merged_records if r.oeis_id == "A000002")
-        assert rec2.name == "Name for Sequence Two"
-        
-        rec9 = next(r for r in merged_records if r.oeis_id == "A999999")
-        assert rec9.name == ""
+        assert len(result) == 3
+        assert result["A000001"] == "Name One"
+        assert result["A000002"] == "Name Two"
+        assert result["A000003"] == "Name Three"
 
 
-# ==========================================
-# 3. Test process_merge_metadata
-# ==========================================
-
-class TestProcessMergeMetadata:
-    """Tests for merging .seq metadata into JSONL."""
+class TestScanSeqFiles:
+    """Tests for _scan_seq_files."""
     
-    def test_end_to_end(self, tmp_path):
-        """Test metadata merging from .seq files."""
-        records = [
-            schemas.OEISRecord(oeis_id="A000001", sequence=[1, 2, 3]),
-            schemas.OEISRecord(oeis_id="A000002", sequence=[4, 5, 6]),
-            schemas.OEISRecord(oeis_id="A000003", sequence=[7, 8, 9])  # No .seq file
-        ]
-        input_jsonl = tmp_path / "step2.jsonl"
-        schemas.save_records(records, str(input_jsonl))
-        
-        # Create .seq directory structure
-        seq_root = tmp_path / "seq"
-        a000_dir = seq_root / "A000"
+    def test_scans_files(self, tmp_path):
+        """Test scanning directory for .seq files."""
+        # Create directory structure
+        seq_dir = tmp_path / "seq"
+        a000_dir = seq_dir / "A000"
         a000_dir.mkdir(parents=True)
         
-        # A000001.seq: Keywords and Offset
-        seq1_content = """
-%I A000001
-%K A000001 nonn, core
-%O A000001 1,5
-        """.strip()
-        (a000_dir / "A000001.seq").write_text(seq1_content, encoding='utf-8')
+        (a000_dir / "A000001.seq").write_text("%I A000001")
+        (a000_dir / "A000002.seq").write_text("%I A000002")
+        (a000_dir / "readme.txt").write_text("Not a seq file")
         
-        # A000002.seq: Related (Cross-refs)
-        seq2_content = """
-%I A000002
-%Y A000002 Cf. A000005, A000010.
-        """.strip()
-        (a000_dir / "A000002.seq").write_text(seq2_content, encoding='utf-8')
+        result = preprocess._scan_seq_files(seq_dir)
         
-        output_jsonl = tmp_path / "final.jsonl"
-        args = argparse.Namespace(
-            input_jsonl=str(input_jsonl),
-            seq_dir=str(seq_root),
-            output=str(output_jsonl)
-        )
-        
-        preprocess.process_merge_metadata(args)
-        
-        assert output_jsonl.exists()
-        final_records = schemas.load_records(str(output_jsonl))
-        assert len(final_records) == 3
-        
-        rec1 = next(r for r in final_records if r.oeis_id == "A000001")
-        assert "nonn" in rec1.keywords
-        assert "core" in rec1.keywords
-        assert rec1.offset_a == 1
-        
-        rec2 = next(r for r in final_records if r.oeis_id == "A000002")
-        assert "A000005" in rec2.related
-        assert "A000010" in rec2.related
-        
-        rec3 = next(r for r in final_records if r.oeis_id == "A000003")
-        assert rec3.keywords == []
-        assert rec3.offset_a == 0
-
-
-# ==========================================
-# 4. Test process_features (NEW)
-# ==========================================
-
-class TestProcessFeatures:
-    """Tests for feature extraction pipeline."""
+        assert len(result) == 2
+        assert "A000001" in result
+        assert "A000002" in result
     
-    def test_feature_chunk_processing(self, tmp_path):
-        """Test _process_feature_chunk helper function."""
+    def test_ignores_non_a_files(self, tmp_path):
+        """Test that non-A prefixed files are ignored."""
+        seq_dir = tmp_path / "seq"
+        seq_dir.mkdir()
+        
+        (seq_dir / "A000001.seq").write_text("")
+        (seq_dir / "b000001.seq").write_text("")  # b-file, not A-file
+        
+        result = preprocess._scan_seq_files(seq_dir)
+        
+        assert len(result) == 1
+        assert "A000001" in result
+
+
+class TestWorkerExtractFeatures:
+    """Tests for _worker_extract_features."""
+    
+    def test_extracts_features(self, tmp_path):
+        """Test feature extraction from JSONL lines."""
         output_dir = tmp_path / "features"
         output_dir.mkdir()
         
-        # Create test chunk
-        chunk = [
-            {'oeis_id': 'A000001', 'sequence': [1, 2, 3, 4, 5]},
-            {'oeis_id': 'A000002', 'sequence': [10, 20, 30, 40, 50]},
-            {'oeis_id': 'A000003', 'sequence': [1, 2]},  # Too short (< 5)
-            {'oeis_id': None, 'sequence': [1, 2, 3, 4, 5]},  # No ID
-        ]
+        # Create valid JSONL lines (must have MIN_SEQUENCE_LENGTH elements)
+        record = schemas.OEISRecord(
+            oeis_id="A000001",
+            sequence=list(range(1, config.MIN_SEQUENCE_LENGTH + 5))
+        )
+        lines = [record.to_json_line()]
         
-        count = preprocess._process_feature_chunk(chunk, output_dir)
+        count = preprocess._worker_extract_features(lines, output_dir)
         
-        # Only 2 valid records
-        assert count == 2
+        assert count == 1
         assert (output_dir / "A000001.pt").exists()
-        assert (output_dir / "A000002.pt").exists()
-        assert not (output_dir / "A000003.pt").exists()
     
-    def test_feature_file_structure(self, tmp_path):
+    def test_skips_short_sequences(self, tmp_path):
+        """Test that sequences shorter than MIN_SEQUENCE_LENGTH are skipped."""
+        output_dir = tmp_path / "features"
+        output_dir.mkdir()
+        
+        record = schemas.OEISRecord(
+            oeis_id="A000001",
+            sequence=[1, 2, 3]  # Too short
+        )
+        lines = [record.to_json_line()]
+        
+        count = preprocess._worker_extract_features(lines, output_dir)
+        
+        assert count == 0
+        assert not (output_dir / "A000001.pt").exists()
+    
+    def test_saved_file_structure(self, tmp_path):
         """Test that saved .pt files have correct structure."""
         output_dir = tmp_path / "features"
         output_dir.mkdir()
         
-        chunk = [{'oeis_id': 'A000042', 'sequence': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}]
-        preprocess._process_feature_chunk(chunk, output_dir)
+        record = schemas.OEISRecord(
+            oeis_id="A000042",
+            sequence=list(range(1, 20))  # 19 elements
+        )
+        lines = [record.to_json_line()]
+        preprocess._worker_extract_features(lines, output_dir)
         
         data = torch.load(output_dir / "A000042.pt")
         
-        # Check structure
-        assert 'oeis_id' in data
-        assert 'mag_features' in data
-        assert 'mod_features' in data
-        assert 'targets' in data
+        # Check keys (using config constants)
+        assert config.KEY_OEIS_ID in data
+        assert config.KEY_MAG_FEATURES in data
+        assert config.KEY_MOD_FEATURES in data
+        assert config.KEY_MOD_INTEGERS in data
         
         # Check shapes
-        assert data['oeis_id'] == 'A000042'
-        assert data['mag_features'].shape == (10, 5)   # (SeqLen, 5)
-        assert data['mod_features'].shape == (10, 200) # (SeqLen, 200)
-        
-        # Check targets
-        assert 'mag' in data['targets']
-        assert 'mod3' in data['targets']
-        assert 'mod101' in data['targets']
+        L = 19
+        assert data[config.KEY_OEIS_ID] == "A000042"
+        assert data[config.KEY_MAG_FEATURES].shape == (L, config.MAG_RAW_DIM)
+        assert data[config.KEY_MOD_FEATURES].shape == (L, config.MOD_FEATURE_DIM)
+        assert data[config.KEY_MOD_INTEGERS].shape == (L, config.NUM_MODULI)
+
+
+# ==========================================
+# Layer 3: Command Handlers
+# ==========================================
+
+class TestCmdBuildJsonl:
+    """Tests for cmd_build_jsonl."""
     
-        assert data['targets']['mod3'][0] == 1
-        assert data['targets']['mod101'][0] == 1
-    
-    def test_process_features_end_to_end(self, tmp_path):
-        """Test full feature extraction pipeline."""
-        # Create input JSONL
-        input_jsonl = tmp_path / "input.jsonl"
-        with open(input_jsonl, 'w') as f:
-            for i in range(5):
-                record = {
-                    'oeis_id': f'A{i:06d}',
-                    'sequence': list(range(1, 11))  # 10 elements
-                }
-                f.write(json.dumps(record) + '\n')
-        
-        output_dir = tmp_path / "features"
+    def test_basic_build(self, tmp_path):
+        """Test building JSONL from stripped.gz only."""
+        stripped_data = """A000001 ,1,2,3,4,5
+A000002 ,10,20,30
+"""
+        input_gz = tmp_path / "stripped.gz"
+        output_jsonl = tmp_path / "data.jsonl"
+        create_gzipped_file(input_gz, stripped_data)
         
         args = argparse.Namespace(
-            input=str(input_jsonl),
-            output_dir=str(output_dir),
-            workers=1,  # Single worker for testing
-            chunk_size=2
+            stripped=str(input_gz),
+            names=None,
+            seq_dir=None,
+            output=str(output_jsonl)
         )
         
-        preprocess.process_features(args)
+        preprocess.cmd_build_jsonl(args)
         
-        # Verify output
-        assert output_dir.exists()
-        pt_files = list(output_dir.glob("*.pt"))
-        assert len(pt_files) == 5
+        assert output_jsonl.exists()
+        records = list(schemas.load_records(str(output_jsonl)))
+        assert len(records) == 2
+        
+        rec1 = next(r for r in records if r.oeis_id == "A000001")
+        assert rec1.sequence == [1, 2, 3, 4, 5]
     
-    def test_process_features_handles_errors(self, tmp_path):
-        """Test that feature extraction handles invalid data gracefully."""
-        input_jsonl = tmp_path / "input.jsonl"
-        with open(input_jsonl, 'w') as f:
-            # Valid record
-            f.write(json.dumps({'oeis_id': 'A000001', 'sequence': [1, 2, 3, 4, 5]}) + '\n')
-            # Invalid JSON (should be skipped)
-            f.write("not valid json\n")
-            # Empty sequence
-            f.write(json.dumps({'oeis_id': 'A000002', 'sequence': []}) + '\n')
-            # Too short
-            f.write(json.dumps({'oeis_id': 'A000003', 'sequence': [1, 2]}) + '\n')
+    def test_with_names(self, tmp_path):
+        """Test building JSONL with names.gz merge."""
+        stripped_data = "A000001 ,1,2,3,4,5\n"
+        names_data = "A000001 Fibonacci numbers\n"
+        
+        stripped_gz = tmp_path / "stripped.gz"
+        names_gz = tmp_path / "names.gz"
+        output_jsonl = tmp_path / "data.jsonl"
+        
+        create_gzipped_file(stripped_gz, stripped_data)
+        create_gzipped_file(names_gz, names_data)
+        
+        args = argparse.Namespace(
+            stripped=str(stripped_gz),
+            names=str(names_gz),
+            seq_dir=None,
+            output=str(output_jsonl)
+        )
+        
+        preprocess.cmd_build_jsonl(args)
+        
+        records = list(schemas.load_records(str(output_jsonl)))
+        assert records[0].name == "Fibonacci numbers"
+
+
+class TestCmdExtractFeatures:
+    """Tests for cmd_extract_features."""
+    
+    def test_extraction(self, tmp_path):
+        """Test feature extraction from JSONL."""
+        # Create input
+        input_jsonl = tmp_path / "data.jsonl"
+        records = [
+            schemas.OEISRecord(oeis_id=f"A{i:06d}", sequence=list(range(1, 20)))
+            for i in range(5)
+        ]
+        create_jsonl_file(input_jsonl, records)
         
         output_dir = tmp_path / "features"
         
@@ -278,93 +352,130 @@ class TestProcessFeatures:
             input=str(input_jsonl),
             output_dir=str(output_dir),
             workers=1,
-            chunk_size=10
+            chunk_size=2
         )
         
-        # Should not raise
-        preprocess.process_features(args)
+        preprocess.cmd_extract_features(args)
         
-        # Only one valid file
         pt_files = list(output_dir.glob("*.pt"))
-        assert len(pt_files) == 1
-        assert (output_dir / "A000001.pt").exists()
+        assert len(pt_files) == 5
+
+
+class TestCmdSplitDataset:
+    """Tests for cmd_split_dataset."""
+    
+    def test_split_creation(self, tmp_path):
+        """Test train/val/test split creation."""
+        # Create dummy .pt files
+        input_dir = tmp_path / "features"
+        input_dir.mkdir()
+        
+        for i in range(100):
+            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+        
+        output_dir = tmp_path / "splits"
+        
+        args = argparse.Namespace(
+            input_dir=str(input_dir),
+            output_dir=str(output_dir)
+        )
+        
+        preprocess.cmd_split_dataset(args)
+        
+        assert (output_dir / "train.txt").exists()
+        assert (output_dir / "val.txt").exists()
+        assert (output_dir / "test.txt").exists()
+        
+        # Check total IDs match input
+        all_ids = set()
+        for split_file in ["train.txt", "val.txt", "test.txt"]:
+            with open(output_dir / split_file) as f:
+                ids = [line.strip() for line in f if line.strip()]
+                all_ids.update(ids)
+        
+        assert len(all_ids) == 100
+    
+    def test_deterministic_split(self, tmp_path):
+        """Test that splits are deterministic with same seed."""
+        input_dir = tmp_path / "features"
+        input_dir.mkdir()
+        
+        for i in range(50):
+            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
+        
+        # First split
+        output1 = tmp_path / "split1"
+        args1 = argparse.Namespace(input_dir=str(input_dir), output_dir=str(output1))
+        preprocess.cmd_split_dataset(args1)
+        
+        # Second split
+        output2 = tmp_path / "split2"
+        args2 = argparse.Namespace(input_dir=str(input_dir), output_dir=str(output2))
+        preprocess.cmd_split_dataset(args2)
+        
+        # Compare
+        with open(output1 / "train.txt") as f1, open(output2 / "train.txt") as f2:
+            assert f1.read() == f2.read()
 
 
 # ==========================================
-# 5. CLI Tests
+# CLI Integration Tests
 # ==========================================
 
 class TestCLI:
-    """Tests for CLI argument parsing and execution."""
+    """Tests for CLI argument parsing."""
     
-    def test_stripped_cli(self, tmp_path, monkeypatch):
-        """Test CLI execution for stripped command."""
-        input_gz = tmp_path / "data.gz"
-        output_jsonl = tmp_path / "out.jsonl"
+    def test_build_jsonl_cli(self, tmp_path, monkeypatch):
+        """Test build-jsonl command via CLI."""
+        stripped_gz = tmp_path / "stripped.gz"
+        output = tmp_path / "out.jsonl"
         
-        create_gzipped_file(input_gz, "A001 ,1,2,3")
+        create_gzipped_file(stripped_gz, "A000001 ,1,2,3,4,5\n")
         
-        test_args = [
-            "preprocess.py", "stripped",
-            "-i", str(input_gz),
-            "-o", str(output_jsonl),
-            "--min_len", "1"
-        ]
-        monkeypatch.setattr("sys.argv", test_args)
+        monkeypatch.setattr("sys.argv", [
+            "preprocess.py", "build-jsonl",
+            "--stripped", str(stripped_gz),
+            "-o", str(output)
+        ])
         
         preprocess.main()
         
-        assert output_jsonl.exists()
-        records = schemas.load_records(str(output_jsonl))
-        assert len(records) == 1
-        assert records[0].oeis_id == "A001"
+        assert output.exists()
     
-    def test_features_cli(self, tmp_path, monkeypatch):
-        """Test CLI execution for features command."""
-        # Create input
-        input_jsonl = tmp_path / "input.jsonl"
-        with open(input_jsonl, 'w') as f:
-            f.write(json.dumps({'oeis_id': 'A000001', 'sequence': [1, 2, 3, 4, 5]}) + '\n')
+    def test_extract_features_cli(self, tmp_path, monkeypatch):
+        """Test extract-features command via CLI."""
+        input_jsonl = tmp_path / "data.jsonl"
+        records = [schemas.OEISRecord(oeis_id="A000001", sequence=list(range(1, 20)))]
+        create_jsonl_file(input_jsonl, records)
         
         output_dir = tmp_path / "features"
         
-        test_args = [
-            "preprocess.py", "features",
+        monkeypatch.setattr("sys.argv", [
+            "preprocess.py", "extract-features",
             "-i", str(input_jsonl),
             "-o", str(output_dir),
-            "--workers", "1",
-            "--chunk-size", "10"
-        ]
-        monkeypatch.setattr("sys.argv", test_args)
+            "--workers", "1"
+        ])
         
         preprocess.main()
         
         assert (output_dir / "A000001.pt").exists()
-
-
-# ==========================================
-# 6. Helper Function Tests
-# ==========================================
-
-class TestHelperFunctions:
-    """Tests for helper functions."""
     
-    def test_open_text_plain_file(self, tmp_path):
-        """Test opening plain text file."""
-        plain_file = tmp_path / "test.txt"
-        plain_file.write_text("hello world")
+    def test_split_dataset_cli(self, tmp_path, monkeypatch):
+        """Test split-dataset command via CLI."""
+        input_dir = tmp_path / "features"
+        input_dir.mkdir()
+        for i in range(20):
+            (input_dir / f"A{i:06d}.pt").write_bytes(b"dummy")
         
-        with preprocess._open_text(str(plain_file)) as f:
-            content = f.read()
+        output_dir = tmp_path / "splits"
         
-        assert content == "hello world"
-    
-    def test_open_text_gzipped_file(self, tmp_path):
-        """Test opening gzipped file."""
-        gz_file = tmp_path / "test.gz"
-        create_gzipped_file(gz_file, "hello compressed")
+        monkeypatch.setattr("sys.argv", [
+            "preprocess.py", "split-dataset",
+            "-i", str(input_dir),
+            "-o", str(output_dir)
+        ])
         
-        with preprocess._open_text(str(gz_file)) as f:
-            content = f.read()
+        preprocess.main()
         
-        assert content == "hello compressed"
+        assert (output_dir / "train.txt").exists()
