@@ -49,15 +49,14 @@ class EarlyStopping:
         self.early_stop = False
 
     def __call__(self, val_loss: float) -> bool:
+        """Returns True if training should stop."""
         if val_loss < self.best_loss - self.delta:
             self.best_loss = val_loss
             self.counter = 0
-            return False
         else:
             self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-            return True
+        
+        return self.counter >= self.patience
 
 def set_seed(seed: int):
     """Fix random seeds for reproducibility."""
