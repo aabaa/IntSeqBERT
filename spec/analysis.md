@@ -4,6 +4,7 @@
 
 本仕様書は、学習済み IntSeqBERT モデルの性能を多角的に評価・分析するための実験計画を定義する。
 単なる全体平均の精度だけでなく、**「モデルが数論的構造（大きさ、周期性、符号）を学習しているか」**、あるいは**「10進表記のパターンに依存していないか」**を解明することを目的とする。
+また、既存の標準的なTransformer（Vanilla Transformer）と比較して、提案手法の優位性を実証する。
 
 ## 2. 実験構成
 
@@ -25,7 +26,20 @@
 
 ## 3. Baseline 比較
 
-NIGスコアやAccuracyの絶対値だけでは「良い」かどうか判断できないため、以下のベースラインを明示する。
+### 3.1. 比較対象モデル
+
+| モデル名 | アーキテクチャ概要 | 役割 |
+| --- | --- | --- |
+| **IntSeqBERT (Proposed)** | **Dual Stream (Mag+Mod) + FiLM Fusion** | 提案手法。数論的構造（大きさ・周期性）を明示的に統合して学習する。 |
+| **Vanilla Transformer** [^1] | **Single Stream (Number Token) + Standard Self-Attention** | **ベースライン**。数値を1つのトークンIDとして扱い、Dual StreamやFiLMを用いない標準的なTransformerモデル。既存研究（FACT等）における標準的なアプローチとの性能差を検証する。 |
+| **Ablation (No-Mod)** [^2] | **Magnitude Stream Only** | Modulo Stream（周期性情報）を除去したモデル。周期性情報の寄与度を測定するために用いる。 |
+
+[^1]: **External Baseline** - 完全に異なるアーキテクチャ（離散トークン入力）。詳細仕様は [`spec/models.md`](./models.md) Section 7 を参照。
+[^2]: **Internal Ablation** - IntSeqBERT から Modulo Stream のみを除去した派生モデル。提案手法の各コンポーネントの寄与度を測定する。
+
+### 3.2. 基準値
+
+指標の絶対値を評価するための理論的な下限値（ランダム予測）。
 
 | 指標 | Random Baseline | 意味 |
 |------|-----------------|------|

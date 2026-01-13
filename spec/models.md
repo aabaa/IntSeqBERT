@@ -287,3 +287,220 @@ def _generate_sinusoidal_encoding(max_len, d_model):
 |------|------|--------|
 | Relative Positional Encoding | 隣接項関係の学習強化 (RoPE 等) | 中 |
 | Gradient Checkpointing | メモリ効率化 | 低 |
+
+---
+
+## 7. Baseline / Ablation モデル
+
+ベースライン比較およびアブレーション実験用のモデル定義。
+提案手法 (IntSeqBERT) との公平な比較のため、Transformer Encoder 部分は同一アーキテクチャを共有する。
+
+### 7.1. クラス継承構造
+
+```mermaid
+classDiagram
+    class IntSeqEmbeddings {
+        +mag_proj: Linear
+        +mod_proj: Linear
+        +film_scale: Linear
+        +film_shift: Linear
+        +forward(mag_features, mod_features)
+    }
+    
+    class VanillaEmbeddings {
+        +token_embedding: Embedding
+        +forward(token_ids)
+    }
+    
+    class MagOnlyEmbeddings {
+        +mag_proj: Linear
+        +forward(mag_features)
+    }
+    
+    class IntSeqForPreTraining {
+        +bert: IntSeqModel
+        +mag_head, sign_head, mod_head
+    }
+    
+    class VanillaTransformerForPreTraining {
+        +encoder: VanillaTransformerModel
+        +mag_head, sign_head, mod_head
+    }
+    
+    IntSeqEmbeddings <|-- MagOnlyEmbeddings : simplified
+    IntSeqForPreTraining ..> IntSeqEmbeddings : uses
+    VanillaTransformerForPreTraining ..> VanillaEmbeddings : uses
+```
+
+---
+
+### 7.2. `VanillaEmbeddings` (Single Stream Input Layer)
+
+数値を離散トークンとして扱う標準的な Embedding 層。FiLM や Dual Stream を使用しない。
+
+#### `__init__` 引数
+
+| 引数 | 型 | デフォルト | 説明 |
+|------|------|-----------|------|
+| `vocab_size` | int | `config.VANILLA_VOCAB_SIZE` | トークン語彙サイズ |
+| `d_model` | int | `config.D_MODEL` | 隠れ層次元 |
+| `dropout` | float | `config.DROPOUT` | ドロップアウト率 |
+| `max_len` | int | `config.MAX_SEQUENCE_LENGTH` | 最大系列長 |
+
+#### ネットワーク構成
+
+```python
+token_embedding: nn.Embedding(vocab_size, d_model)
+pos_encoding:    Sinusoidal (固定、max_len x d_model)
+layer_norm:      LayerNorm(d_model)
+dropout:         Dropout(dropout)
+```
+
+#### `forward` 入出力
+
+**入力:**
+- `token_ids`: `(B, L)` - 数値トークンID
+
+**出力:**
+- `embeddings`: `(B, L, d_model)`
+
+#### 処理フロー
+
+```
+1. Token Embedding:
+   x = token_embedding(token_ids)     # (B, L, d_model)
+
+2. Add Position Encoding:
+   x = x + pos_encoding[:, :L, :]
+
+3. Post-Process:
+   x = LayerNorm(x)
+   x = Dropout(x)
+```
+
+---
+
+### 7.3. `VanillaTransformerModel` (Baseline Backbone)
+
+標準的な Transformer Encoder。`IntSeqModel` と同じ Encoder 構造を持つが、入力層が異なる。
+
+#### `__init__` 引数
+
+| 引数 | 型 | 説明 |
+|------|------|------|
+| `vocab_size` | int | トークン語彙サイズ |
+| `d_model` | int | 隠れ層次元 |
+| `nhead` | int | Attention ヘッド数 |
+| `num_layers` | int | Encoder 層数 |
+| `dropout` | float | ドロップアウト率 |
+
+#### 構成
+
+```python
+embeddings: VanillaEmbeddings(vocab_size, d_model, dropout)
+encoder:    nn.TransformerEncoder(...)  # IntSeqModel と同一
+```
+
+#### `forward` 入出力
+
+**入力:**
+- `token_ids`: `(B, L)` - 数値トークンID
+- `src_key_padding_mask`: `(B, L)` - BoolTensor, `True` = Padding
+
+**出力:**
+- `last_hidden_state`: `(B, L, d_model)`
+
+---
+
+### 7.4. `VanillaTransformerForPreTraining` (Baseline Heads & Loss)
+
+ベースラインモデルの事前学習ラッパー。予測ヘッドと損失計算は `IntSeqForPreTraining` と同一。
+
+#### 予測ヘッド構成
+
+`IntSeqForPreTraining` と同一（`mag_head`, `sign_head`, `mod_head`）。
+
+#### `forward` 入出力
+
+**入力:**
+
+| 引数 | 型 | 必須 | 説明 |
+|------|------|------|------|
+| `token_ids` | `(B, L)` | ✅ | 数値トークンID |
+| `src_key_padding_mask` | `(B, L)` | ✅ | Padding mask |
+| `labels` | Dict | | 学習時のみ（形式は `IntSeqForPreTraining` と同一） |
+
+**出力:**
+`IntSeqForPreTraining` と同一の辞書構造。
+
+---
+
+### 7.5. トークン化仕様
+
+Vanilla Transformer では数値を離散トークンに変換する必要がある。
+
+#### 語彙設計
+
+| トークン種別 | ID範囲 | 説明 |
+|-------------|--------|------|
+| `[PAD]` | 0 | パディング |
+| `[MASK]` | 1 | マスクトークン |
+| `[UNK]` | 2 | 未知トークン（語彙外の数値） |
+| 数値トークン | 3〜 | 頻出数値に対応（例: 0, 1, 2, ..., 999 等） |
+
+#### config への追加
+
+```python
+# config.py
+VANILLA_VOCAB_SIZE = 10003    # [PAD], [MASK], [UNK] + 頻出数値 10000個
+VANILLA_PAD_TOKEN_ID = 0
+VANILLA_MASK_TOKEN_ID = 1
+VANILLA_UNK_TOKEN_ID = 2
+```
+
+> **Note:** 語彙サイズは OEIS データセットの数値分布に基づいて調整する。
+> 語彙外の数値は `[UNK]` にマッピングされ、これがベースラインの性能上限となる。
+
+---
+
+### 7.6. MagOnlyEmbeddings (Ablation: No-Mod)
+
+Modulo Stream を除去した Ablation 用 Embedding 層。
+
+#### `__init__` 引数
+
+`IntSeqEmbeddings` と同一（ただし `mod_proj`, `film_*` は持たない）。
+
+#### ネットワーク構成
+
+```python
+mag_proj:     Linear(MAG_EXTENDED_DIM, d_model)
+pos_encoding: Sinusoidal (固定)
+layer_norm:   LayerNorm(d_model)
+dropout:      Dropout(dropout)
+```
+
+#### `forward` 入出力
+
+**入力:**
+- `mag_features`: `(B, L, 5)` - Magnitude stream のみ
+
+**出力:**
+- `embeddings`: `(B, L, d_model)`
+
+#### 処理フロー
+
+```
+1. Projection:
+   h_mag = mag_proj(mag_features)     # (B, L, d_model)
+
+2. Add Position Encoding:
+   h_out = h_mag + pos_encoding[:, :L, :]
+
+3. Post-Process:
+   h_out = LayerNorm(h_out)
+   h_out = Dropout(h_out)
+```
+
+> **Note:** FiLM 変調なしの単純な投影。IntSeqBERT との差分を測定することで、Modulo Stream の寄与度を評価する。
+
