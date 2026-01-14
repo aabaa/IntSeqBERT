@@ -102,6 +102,20 @@ SIGN_POSITIVE = 0  # sign+ column in features
 SIGN_NEGATIVE = 1  # sign- column in features
 SIGN_ZERO = 2      # sign0 column in features
 
+# Sinusoidal positional encoding base frequency
+# Controls wavelength range: from 2π to 2π * (base^1) at the last dimension
+POSITIONAL_ENCODING_BASE = 10000.0
+
+# Fixed loss weights to prevent task collapse
+# Mag : Sign : Mod = 1.0 : 1.0 : 2.0
+LOSS_WEIGHT_MAG = 1.0
+LOSS_WEIGHT_SIGN = 1.0
+LOSS_WEIGHT_MOD = 2.0
+
+# Representative moduli for console output (subset of MOD_RANGE)
+# Used for logging during training to avoid printing all 100 mod accuracies
+REPRESENTATIVE_MODS = [2, 3, 5, 7, 10, 100, 101]
+
 # ==========================================
 # 8. Training Hyperparameters
 # ==========================================

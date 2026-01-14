@@ -16,7 +16,7 @@ def _generate_sinusoidal_encoding(max_len: int, d_model: int) -> torch.Tensor:
     """Generates standard sinusoidal positional encoding table."""
     pe = torch.zeros(max_len, d_model)
     position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-    div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+    div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(config.POSITIONAL_ENCODING_BASE) / d_model))
     
     pe[:, 0::2] = torch.sin(position * div_term)
     pe[:, 1::2] = torch.cos(position * div_term)
@@ -173,8 +173,12 @@ class IntSeqForPreTraining(nn.Module):
         
         # --- Fixed Loss Weights ---
         # Using fixed weights to prevent task collapse
-        # Mag : Sign : Mod = 1.0 : 1.0 : 2.0
-        self.register_buffer("loss_weights", torch.tensor([1.0, 1.0, 2.0]))
+        # Values from config: LOSS_WEIGHT_MAG, LOSS_WEIGHT_SIGN, LOSS_WEIGHT_MOD
+        self.register_buffer("loss_weights", torch.tensor([
+            config.LOSS_WEIGHT_MAG,
+            config.LOSS_WEIGHT_SIGN,
+            config.LOSS_WEIGHT_MOD
+        ]))
 
     def _split_mod_logits(self, logits: torch.Tensor) -> List[torch.Tensor]:
         """Splits the unified mod logits into a list of tensors for each modulus."""

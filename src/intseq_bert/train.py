@@ -65,8 +65,8 @@ class TrainingLogger:
     Creates config.json, history.csv, best_metrics.json, and train.log.
     """
     
-    # Representative moduli for console output (indices into MOD_RANGE)
-    REPRESENTATIVE_MODS = [2, 3, 5, 7, 10, 100, 101]
+    # Representative moduli for console output (uses config)
+    REPRESENTATIVE_MODS = config.REPRESENTATIVE_MODS
     
     def __init__(
         self, 
@@ -134,7 +134,11 @@ class TrainingLogger:
         config_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "args": vars(args),
-            "loss_weights": {"mag": 1.0, "sign": 1.0, "mod": 2.0},
+            "loss_weights": {
+                "mag": config.LOSS_WEIGHT_MAG,
+                "sign": config.LOSS_WEIGHT_SIGN,
+                "mod": config.LOSS_WEIGHT_MOD
+            },
             "environment": {
                 "python_version": platform.python_version(),
                 "torch_version": torch.__version__,
@@ -220,9 +224,9 @@ class TrainingLogger:
         
         # Add weights
         row.extend([
-            epoch_data.get("w_mag", 1.0),
-            epoch_data.get("w_sign", 1.0),
-            epoch_data.get("w_mod", 2.0)
+            epoch_data.get("w_mag", config.LOSS_WEIGHT_MAG),
+            epoch_data.get("w_sign", config.LOSS_WEIGHT_SIGN),
+            epoch_data.get("w_mod", config.LOSS_WEIGHT_MOD)
         ])
         
         with open(self.history_path, "a", newline="", encoding="utf-8") as f:
