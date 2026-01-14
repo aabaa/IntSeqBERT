@@ -301,6 +301,7 @@ class TestEvaluate:
         assert "sign_acc" in metrics
         assert "mod_acc" in metrics
         assert "mod_loss" in metrics
+        assert "mod_accuracies" in metrics
     
     def test_accuracy_ranges(self, small_model, mock_collator_output, device):
         """Test that accuracy metrics are in valid percentage range."""
@@ -321,6 +322,13 @@ class TestEvaluate:
         assert 0 <= metrics["mag_acc"] <= 100
         assert 0 <= metrics["sign_acc"] <= 100
         assert 0 <= metrics["mod_acc"] <= 100
+        
+        # mod_accuracies should be a list of 100 values
+        from intseq_bert import config as cfg
+        assert isinstance(metrics["mod_accuracies"], list)
+        assert len(metrics["mod_accuracies"]) == cfg.NUM_MODULI
+        for acc in metrics["mod_accuracies"]:
+            assert 0 <= acc <= 100
         
         # MSE should be non-negative
         assert metrics["mag_mse"] >= 0

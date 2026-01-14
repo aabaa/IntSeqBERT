@@ -357,6 +357,11 @@ def evaluate(
     """
     Run validation loop and calculate metrics.
     All accuracy metrics are returned as percentages (0-100).
+    
+    Returns:
+        Dict containing:
+        - val_loss, mag_mse, mag_acc, sign_acc, mod_acc, mod_loss
+        - mod_accuracies: List of 100 floats, one per modulus (2-101)
     """
     model.eval()
     
@@ -365,13 +370,14 @@ def evaluate(
     
     # Metric Accumulators
     total_mask_count = 0
-    total_mod_mask_count = 0 # mask_count * num_moduli
     
     correct_sign = 0
     correct_mag_thresh = 0 # |diff| < threshold
     sum_mag_mse = 0.0
-    correct_mod = 0 # Sum of correct predictions across all moduli
     sum_mod_loss = 0.0  # Accumulated normalized mod loss
+    
+    # Per-mod accuracy tracking (100 moduli)
+    correct_mod_per_mod = [0] * config.NUM_MODULI
     
     with torch.no_grad():
         for raw_batch in tqdm(dataloader, desc="Validating", leave=False):
@@ -417,7 +423,7 @@ def evaluate(
             target_sign = labels["sign_targets"][mask_map]
             correct_sign += (pred_sign == target_sign).sum().item()
             
-            # 3. Modulo Accuracy (Mean across 100 mods)
+            # 3. Modulo Accuracy (Per-mod tracking)
             # Access helper method (handle DataParallel if needed)
             raw_model = model.module if hasattr(model, "module") else model
             mod_logits_split = raw_model._split_mod_logits(preds["mod_logits"]) # List of (B, L, m)
@@ -428,7 +434,7 @@ def evaluate(
                 m_pred = torch.argmax(m_logits, dim=-1)[mask_map]
                 m_target = labels["mod_targets"][:, :, i][mask_map]
                 
-                correct_mod += (m_pred == m_target).sum().item()
+                correct_mod_per_mod[i] += (m_pred == m_target).sum().item()
             
             # Get normalized mod loss from model output
             if "loss_breakdown" in outputs:
@@ -437,7 +443,6 @@ def evaluate(
             # Update counts
             n_masked = mask_map.sum().item()
             total_mask_count += n_masked
-            total_mod_mask_count += n_masked * config.NUM_MODULI
 
     # Calculate Averages
     avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
@@ -446,10 +451,16 @@ def evaluate(
         mag_mse = sum_mag_mse / total_mask_count
         mag_acc = (correct_mag_thresh / total_mask_count) * 100
         sign_acc = (correct_sign / total_mask_count) * 100
-        mod_acc = (correct_mod / total_mod_mask_count) * 100
         mod_loss = sum_mod_loss / num_batches if num_batches > 0 else 0.0
+        
+        # Per-mod accuracies (as percentages)
+        mod_accuracies = [(correct / total_mask_count) * 100 for correct in correct_mod_per_mod]
+        
+        # Overall mod accuracy is mean of per-mod accuracies
+        mod_acc = sum(mod_accuracies) / len(mod_accuracies) if mod_accuracies else 0.0
     else:
         mag_mse, mag_acc, sign_acc, mod_acc, mod_loss = 0.0, 0.0, 0.0, 0.0, 0.0
+        mod_accuracies = [0.0] * config.NUM_MODULI
         
     return {
         "val_loss": avg_loss,
@@ -457,7 +468,8 @@ def evaluate(
         "mag_acc": mag_acc,
         "sign_acc": sign_acc,
         "mod_acc": mod_acc,
-        "mod_loss": mod_loss  # Normalized mod loss (1.0 = random prediction)
+        "mod_loss": mod_loss,  # Normalized mod loss (1.0 = random prediction)
+        "mod_accuracies": mod_accuracies  # List of 100 per-mod accuracies
     }
 
 
@@ -637,7 +649,18 @@ def train(args):
         logger.info(f"  Val Loss:   {val_metrics['val_loss']:.4f}")
         logger.info(f"  Mag Acc:    {val_metrics['mag_acc']:.2f}% (MSE: {val_metrics['mag_mse']:.4f})")
         logger.info(f"  Sign Acc:   {val_metrics['sign_acc']:.2f}%")
-        logger.info(f"  Mod Acc:    {val_metrics['mod_acc']:.2f}% (Loss: {val_metrics['mod_loss']:.4f})")
+        logger.info(f"  Mod Acc:    {val_metrics['mod_acc']:.2f}% (Mean of {config.NUM_MODULI} mods)")
+        
+        # Display representative mod accuracies
+        mod_accs = val_metrics.get("mod_accuracies", [])
+        if mod_accs:
+            rep_indices = TrainingLogger.get_representative_mod_indices()
+            rep_strs = []
+            for idx in rep_indices:
+                if idx < len(mod_accs):
+                    mod_val = config.MOD_RANGE[idx]
+                    rep_strs.append(f"mod{mod_val}: {mod_accs[idx]:.1f}%")
+            logger.info(f"    {', '.join(rep_strs)}")
         
         # Log to CSV via TrainingLogger
         epoch_data = {
