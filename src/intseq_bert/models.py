@@ -171,9 +171,10 @@ class IntSeqForPreTraining(nn.Module):
         total_mod_classes = sum(config.MOD_RANGE)
         self.mod_head = nn.Linear(d_model, total_mod_classes)
         
-        # --- Loss Parameters (Automatic Weighting) ---
-        # s_mag, s_sign, s_mod
-        self.loss_log_vars = nn.Parameter(torch.zeros(3))
+        # --- Fixed Loss Weights ---
+        # Using fixed weights to prevent task collapse
+        # Mag : Sign : Mod = 1.0 : 1.0 : 2.0
+        self.register_buffer("loss_weights", torch.tensor([1.0, 1.0, 2.0]))
 
     def _split_mod_logits(self, logits: torch.Tensor) -> List[torch.Tensor]:
         """Splits the unified mod logits into a list of tensors for each modulus."""
@@ -250,15 +251,11 @@ class IntSeqForPreTraining(nn.Module):
                 
             loss_mod = total_mod_loss / len(config.MOD_RANGE)
             
-            # --- D. Weighted Sum (Automatic Loss Balancing) ---
-            # L = sum( 0.5 * exp(-s) * L_task + 0.5 * s )
-            s_mag, s_sign, s_mod = self.loss_log_vars
+            # --- D. Fixed Weighted Sum ---
+            # Weights: Mag=1.0, Sign=1.0, Mod=2.0
+            w_mag, w_sign, w_mod = self.loss_weights
             
-            weighted_loss = (
-                (0.5 * torch.exp(-s_mag) * loss_mag + 0.5 * s_mag) +
-                (0.5 * torch.exp(-s_sign) * loss_sign + 0.5 * s_sign) +
-                (0.5 * torch.exp(-s_mod) * loss_mod + 0.5 * s_mod)
-            )
+            weighted_loss = w_mag * loss_mag + w_sign * loss_sign + w_mod * loss_mod
             
             outputs["loss"] = weighted_loss
             
@@ -267,9 +264,9 @@ class IntSeqForPreTraining(nn.Module):
                 "raw_mag": loss_mag.detach(),
                 "raw_sign": loss_sign.detach(),
                 "raw_mod": loss_mod.detach(),
-                "s_mag": s_mag.detach(),
-                "s_sign": s_sign.detach(),
-                "s_mod": s_mod.detach()
+                "w_mag": w_mag,
+                "w_sign": w_sign,
+                "w_mod": w_mod
             }
             
         return outputs

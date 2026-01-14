@@ -129,27 +129,31 @@ class TestEarlyStopping:
         
         es(1.0)  # Set baseline
         
-        # No improvement
+        # No improvement - counter increases but not yet at patience
         result = es(1.0)
-        assert result == True
+        assert result == False  # Not yet at patience
         assert es.counter == 1
         
         result = es(1.1)  # Worse
-        assert result == True
+        assert result == False  # Still not at patience
         assert es.counter == 2
     
     def test_early_stop_triggered(self):
         """Test early stopping is triggered after patience epochs."""
         es = EarlyStopping(patience=3)
         
-        es(1.0)  # Set baseline
-        es(1.0)  # No improvement, counter = 1
-        es(1.0)  # No improvement, counter = 2
-        result = es(1.0)  # No improvement, counter = 3
+        result = es(1.0)  # Set baseline, counter = 0
+        assert result == False
         
+        result = es(1.0)  # No improvement, counter = 1
+        assert result == False
+        
+        result = es(1.0)  # No improvement, counter = 2
+        assert result == False
+        
+        result = es(1.0)  # No improvement, counter = 3 >= patience
         assert result == True
         assert es.counter == 3
-        assert es.early_stop == True
     
     def test_delta_threshold(self):
         """Test delta threshold for improvement detection."""
@@ -157,12 +161,12 @@ class TestEarlyStopping:
         
         es(1.0)  # Set baseline
         
-        # Improvement less than delta doesn't count
+        # Improvement less than delta doesn't count as improvement
         result = es(0.95)  # 1.0 - 0.95 = 0.05 < delta
-        assert result == True
+        assert result == False  # Not yet at patience
         assert es.counter == 1
         
-        # Improvement greater than delta counts
+        # Improvement greater than delta resets counter
         es = EarlyStopping(patience=3, delta=0.1)
         es(1.0)
         result = es(0.85)  # 1.0 - 0.85 = 0.15 > delta

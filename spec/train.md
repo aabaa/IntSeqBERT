@@ -186,11 +186,9 @@ def prepare_labels(batch: Dict) -> Dict:
   * `train/raw_loss_mod` (CE)
   * `val/total_loss`
 
-* **Learnable Weights (Automatic Loss Balancing):**
-  * `weights/s_mag`
-  * `weights/s_sign`
-  * `weights/s_mod`
-  * ※ これらの値が極端に発散していないか監視する（正常範囲: -5 〜 +5程度）。
+* **Fixed Loss Weights:**
+  * 損失重みは固定値: `w_mag = 1.0`, `w_sign = 1.0`, `w_mod = 2.0`
+  * Modulo タスクに2倍の重みを与え、周期性情報の学習を促進する
 
 * **Metrics (Accuracy %):**
   * `val/acc_mag`

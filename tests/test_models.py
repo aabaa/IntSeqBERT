@@ -230,20 +230,25 @@ class TestIntSeqForPreTraining:
         outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
         
         breakdown = outputs["loss_breakdown"]
-        expected_keys = ["raw_mag", "raw_sign", "raw_mod", "s_mag", "s_sign", "s_mod"]
+        expected_keys = ["raw_mag", "raw_sign", "raw_mod", "w_mag", "w_sign", "w_mod"]
         for key in expected_keys:
             assert key in breakdown, f"Missing key: {key}"
     
-    def test_loss_log_vars_learnable(self, d_model):
-        """Test that loss_log_vars are learnable parameters."""
+    def test_loss_weights_fixed(self, d_model):
+        """Test that loss_weights are fixed buffers (not learnable)."""
         model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
         
-        assert model.loss_log_vars.requires_grad
-        assert model.loss_log_vars.shape == (3,)
+        # loss_weights should be a buffer, not a parameter
+        assert not model.loss_weights.requires_grad
+        assert model.loss_weights.shape == (3,)
         
-        # Check it's in model parameters
+        # Verify fixed values: [1.0, 1.0, 2.0]
+        expected = torch.tensor([1.0, 1.0, 2.0])
+        assert torch.allclose(model.loss_weights, expected)
+        
+        # Check it's NOT in model parameters
         param_names = [n for n, _ in model.named_parameters()]
-        assert "loss_log_vars" in param_names
+        assert "loss_weights" not in param_names
     
     def test_gradient_flow_through_loss(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
         """Test gradients flow through loss computation."""

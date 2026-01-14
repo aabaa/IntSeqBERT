@@ -363,11 +363,8 @@ def train(args):
             current_loss = loss.item() * args.accum_steps
             train_loss += current_loss
             
-            s_mag, s_sign, s_mod = model.loss_log_vars.detach().cpu().tolist()
             progress_bar.set_postfix({
-                "loss": f"{current_loss:.3f}",
-                "s_mag": f"{s_mag:.2f}",
-                "s_mod": f"{s_mod:.2f}"
+                "loss": f"{current_loss:.3f}"
             })
             
         avg_train_loss = train_loss / len(train_loader)

@@ -156,13 +156,15 @@ encoder:    nn.TransformerEncoder(
 
 > **Note:** `sign_head` のクラス順序は `config.SIGN_POSITIVE=0`, `SIGN_NEGATIVE=1`, `SIGN_ZERO=2` に対応。
 
-#### 学習可能損失パラメータ
+#### 固定損失重み
 
 ```python
-loss_log_vars: nn.Parameter(torch.zeros(3))  # [s_mag, s_sign, s_mod]
+loss_weights: register_buffer(torch.tensor([1.0, 1.0, 2.0]))  # [w_mag, w_sign, w_mod]
 ```
 
-Automatic Weighted Loss (Kendall et al., 2018) 用のノイズレベルパラメータ。
+タスク間のバランスを維持するための固定重み。Modulo タスクには2倍の重みを与え、周期性情報の学習を促進する。
+
+> **Note:** 当初は Automatic Weighted Loss (Kendall et al., 2018) を採用していたが、Magnitude タスクの不確実性パラメータが過度に低下し、Modulo タスクが崩壊する問題（Task Collapse）が発生したため、固定重みに変更した。
 
 #### `forward` 入出力
 
@@ -199,9 +201,9 @@ Automatic Weighted Loss (Kendall et al., 2018) 用のノイズレベルパラメ
     "raw_mag": Tensor (scalar),   # Magnitude 損失
     "raw_sign": Tensor (scalar),  # Sign 損失
     "raw_mod": Tensor (scalar),   # Modulo 損失
-    "s_mag": Tensor (scalar),     # Mag の学習済み重み
-    "s_sign": Tensor (scalar),    # Sign の学習済み重み
-    "s_mod": Tensor (scalar)      # Mod の学習済み重み
+    "w_mag": Tensor (scalar),     # Mag の固定重み (1.0)
+    "w_sign": Tensor (scalar),    # Sign の固定重み (1.0)
+    "w_mod": Tensor (scalar)      # Mod の固定重み (2.0)
   }
 }
 ```
@@ -242,13 +244,13 @@ L_mod = mean(L_mod_list)
 
 `mod_head` 出力を `_split_mod_logits()` で各法にスライス。
 
-### 4.4. 統合損失 (Automatic Weighted Loss)
+### 4.4. 統合損失 (固定重み)
 
 ```
-L_total = Σ_i [ (1/2) * exp(-s_i) * L_i + (1/2) * s_i ]
+L_total = w_mag * L_mag + w_sign * L_sign + w_mod * L_mod
 ```
 
-ここで `s_i = loss_log_vars[i]` は学習可能パラメータ。
+ここで重みは固定値: `w_mag = 1.0`, `w_sign = 1.0`, `w_mod = 2.0`。
 
 ---
 
