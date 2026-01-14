@@ -399,3 +399,253 @@ class TestTrainingIntegration:
         # Weights should have changed
         updated_weight = small_model.bert.embeddings.mag_proj.weight
         assert not torch.allclose(initial_weight, updated_weight)
+
+
+# ==========================================
+# TrainingLogger Tests
+# ==========================================
+
+class TestTrainingLogger:
+    """Tests for TrainingLogger class."""
+    
+    @pytest.fixture
+    def mock_args(self):
+        """Create mock argparse.Namespace for testing."""
+        import argparse
+        args = argparse.Namespace(
+            lr=5e-5,
+            batch_size=32,
+            d_model=512,
+            num_layers=8,
+            nhead=8,
+            split_type="std",
+            resume=None
+        )
+        return args
+    
+    @pytest.fixture
+    def data_stats(self):
+        return {"train_samples": 1000, "val_samples": 100, "test_samples": 100}
+    
+    def test_init_creates_config_json(self, tmp_path, mock_args, data_stats):
+        """Test that __init__ creates config.json."""
+        from intseq_bert.train import TrainingLogger
+        
+        logger = TrainingLogger(tmp_path, mock_args, data_stats)
+        
+        assert (tmp_path / "config.json").exists()
+        
+        import json
+        with open(tmp_path / "config.json") as f:
+            config_data = json.load(f)
+        
+        assert "timestamp" in config_data
+        assert "args" in config_data
+        assert config_data["args"]["lr"] == 5e-5
+        assert "environment" in config_data
+        assert "data_stats" in config_data
+    
+    def test_init_creates_csv_header(self, tmp_path, mock_args):
+        """Test that __init__ creates history.csv with header."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        
+        logger = TrainingLogger(tmp_path, mock_args)
+        
+        assert (tmp_path / "history.csv").exists()
+        
+        import csv
+        with open(tmp_path / "history.csv") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+        
+        # Check basic headers
+        assert "epoch" in headers
+        assert "val_loss" in headers
+        assert "val_mod_acc" in headers
+        
+        # Check per-mod columns exist (100 columns)
+        mod_columns = [h for h in headers if h.startswith("mod_acc_")]
+        assert len(mod_columns) == len(cfg.MOD_RANGE)
+        assert "mod_acc_2" in headers
+        assert "mod_acc_101" in headers
+    
+    def test_init_resume_skips_config(self, tmp_path, mock_args):
+        """Test that resume=True skips config.json creation if it exists."""
+        from intseq_bert.train import TrainingLogger
+        import json
+        
+        # Create initial config
+        logger1 = TrainingLogger(tmp_path, mock_args)
+        
+        # Read original timestamp
+        with open(tmp_path / "config.json") as f:
+            original_config = json.load(f)
+        original_timestamp = original_config["timestamp"]
+        
+        # Create new args with different values
+        import argparse
+        new_args = argparse.Namespace(lr=1e-4, batch_size=64, resume="some_path.pt")
+        
+        # Resume should NOT overwrite config
+        logger2 = TrainingLogger(tmp_path, new_args, resume=True)
+        
+        with open(tmp_path / "config.json") as f:
+            resumed_config = json.load(f)
+        
+        # Config should be unchanged
+        assert resumed_config["timestamp"] == original_timestamp
+        assert resumed_config["args"]["lr"] == 5e-5  # Original value
+    
+    def test_log_epoch_appends_csv(self, tmp_path, mock_args):
+        """Test that log_epoch appends rows to CSV."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        
+        logger = TrainingLogger(tmp_path, mock_args)
+        
+        epoch_data = {
+            "epoch": 1,
+            "lr": 5e-5,
+            "time_sec": 120.5,
+            "is_best": True,
+            "early_stop_counter": 0,
+            "train_loss": 0.5,
+            "val_loss": 0.3,
+            "val_mag_acc": 85.0,
+            "val_mag_mse": 0.2,
+            "val_sign_acc": 90.0,
+            "val_mod_acc": 15.0,
+            "val_mod_loss": 0.8,
+            "mod_accuracies": [50.0 + i for i in range(len(cfg.MOD_RANGE))],
+            "w_mag": 1.0,
+            "w_sign": 1.0,
+            "w_mod": 2.0
+        }
+        
+        logger.log_epoch(epoch_data)
+        
+        import csv
+        with open(tmp_path / "history.csv") as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+        
+        assert len(rows) == 2  # header + 1 data row
+        assert rows[1][0] == "1"  # epoch
+    
+    def test_log_epoch_includes_all_mods(self, tmp_path, mock_args):
+        """Test that log_epoch includes all 100 mod accuracies."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        
+        logger = TrainingLogger(tmp_path, mock_args)
+        
+        mod_accs = [float(i) for i in range(len(cfg.MOD_RANGE))]
+        epoch_data = {
+            "epoch": 1,
+            "lr": 5e-5,
+            "train_loss": 0.5,
+            "val_loss": 0.3,
+            "val_mag_acc": 85.0,
+            "val_sign_acc": 90.0,
+            "val_mod_acc": 15.0,
+            "mod_accuracies": mod_accs
+        }
+        
+        logger.log_epoch(epoch_data)
+        
+        import csv
+        with open(tmp_path / "history.csv") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data_row = next(reader)
+        
+        # Total columns: 12 base + 100 mods + 3 weights = 115
+        expected_cols = 12 + len(cfg.MOD_RANGE) + 3
+        assert len(headers) == expected_cols
+        assert len(data_row) == expected_cols
+    
+    def test_save_best_metrics(self, tmp_path, mock_args):
+        """Test that save_best_metrics creates best_metrics.json."""
+        from intseq_bert.train import TrainingLogger
+        import json
+        
+        logger = TrainingLogger(tmp_path, mock_args)
+        
+        metrics = {
+            "epoch": 10,
+            "val_loss": 0.1,
+            "val_mag_acc": 95.0,
+            "val_mag_mse": 0.05,
+            "val_sign_acc": 99.0,
+            "val_mod_acc": 30.0,
+            "val_mod_loss": 0.5,
+            "mod_accuracies": [80.0] * 100
+        }
+        
+        logger.save_best_metrics(metrics)
+        
+        assert (tmp_path / "best_metrics.json").exists()
+        
+        with open(tmp_path / "best_metrics.json") as f:
+            best_data = json.load(f)
+        
+        assert best_data["best_epoch"] == 10
+        assert best_data["val_loss"] == 0.1
+        assert "saved_at" in best_data
+    
+    def test_save_best_metrics_includes_representative_mods(self, tmp_path, mock_args):
+        """Test that best_metrics.json includes representative mod accuracies."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        import json
+        
+        logger = TrainingLogger(tmp_path, mock_args)
+        
+        # Create distinct values for each mod
+        mod_accuracies = [float(m) for m in cfg.MOD_RANGE]  # Use mod value as accuracy
+        
+        metrics = {
+            "epoch": 5,
+            "val_loss": 0.2,
+            "val_mag_acc": 90.0,
+            "val_sign_acc": 95.0,
+            "val_mod_acc": 25.0,
+            "mod_accuracies": mod_accuracies
+        }
+        
+        logger.save_best_metrics(metrics)
+        
+        with open(tmp_path / "best_metrics.json") as f:
+            best_data = json.load(f)
+        
+        assert "representative_mods" in best_data
+        rep_mods = best_data["representative_mods"]
+        
+        # Check representative mods are present
+        assert "mod_2" in rep_mods
+        assert "mod_3" in rep_mods
+        assert "mod_5" in rep_mods
+        assert "mod_7" in rep_mods
+        assert "mod_10" in rep_mods
+        assert "mod_100" in rep_mods
+        assert "mod_101" in rep_mods
+        
+        # Check values match expected (mod value used as accuracy)
+        assert rep_mods["mod_2"] == 2.0
+        assert rep_mods["mod_10"] == 10.0
+    
+    def test_get_representative_mod_indices(self):
+        """Test get_representative_mod_indices returns correct indices."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        
+        indices = TrainingLogger.get_representative_mod_indices()
+        
+        # All representative mods should have valid indices
+        assert len(indices) == 7  # [2,3,5,7,10,100,101]
+        
+        # Verify indices are correct
+        for idx, expected_mod in zip(indices, [2, 3, 5, 7, 10, 100, 101]):
+            assert cfg.MOD_RANGE[idx] == expected_mod
+

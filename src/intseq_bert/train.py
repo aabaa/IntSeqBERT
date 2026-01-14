@@ -58,6 +58,236 @@ class EarlyStopping:
         
         return self.counter >= self.patience
 
+
+class TrainingLogger:
+    """
+    Structured logging for training runs.
+    Creates config.json, history.csv, best_metrics.json, and train.log.
+    """
+    
+    # Representative moduli for console output (indices into MOD_RANGE)
+    REPRESENTATIVE_MODS = [2, 3, 5, 7, 10, 100, 101]
+    
+    def __init__(
+        self, 
+        output_dir: Path, 
+        args: argparse.Namespace,
+        data_stats: Optional[Dict[str, int]] = None,
+        resume: bool = False
+    ):
+        """
+        Initialize training logger.
+        
+        Args:
+            output_dir: Directory to save logs
+            args: Command line arguments
+            data_stats: Optional dict with train_samples, val_samples, test_samples
+            resume: If True, append to existing logs instead of overwriting
+        """
+        import json
+        import csv
+        import subprocess
+        from datetime import datetime
+        
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.resume = resume
+        
+        # File paths
+        self.config_path = self.output_dir / "config.json"
+        self.history_path = self.output_dir / "history.csv"
+        self.best_metrics_path = self.output_dir / "best_metrics.json"
+        self.log_path = self.output_dir / "train.log"
+        
+        # 1. Create config.json (skip if resume and exists)
+        if not (resume and self.config_path.exists()):
+            self._save_config(args, data_stats)
+        
+        # 2. Create CSV header if needed
+        if not self.history_path.exists():
+            self._create_csv_header()
+        
+        # 3. Setup file handler for train.log
+        self._setup_file_handler()
+    
+    def _save_config(
+        self, 
+        args: argparse.Namespace, 
+        data_stats: Optional[Dict[str, int]]
+    ) -> None:
+        """Save experiment configuration to config.json."""
+        import json
+        import subprocess
+        import platform
+        from datetime import datetime
+        
+        # Try to get git hash
+        try:
+            git_hash = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=self.output_dir,
+                stderr=subprocess.DEVNULL
+            ).decode().strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            git_hash = None
+        
+        config_data = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "args": vars(args),
+            "loss_weights": {"mag": 1.0, "sign": 1.0, "mod": 2.0},
+            "environment": {
+                "python_version": platform.python_version(),
+                "torch_version": torch.__version__,
+                "cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
+                "device": str(torch.device("cuda" if torch.cuda.is_available() else "cpu")),
+                "git_hash": git_hash
+            },
+            "data_stats": data_stats or {},
+            "resume_from": getattr(args, "resume", None)
+        }
+        
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2, ensure_ascii=False)
+    
+    def _create_csv_header(self) -> None:
+        """Create history.csv with header row."""
+        import csv
+        
+        headers = [
+            "epoch", "lr", "time_sec", "is_best", "early_stop_counter",
+            "train_loss", "val_loss",
+            "val_mag_acc", "val_mag_mse", "val_sign_acc",
+            "val_mod_acc", "val_mod_loss"
+        ]
+        
+        # Add per-mod accuracy columns (mod_acc_2 through mod_acc_101)
+        for m in config.MOD_RANGE:
+            headers.append(f"mod_acc_{m}")
+        
+        # Add weight columns
+        headers.extend(["w_mag", "w_sign", "w_mod"])
+        
+        with open(self.history_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+    
+    def _setup_file_handler(self) -> None:
+        """Add file handler to logger."""
+        mode = "a" if self.resume else "w"
+        file_handler = logging.FileHandler(self.log_path, mode=mode, encoding="utf-8")
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        file_handler.setLevel(logging.INFO)
+        
+        # Avoid adding duplicate handlers
+        for handler in logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                logger.removeHandler(handler)
+        
+        logger.addHandler(file_handler)
+    
+    def log_epoch(self, epoch_data: Dict) -> None:
+        """
+        Append one row to history.csv.
+        
+        Args:
+            epoch_data: Dictionary containing all epoch metrics.
+                Required keys: epoch, lr, time_sec, is_best, early_stop_counter,
+                              train_loss, val_loss, val_mag_acc, val_mag_mse,
+                              val_sign_acc, val_mod_acc, val_mod_loss,
+                              mod_accuracies (list of 100 floats),
+                              w_mag, w_sign, w_mod
+        """
+        import csv
+        
+        row = [
+            epoch_data["epoch"],
+            epoch_data["lr"],
+            epoch_data.get("time_sec", 0),
+            epoch_data.get("is_best", False),
+            epoch_data.get("early_stop_counter", 0),
+            epoch_data["train_loss"],
+            epoch_data["val_loss"],
+            epoch_data["val_mag_acc"],
+            epoch_data.get("val_mag_mse", 0),
+            epoch_data["val_sign_acc"],
+            epoch_data["val_mod_acc"],
+            epoch_data.get("val_mod_loss", 0)
+        ]
+        
+        # Add per-mod accuracies
+        mod_accuracies = epoch_data.get("mod_accuracies", [0.0] * len(config.MOD_RANGE))
+        row.extend(mod_accuracies)
+        
+        # Add weights
+        row.extend([
+            epoch_data.get("w_mag", 1.0),
+            epoch_data.get("w_sign", 1.0),
+            epoch_data.get("w_mod", 2.0)
+        ])
+        
+        with open(self.history_path, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+    
+    def save_best_metrics(self, metrics: Dict) -> None:
+        """
+        Save best model metrics to best_metrics.json.
+        
+        Args:
+            metrics: Dictionary with validation metrics and mod_accuracies
+        """
+        import json
+        from datetime import datetime
+        
+        # Extract representative mod accuracies
+        mod_accuracies = metrics.get("mod_accuracies", [])
+        representative_mods = {}
+        
+        for mod in self.REPRESENTATIVE_MODS:
+            idx = self._mod_to_index(mod)
+            if idx is not None and idx < len(mod_accuracies):
+                representative_mods[f"mod_{mod}"] = mod_accuracies[idx]
+        
+        best_data = {
+            "best_epoch": metrics.get("epoch", 0),
+            "val_loss": metrics.get("val_loss", 0),
+            "val_mag_acc": metrics.get("val_mag_acc", 0),
+            "val_mag_mse": metrics.get("val_mag_mse", 0),
+            "val_sign_acc": metrics.get("val_sign_acc", 0),
+            "val_mod_acc": metrics.get("val_mod_acc", 0),
+            "val_mod_loss": metrics.get("val_mod_loss", 0),
+            "representative_mods": representative_mods,
+            "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        with open(self.best_metrics_path, "w", encoding="utf-8") as f:
+            json.dump(best_data, f, indent=2, ensure_ascii=False)
+    
+    @staticmethod
+    def get_representative_mod_indices() -> list:
+        """
+        Get indices into MOD_RANGE for representative moduli.
+        
+        Returns:
+            List of indices for mods [2,3,5,7,10,100,101]
+        """
+        indices = []
+        for mod in TrainingLogger.REPRESENTATIVE_MODS:
+            try:
+                idx = config.MOD_RANGE.index(mod)
+                indices.append(idx)
+            except ValueError:
+                pass  # mod not in range
+        return indices
+    
+    @staticmethod
+    def _mod_to_index(mod: int) -> Optional[int]:
+        """Convert modulus value to index in MOD_RANGE."""
+        try:
+            return config.MOD_RANGE.index(mod)
+        except ValueError:
+            return None
+
 def set_seed(seed: int):
     """Fix random seeds for reproducibility."""
     random.seed(seed)
