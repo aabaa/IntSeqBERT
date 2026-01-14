@@ -34,9 +34,8 @@ We use [Official OEIS Keywords](https://oeis.org/wiki/Clear-cut_examples_of_keyw
 | Subset | Type | Strategy | Tags |
 |--------|------|----------|------|
 | **`easy`** | PoC | **Include** | `core`, `easy`, `nice` |
-| **`std`** | Main | **Exclude** | `cons`, `base`, `word`, `fini`, `dead`, `dumb`, `unkn`, `less` |
+| **`std`** | Main | **Exclude** | `cons`, `base`, `word`, `fini`, `dead`, `dumb`, `unkn`, `less`, `tabl`, `frac`, `cofr` |
 | **`all`** | Test | **None** | (All sequences) |
-| **`number_theory`** | Test | **Include** | `mult`, `cofr`, `tabl`, `frac` |
 
 ---
 
