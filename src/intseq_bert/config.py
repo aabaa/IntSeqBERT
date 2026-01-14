@@ -28,9 +28,9 @@ SPLIT_ALL = "all"
 # Global random seed for reproducibility
 SEED = 42
 
-# Default dataset split ratios
-VAL_RATIO = 0.05
-TEST_RATIO = 0.05
+# Default dataset split ratios (80:10:10 split)
+VAL_RATIO = 0.10
+TEST_RATIO = 0.10
 
 # ==========================================
 # 3. Model Structure & Constants

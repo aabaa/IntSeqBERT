@@ -37,8 +37,8 @@ from . import schemas
 | `SPLIT_DIR_NAME` | `"splits"` | 分割ファイルディレクトリ名 |
 | `FEATURES_DIR_NAME` | `"features"` | 特徴量ディレクトリ名 |
 | `SEED` | `42` | 乱数シード |
-| `VAL_RATIO` | `0.05` | 検証データ比率 |
-| `TEST_RATIO` | `0.05` | テストデータ比率 |
+| `VAL_RATIO` | `0.10` | 検証データ比率 |
+| `TEST_RATIO` | `0.10` | テストデータ比率 |
 | `KEY_MAG_FEATURES` | `"mag_features"` | 必須キー |
 | `KEY_MOD_FEATURES` | `"mod_features"` | 必須キー |
 | `KEY_OEIS_ID` | `"oeis_id"` | ID キー |
