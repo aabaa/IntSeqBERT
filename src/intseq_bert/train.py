@@ -519,6 +519,18 @@ def train(args):
     
     logger.info(f"Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}")
     
+    # Initialize Training Logger
+    data_stats = {
+        "train_samples": len(train_dataset),
+        "val_samples": len(val_dataset)
+    }
+    training_logger = TrainingLogger(
+        output_dir=output_dir,
+        args=args,
+        data_stats=data_stats,
+        resume=args.resume is not None
+    )
+    
     # 3. Model Initialization
     logger.info("Initializing model...")
     model = models.IntSeqForPreTraining(
@@ -555,11 +567,16 @@ def train(args):
     
     scaler = GradScaler()
     early_stopping = EarlyStopping(patience=args.patience)
+    best_val_loss = float("inf")
     
     # 5. Training Loop
     logger.info("Starting training...")
     
+    import time
+    
     for epoch in range(start_epoch, args.epochs):
+        epoch_start_time = time.time()
+        
         # --- Training Phase ---
         model.train()
         train_loss = 0.0
@@ -607,7 +624,14 @@ def train(args):
         logger.info(f"Validating Epoch {epoch+1}...")
         val_metrics = evaluate(model, val_loader, device)
         
-        # Log Metrics
+        epoch_time = time.time() - epoch_start_time
+        
+        # Determine if this is the best epoch
+        is_best = val_metrics["val_loss"] < best_val_loss
+        if is_best:
+            best_val_loss = val_metrics["val_loss"]
+        
+        # Log Metrics to console
         logger.info(f"Epoch {epoch+1} Results:")
         logger.info(f"  Train Loss: {avg_train_loss:.4f}")
         logger.info(f"  Val Loss:   {val_metrics['val_loss']:.4f}")
@@ -615,12 +639,35 @@ def train(args):
         logger.info(f"  Sign Acc:   {val_metrics['sign_acc']:.2f}%")
         logger.info(f"  Mod Acc:    {val_metrics['mod_acc']:.2f}% (Loss: {val_metrics['mod_loss']:.4f})")
         
+        # Log to CSV via TrainingLogger
+        epoch_data = {
+            "epoch": epoch + 1,
+            "lr": scheduler.get_last_lr()[0],
+            "time_sec": epoch_time,
+            "is_best": is_best,
+            "early_stop_counter": early_stopping.counter,
+            "train_loss": avg_train_loss,
+            "val_loss": val_metrics["val_loss"],
+            "val_mag_acc": val_metrics["mag_acc"],
+            "val_mag_mse": val_metrics["mag_mse"],
+            "val_sign_acc": val_metrics["sign_acc"],
+            "val_mod_acc": val_metrics["mod_acc"],
+            "val_mod_loss": val_metrics["mod_loss"],
+            "mod_accuracies": val_metrics.get("mod_accuracies", [0.0] * config.NUM_MODULI),
+            "w_mag": config.LOSS_WEIGHT_MAG,
+            "w_sign": config.LOSS_WEIGHT_SIGN,
+            "w_mod": config.LOSS_WEIGHT_MOD
+        }
+        training_logger.log_epoch(epoch_data)
+        
         # --- Checkpointing ---
         state = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
             "val_loss": val_metrics["val_loss"],
+            "val_metrics": val_metrics,
             "config": vars(args)
         }
         
@@ -630,9 +677,22 @@ def train(args):
         # Save Best & Early Stopping check
         should_stop = early_stopping(val_metrics["val_loss"])
         
-        if val_metrics["val_loss"] == early_stopping.best_loss:
+        if is_best:
             torch.save(state, output_dir / "best_model.pt")
             logger.info(f"New best model saved! (Loss: {val_metrics['val_loss']:.4f})")
+            
+            # Save best metrics JSON
+            best_metrics_data = {
+                "epoch": epoch + 1,
+                "val_loss": val_metrics["val_loss"],
+                "val_mag_acc": val_metrics["mag_acc"],
+                "val_mag_mse": val_metrics["mag_mse"],
+                "val_sign_acc": val_metrics["sign_acc"],
+                "val_mod_acc": val_metrics["mod_acc"],
+                "val_mod_loss": val_metrics["mod_loss"],
+                "mod_accuracies": val_metrics.get("mod_accuracies", [])
+            }
+            training_logger.save_best_metrics(best_metrics_data)
         
         if should_stop:
             logger.info(f"Early stopping triggered at epoch {epoch+1}")
