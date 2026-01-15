@@ -15,11 +15,15 @@ import logging
 import argparse
 from pathlib import Path
 from typing import Dict, List
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from tqdm import tqdm
 
 from intseq_bert import config
+from intseq_bert.analysis.common import (
+    ModelWrapper,
+    create_model_wrapper,
+    split_mod_logits,
+)
 
 
 # ==========================================
@@ -89,67 +93,6 @@ def get_interpretation(modulus: int) -> str:
 
 
 # ==========================================
-# Model Wrapper (Abstract Base)
-# ==========================================
-
-class ModelWrapper(ABC):
-    """Abstract base class for model wrappers."""
-    
-    @abstractmethod
-    def predict(self, batch: Dict) -> Dict[str, torch.Tensor]:
-        """
-        Returns:
-            {
-                "mag_mu": (B, L),
-                "mag_log_var": (B, L),
-                "sign_logits": (B, L, 3),
-                "mod_logits": (B, L, ~5150)
-            }
-        """
-        pass
-    
-    @abstractmethod
-    def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
-        """Return log-probabilities for each modulus."""
-        pass
-
-
-class IntSeqWrapper(ModelWrapper):
-    """Wrapper for IntSeqForPreTraining model."""
-    
-    def __init__(self, checkpoint_path: str, device: str):
-        from intseq_bert.models import IntSeqForPreTraining
-        self.model = IntSeqForPreTraining.from_checkpoint(checkpoint_path)
-        self.model.to(device).eval()
-        self.device = device
-    
-    def predict(self, batch: Dict) -> Dict:
-        with torch.no_grad():
-            outputs = self.model(
-                mag_features=batch["mag_inputs"].to(self.device),
-                mod_features=batch["mod_inputs"].to(self.device),
-                src_key_padding_mask=(batch["attention_mask"] == 0).to(self.device)
-            )
-        return outputs["predictions"]
-    
-    def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
-        split_logits = _split_mod_logits(mod_logits)
-        return [F.log_softmax(logits, dim=-1) for logits in split_logits]
-
-
-def create_model_wrapper(
-    model_type: str,
-    checkpoint_path: str,
-    device: str
-) -> ModelWrapper:
-    """Factory function to create appropriate model wrapper."""
-    if model_type == "intseq":
-        return IntSeqWrapper(checkpoint_path, device)
-    else:
-        raise ValueError(f"Unknown model_type: {model_type}")
-
-
-# ==========================================
 # Core Functions
 # ==========================================
 
@@ -168,25 +111,8 @@ def compute_nig(ce_loss: float, modulus: int) -> float:
     return 1.0 - (ce_loss / max_entropy)
 
 
-def _split_mod_logits(mod_logits: torch.Tensor) -> List[torch.Tensor]:
-    """
-    Split concatenated mod logits into per-modulus tensors.
-    
-    Args:
-        mod_logits: (N, L, sum(MOD_RANGE)) or (L, sum(MOD_RANGE))
-    
-    Returns:
-        List of tensors, one per modulus
-    """
-    splits = []
-    offset = 0
-    for m in config.MOD_RANGE:
-        if mod_logits.dim() == 2:
-            splits.append(mod_logits[:, offset:offset+m])
-        else:
-            splits.append(mod_logits[:, :, offset:offset+m])
-        offset += m
-    return splits
+# Re-export split_mod_logits for backward compatibility
+_split_mod_logits = split_mod_logits
 
 
 def compute_mod_metrics(
@@ -201,10 +127,10 @@ def compute_mod_metrics(
         DataFrame with columns: [modulus, accuracy, ce_loss, nig_score]
     """
     results = []
-    split_logits = _split_mod_logits(mod_logits)
+    split_logits_list = split_mod_logits(mod_logits)
     
     for i, m in enumerate(config.MOD_RANGE):
-        logits_m = split_logits[i]  # (N, L, m)
+        logits_m = split_logits_list[i]  # (N, L, m)
         targets_m = mod_targets[:, :, i]  # (N, L)
         
         # Only valid (masked) positions
@@ -305,7 +231,7 @@ def load_oeis_tags(jsonl_path: str) -> Dict[str, List[str]]:
         {oeis_id: [tag1, tag2, ...], ...}
     """
     id_to_tags = {}
-    with open(jsonl_path, "r") as f:
+    with open(jsonl_path, "r", encoding="utf-8") as f:
         for line in f:
             record = json.loads(line)
             id_to_tags[record["oeis_id"]] = record.get("keywords", [])
@@ -521,7 +447,7 @@ def main(args=None):
         "bootstrap_samples": args.bootstrap_samples,
         "seed": args.seed
     }
-    with open(output_dir / "analysis_config.json", "w") as f:
+    with open(output_dir / "analysis_config.json", "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2)
     
     logging.info("Done!")
