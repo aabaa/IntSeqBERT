@@ -48,9 +48,16 @@ def sample_sequence_length():
 def sample_batch(sample_sequence_length):
     """Creates a sample batch for testing."""
     L = sample_sequence_length
+    
+    # Create valid mod_inputs: (1, L, 100) with integer targets in valid range
+    # Each column i contains target values for modulus MOD_RANGE[i] (2 to 101)
+    mod_targets = torch.stack([
+        torch.randint(0, m, (L,)) for m in config.MOD_RANGE
+    ], dim=-1).float()  # (L, 100)
+    
     return {
         "mag_inputs": torch.randn(1, L, config.MAG_EXTENDED_DIM),
-        "mod_inputs": torch.randn(1, L, config.MOD_FEATURE_DIM),
+        "mod_inputs": mod_targets.unsqueeze(0),  # (1, L, 100)
         "attention_mask": torch.ones(1, L),
         "oeis_id": "A000045"
     }
