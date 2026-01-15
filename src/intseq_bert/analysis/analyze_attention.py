@@ -22,7 +22,6 @@ try:
 except ImportError:
     plt = None
 
-from intseq_bert import config
 from intseq_bert.analysis.common import (
     ModelWrapper,
     create_model_wrapper,
@@ -107,7 +106,8 @@ def plot_layerwise_attention(
     oeis_id: str,
     valid_len: Optional[int] = None,
     layer_ids: Optional[List[int]] = None,
-    figsize: Tuple[int, int] = (16, 12)
+    figsize: Tuple[int, int] = (16, 12),
+    dpi: int = 150
 ):
     """
     Plot layer-wise average attention as a grid.
@@ -162,7 +162,7 @@ def plot_layerwise_attention(
     if im is not None:
         fig.colorbar(im, ax=axes, shrink=0.6, label='Attention Weight')
     
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
     plt.close()
     
     logging.info(f"Saved: {output_path}")
@@ -173,7 +173,8 @@ def plot_headwise_attention(
     layer_id: int,
     output_path: Path,
     oeis_id: str,
-    valid_len: Optional[int] = None
+    valid_len: Optional[int] = None,
+    dpi: int = 150
 ):
     """
     Plot all heads for a given layer.
@@ -220,7 +221,7 @@ def plot_headwise_attention(
     if im is not None:
         fig.colorbar(im, ax=axes, shrink=0.6, label='Attention Weight')
     
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
     plt.close()
     
     logging.info(f"Saved: {output_path}")
@@ -230,7 +231,8 @@ def plot_aggregated_attention(
     attention: torch.Tensor,
     output_path: Path,
     oeis_id: str,
-    valid_len: Optional[int] = None
+    valid_len: Optional[int] = None,
+    dpi: int = 150
 ):
     """
     Plot aggregated attention (all layers, all heads average) with horizontal profile.
@@ -273,7 +275,7 @@ def plot_aggregated_attention(
     
     fig.suptitle(f'Attention Analysis: {oeis_id}', fontsize=14)
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
     plt.close()
     
     logging.info(f"Saved: {output_path}")
@@ -404,7 +406,13 @@ def main(args=None):
     features_dir = Path(args.features_dir)
     
     # Parse figsize
-    figsize = tuple(int(x) for x in args.figsize.split(","))
+    try:
+        figsize = tuple(int(x) for x in args.figsize.split(","))
+        if len(figsize) != 2:
+            raise ValueError
+    except ValueError:
+        logging.warning(f"Invalid figsize '{args.figsize}', using default (16, 12)")
+        figsize = (16, 12)
     
     # Parse layer_ids
     layer_ids = None
@@ -445,7 +453,8 @@ def main(args=None):
                 oeis_id,
                 valid_len=valid_len,
                 layer_ids=layer_ids,
-                figsize=figsize
+                figsize=figsize,
+                dpi=args.dpi
             )
             
             plot_headwise_attention(
@@ -453,14 +462,16 @@ def main(args=None):
                 layer_id=-1,  # Last layer
                 output_path=output_dir / f"{oeis_id}_heads_last.png",
                 oeis_id=oeis_id,
-                valid_len=valid_len
+                valid_len=valid_len,
+                dpi=args.dpi
             )
             
             plot_aggregated_attention(
                 attention,
                 output_dir / f"{oeis_id}_aggregated.png",
                 oeis_id,
-                valid_len=valid_len
+                valid_len=valid_len,
+                dpi=args.dpi
             )
             
             # Recurrence analysis
