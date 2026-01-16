@@ -65,8 +65,34 @@ class IntSeqWrapper(ModelWrapper):
     """Wrapper for IntSeqForPreTraining model."""
     
     def __init__(self, checkpoint_path: str, device: str):
+        import torch
         from intseq_bert.models import IntSeqForPreTraining
-        self.model = IntSeqForPreTraining.from_checkpoint(checkpoint_path)
+        
+        # Load checkpoint
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        # Extract model config from checkpoint or use defaults
+        if "config" in checkpoint:
+            model_config = checkpoint["config"]
+            self.model = IntSeqForPreTraining(
+                d_model=model_config.get("d_model", config.D_MODEL),
+                nhead=model_config.get("nhead", config.NHEAD),
+                num_layers=model_config.get("num_layers", config.NUM_LAYERS),
+                dropout=model_config.get("dropout", config.DROPOUT)
+            )
+        else:
+            # Use default config
+            self.model = IntSeqForPreTraining()
+        
+        # Load state dict
+        if "model_state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+        elif "state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["state_dict"])
+        else:
+            # Assume checkpoint is the state dict itself
+            self.model.load_state_dict(checkpoint)
+        
         self.model.to(device).eval()
         self.device = device
     
