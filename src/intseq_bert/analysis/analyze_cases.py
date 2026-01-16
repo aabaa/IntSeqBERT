@@ -141,7 +141,14 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
     features = extract_features(sequence)
     
     return {
-        "mag_inputs": torch.tensor(features["mag_features"], dtype=torch.float32).unsqueeze(0),
+    mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
+    # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
+    if mag_tensor.size(-1) == 4:
+        padding = torch.zeros(mag_tensor.size(0), 1)
+        mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
+        
+    return {
+        "mag_inputs": mag_tensor.unsqueeze(0),
         "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
         "attention_mask": torch.ones(1, len(sequence)),
         "oeis_id": record["oeis_id"]
@@ -155,7 +162,14 @@ def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str
     features = extract_features(sequence)
     
     return {
-        "mag_inputs": torch.tensor(features["mag_features"], dtype=torch.float32).unsqueeze(0),
+    mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
+    # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
+    if mag_tensor.size(-1) == 4:
+        padding = torch.zeros(mag_tensor.size(0), 1)
+        mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
+        
+    return {
+        "mag_inputs": mag_tensor.unsqueeze(0),
         "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
         "attention_mask": torch.ones(1, len(sequence)),
         "oeis_id": oeis_id
