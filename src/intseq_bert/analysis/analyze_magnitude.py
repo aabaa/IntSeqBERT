@@ -6,6 +6,7 @@ Computes scale-wise metrics, calibration analysis, error distribution, and worst
 """
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 import json
