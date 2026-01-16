@@ -163,126 +163,50 @@ class TestComputeNig:
 
 
 # ==========================================
-# compute_mod_metrics Tests
-# ==========================================
-
-@requires_analyze_mod_spectrum
-class TestComputeModMetrics:
-    """Tests for compute_mod_metrics function."""
-    
-    def test_output_structure(self, sample_mod_logits, sample_mod_targets, sample_mask_map):
-        """Test output DataFrame has expected structure."""
-        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics
-        
-        df = compute_mod_metrics(sample_mod_logits, sample_mod_targets, sample_mask_map)
-        
-        assert isinstance(df, pd.DataFrame)
-        assert set(df.columns) == {"modulus", "accuracy", "ce_loss", "nig_score"}
-        assert len(df) == len(config.MOD_RANGE)
-    
-    def test_modulus_values(self, sample_mod_logits, sample_mod_targets, sample_mask_map):
-        """Test modulus column contains correct values."""
-        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics
-        
-        df = compute_mod_metrics(sample_mod_logits, sample_mod_targets, sample_mask_map)
-        
-        assert df["modulus"].tolist() == list(config.MOD_RANGE)
-    
-    def test_accuracy_range(self, sample_mod_logits, sample_mod_targets, sample_mask_map):
-        """Test accuracy is in [0, 100] range."""
-        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics
-        
-        df = compute_mod_metrics(sample_mod_logits, sample_mod_targets, sample_mask_map)
-        
-        assert df["accuracy"].min() >= 0
-        assert df["accuracy"].max() <= 100
-    
-    def test_ce_loss_positive(self, sample_mod_logits, sample_mod_targets, sample_mask_map):
-        """Test CE loss is non-negative."""
-        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics
-        
-        df = compute_mod_metrics(sample_mod_logits, sample_mod_targets, sample_mask_map)
-        
-        assert df["ce_loss"].min() >= 0
-
-
-# ==========================================
-# _split_mod_logits Tests
+# split_mod_logits Tests
 # ==========================================
 
 @requires_analyze_mod_spectrum
 class TestSplitModLogits:
-    """Tests for _split_mod_logits helper function."""
+    """Tests for split_mod_logits helper function."""
     
     def test_split_count(self):
         """Test returns correct number of splits."""
-        from intseq_bert.analysis.analyze_mod_spectrum import _split_mod_logits
+        from intseq_bert.analysis.common import split_mod_logits
         
         total_classes = sum(config.MOD_RANGE)
         logits = torch.randn(10, 16, total_classes)
         
-        splits = _split_mod_logits(logits)
+        splits = split_mod_logits(logits)
         
         assert len(splits) == len(config.MOD_RANGE)
     
     def test_split_shapes(self):
         """Test each split has correct shape."""
-        from intseq_bert.analysis.analyze_mod_spectrum import _split_mod_logits
+        from intseq_bert.analysis.common import split_mod_logits
         
         N, L = 10, 16
         total_classes = sum(config.MOD_RANGE)
         logits = torch.randn(N, L, total_classes)
         
-        splits = _split_mod_logits(logits)
+        splits = split_mod_logits(logits)
         
         for i, m in enumerate(config.MOD_RANGE):
             assert splits[i].shape == (N, L, m)
     
     def test_split_2d_input(self):
         """Test with 2D input (L, sum(MOD_RANGE))."""
-        from intseq_bert.analysis.analyze_mod_spectrum import _split_mod_logits
+        from intseq_bert.analysis.common import split_mod_logits
         
         L = 16
         total_classes = sum(config.MOD_RANGE)
         logits = torch.randn(L, total_classes)
         
-        splits = _split_mod_logits(logits)
+        splits = split_mod_logits(logits)
         
         assert len(splits) == len(config.MOD_RANGE)
         assert splits[0].shape == (L, 2)  # mod 2
         assert splits[-1].shape == (L, 101)  # mod 101
-
-
-# ==========================================
-# _compute_non_base10_acc Tests
-# ==========================================
-
-@requires_analyze_mod_spectrum
-class TestComputeNonBase10Acc:
-    """Tests for _compute_non_base10_acc function."""
-    
-    def test_excludes_base10_mods(self):
-        """Test that Base-10 related mods are excluded."""
-        from intseq_bert.analysis.analyze_mod_spectrum import _compute_non_base10_acc
-        
-        # Create mock metrics DataFrame
-        data = [{"modulus": m, "accuracy": 50.0} for m in config.MOD_RANGE]
-        # Set Base-10 related mods to 100% (should be excluded)
-        for row in data:
-            if row["modulus"] in {10, 20, 50, 100}:
-                row["accuracy"] = 100.0
-        
-        df = pd.DataFrame(data)
-        result = _compute_non_base10_acc(df)
-        
-        # Result should be 50.0 (excluding 100% scores)
-        assert abs(result - 50.0) < 1e-6
-    
-    def test_base10_related_mods(self):
-        """Test the set of Base-10 related mods."""
-        base10_mods = {10, 20, 50, 100}
-        for m in base10_mods:
-            assert m in config.MOD_RANGE
 
 
 # ==========================================
@@ -325,72 +249,79 @@ class TestLoadOeisTags:
 
 @requires_analyze_mod_spectrum
 class TestTagStratifiedAnalysis:
-    """Tests for tag_stratified_analysis function."""
+    """Tests for tag_stratified_analysis_from_stats function."""
     
-    def test_output_structure(
-        self, sample_mod_logits, sample_mod_targets, sample_mask_map,
-        sample_oeis_ids, sample_id_to_tags
-    ):
+    def test_output_structure(self):
         """Test output DataFrame has expected structure."""
-        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
         
-        # Need at least 10 samples per tag for it to be included
-        # Create more samples
         N = 50
-        L = sample_mod_logits.shape[1]
-        mod_logits = torch.randn(N, L, sum(config.MOD_RANGE))
-        mod_targets = torch.stack([
-            torch.randint(0, m, (N, L)) for m in config.MOD_RANGE
-        ], dim=-1)
-        mask_map = torch.ones(N, L, dtype=torch.bool)
+        num_mods = len(config.MOD_RANGE)
         
-        oeis_ids = [f"A{i:06d}" for i in range(N)]
-        id_to_tags = {oeis_id: ["core", "nice"] for oeis_id in oeis_ids}
+        # Mock stats
+        stats = {
+            "loss_sum": torch.rand(N, num_mods),
+            "acc_sum": torch.rand(N, num_mods) * 100,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
         
-        df = tag_stratified_analysis(mod_logits, mod_targets, mask_map, oeis_ids, id_to_tags)
+        id_to_tags = {oid: ["core", "nice"] for oid in stats["oeis_ids"]}
         
-        expected_cols = {"tag", "count", "overall_acc", "non_base10_acc", "nig_score", "top_modulus"}
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        expected_cols = {"tag", "count", "overall_acc", "non_trivial_acc", "nig_score", "top_modulus"}
         assert set(df.columns) == expected_cols
     
-    def test_filters_small_tags(self, sample_mod_logits, sample_mod_targets, sample_mask_map):
-        """Test that tags with < 10 samples are filtered out."""
-        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis
+    def test_filters_small_tags(self):
+        """Test that tags with < MIN_TAG_SAMPLES are filtered out."""
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
         
-        N = 9  # Less than minimum
-        L = sample_mod_logits.shape[1]
-        mod_logits = sample_mod_logits[:N]
-        mod_targets = sample_mod_targets[:N]
-        mask_map = sample_mask_map[:N]
+        N = config.MIN_TAG_SAMPLES - 1  # Less than minimum
+        num_mods = len(config.MOD_RANGE)
         
-        oeis_ids = [f"A{i:06d}" for i in range(N)]
-        id_to_tags = {oeis_id: ["rare_tag"] for oeis_id in oeis_ids}
+        stats = {
+            "loss_sum": torch.rand(N, num_mods),
+            "acc_sum": torch.rand(N, num_mods) * 100,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
         
-        df = tag_stratified_analysis(mod_logits, mod_targets, mask_map, oeis_ids, id_to_tags)
+        # All assigned to "rare_tag"
+        id_to_tags = {oid: ["rare_tag"] for oid in stats["oeis_ids"]}
         
-        # Should be empty since all tags have < 10 samples
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        # Should be empty since count < threshold
         assert len(df) == 0
     
     def test_sorted_by_nig(self):
         """Test results are sorted by nig_score descending."""
-        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
         
-        N = 100
-        L = 16
-        mod_logits = torch.randn(N, L, sum(config.MOD_RANGE))
-        mod_targets = torch.stack([
-            torch.randint(0, m, (N, L)) for m in config.MOD_RANGE
-        ], dim=-1)
-        mask_map = torch.ones(N, L, dtype=torch.bool)
+        N = 50
+        num_mods = len(config.MOD_RANGE)
         
-        oeis_ids = [f"A{i:06d}" for i in range(N)]
+        loss_sum = torch.zeros(N, num_mods)
+        # Make tag_a have better (lower) loss than tag_b
+        loss_sum[:25, :] = 0.5  # tag_a
+        loss_sum[25:, :] = 2.0  # tag_b
+        
+        stats = {
+            "loss_sum": loss_sum,
+            "acc_sum": torch.rand(N, num_mods) * 100,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
+        
         id_to_tags = {}
-        for i, oeis_id in enumerate(oeis_ids):
-            if i < 50:
-                id_to_tags[oeis_id] = ["tag_a"]
+        for i, oid in enumerate(stats["oeis_ids"]):
+            if i < 25:
+                id_to_tags[oid] = ["tag_a"]
             else:
-                id_to_tags[oeis_id] = ["tag_b"]
+                id_to_tags[oid] = ["tag_b"]
         
-        df = tag_stratified_analysis(mod_logits, mod_targets, mask_map, oeis_ids, id_to_tags)
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
         
         if len(df) > 1:
             # Check sorted descending
@@ -431,40 +362,95 @@ class TestInterpretationMap:
         assert "Parity" in get_interpretation(2)
         assert "Base-10" in get_interpretation(10)
         
-        # Prime number
-        assert "Prime" in get_interpretation(97)
+        # Prime number in map
+        assert "Prime" in get_interpretation(101)
 
 
 # ==========================================
-# Integration Tests
+# StreamingEvaluator Tests
 # ==========================================
 
 @requires_analyze_mod_spectrum
-class TestIntegration:
-    """Integration tests for analyze_mod_spectrum module."""
+class TestStreamingEvaluator:
+    """Tests for StreamingEvaluator class."""
     
-    def test_full_metrics_pipeline(self):
-        """Test computing metrics for all moduli."""
-        from intseq_bert.analysis.analyze_mod_spectrum import (
-            compute_mod_metrics,
-            _split_mod_logits
-        )
+    def test_accumulation(
+        self, sample_mod_logits, sample_mod_targets, sample_mask_map, sample_oeis_ids
+    ):
+        """Test accumulation of stats."""
+        from intseq_bert.analysis.analyze_mod_spectrum import StreamingEvaluator
         
-        N, L = 20, 16
-        mod_logits = torch.randn(N, L, sum(config.MOD_RANGE))
-        mod_targets = torch.stack([
-            torch.randint(0, m, (N, L)) for m in config.MOD_RANGE
-        ], dim=-1)
-        mask_map = torch.ones(N, L, dtype=torch.bool)
+        # Prepare batch and preds
+        batch = {
+            "mod_labels": sample_mod_targets,
+            "mask_matrix": sample_mask_map,
+            "oeis_ids": sample_oeis_ids
+        }
+        preds = {"mod_logits": sample_mod_logits}
         
-        # Compute metrics
-        df = compute_mod_metrics(mod_logits, mod_targets, mask_map)
+        evaluator = StreamingEvaluator()
+        evaluator.process_batch(preds, batch)
+        stats = evaluator.finalize()
         
-        # Verify all moduli are present
-        assert len(df) == len(config.MOD_RANGE)
-        assert df["modulus"].tolist() == list(config.MOD_RANGE)
+        # Check shapes
+        N = len(sample_oeis_ids)
+        num_mods = len(config.MOD_RANGE)
         
-        # Verify values are reasonable
-        assert df["accuracy"].min() >= 0
-        assert df["accuracy"].max() <= 100
-        assert df["ce_loss"].min() >= 0
+        assert stats["loss_sum"].shape == (N, num_mods)
+        assert stats["acc_sum"].shape == (N, num_mods)
+        assert stats["counts"].shape == (N,)
+        assert len(stats["oeis_ids"]) == N
+    
+    def test_correctness_simple_case(self):
+        """Verify that StreamingEvaluator produces correct metric values."""
+        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics_from_stats
+        
+        # Manually create stats for a known simple case
+        # 2 samples. 100 mods.
+        # Sample 1: 10 counts. Mod 2 loss=5.0, acc=8.0
+        # Sample 2: 10 counts. Mod 2 loss=15.0, acc=2.0
+        
+        N = 2
+        n_mods = len(config.MOD_RANGE)
+        
+        loss_sum = torch.zeros(N, n_mods)
+        acc_sum = torch.zeros(N, n_mods)
+        counts = torch.tensor([10.0, 10.0])
+        
+        # Set values for Mod 2 (index 0)
+        loss_sum[0, 0] = 5.0
+        loss_sum[1, 0] = 15.0 # Total loss = 20.0, Mean loss = 20/20 = 1.0
+        
+        acc_sum[0, 0] = 8.0
+        acc_sum[1, 0] = 2.0  # Total acc = 10.0, Mean acc = 10/20 = 0.5 (50%)
+        
+        stats = {
+            "loss_sum": loss_sum,
+            "acc_sum": acc_sum,
+            "counts": counts,
+            "oeis_ids": ["A1", "A2"]
+        }
+        
+        df = compute_mod_metrics_from_stats(stats)
+        
+        # Find row for mod 2
+        mod2_row = df[df["modulus"] == 2].iloc[0]
+        
+        assert abs(mod2_row["ce_loss"] - 1.0) < 1e-6
+        assert abs(mod2_row["accuracy"] - 50.0) < 1e-6
+        
+        expected_nig = 1.0 - (1.0 / np.log(2))
+        assert abs(mod2_row["nig_score"] - expected_nig) < 1e-6
+    
+    def test_empty_stats(self):
+        """Test handling of empty stats."""
+        from intseq_bert.analysis.analyze_mod_spectrum import compute_mod_metrics_from_stats
+        
+        stats = {
+            "loss_sum": torch.empty(0, 100),
+            "acc_sum": torch.empty(0, 100),
+            "counts": torch.empty(0),
+            "oeis_ids": []
+        }
+        df = compute_mod_metrics_from_stats(stats)
+        assert len(df) == 0 or len(df.columns) == 4

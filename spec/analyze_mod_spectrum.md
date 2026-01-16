@@ -216,40 +216,32 @@ def compute_nig(ce_loss: float, modulus: int) -> float:
 8. 出力ファイル生成
 ```
 
-### 6.2. `collect_predictions` 関数
+### 6.2. Streaming Evaluation (Memory Efficiency)
 
-テストデータ全体を推論し、予測結果を収集する。
+大規模データセット（例: 30k sequences）において、全ての予測結果（logits: 30000 x 128 x 5150）をメモリに保持すると 70GB+ のメモリを消費し OOM が発生するため、**Streaming Evaluation** 方式を採用する。
+
+1. **バッチ毎の集計:**
+   - 予測 (`mod_logits`) と正解データ (`mod_labels`) をバッチ単位で処理する。
+   - 各バッチで「損失の合計 (`loss_sum`)」「正解数の合計 (`acc_sum`)」「有効サンプル数 (`counts`)」のみを計算・蓄積する。
+   - 巨大な logits テンソルはバッチ処理後に即座に破棄する。
+
+2. **遅延計算:**
+   - 全バッチ処理完了後、蓄積された統計量 (Sufficient Statistics) から全体の平均 Loss / Accuracy / NIG を算出する。
+   - これにより、データセットサイズに依存せず一定のメモリ消費量で解析が可能となる。
 
 ```python
-def collect_predictions(
-    model: ModelWrapper,
-    dataloader: DataLoader,
-    device: str
-) -> Dict[str, torch.Tensor]:
+class StreamingEvaluator:
     """
-    Returns:
-        {
-            "mod_logits": (N, L, ~5150),
-            "mod_targets": (N, L, 100),
-            "mask_map": (N, L),
-            "oeis_ids": List[str]
-        }
+    Evaluates model metrics batch-by-batch to avoid OOM.
+    Stores per-sample statistics instead of full logits.
     """
-    all_logits, all_targets, all_masks, all_ids = [], [], [], []
-    
-    for batch in tqdm(dataloader, desc="Predicting"):
-        preds = model.predict(batch)
-        all_logits.append(preds["mod_logits"].cpu())
-        all_targets.append(batch["mod_labels"].cpu())
-        all_masks.append(batch["mask_matrix"].cpu())
-        all_ids.extend(batch["oeis_id"])
-    
-    return {
-        "mod_logits": torch.cat(all_logits, dim=0),
-        "mod_targets": torch.cat(all_targets, dim=0),
-        "mask_map": torch.cat(all_masks, dim=0),
-        "oeis_ids": all_ids
-    }
+    def process_batch(self, preds: Dict, batch: Dict):
+        # バッチ内の統計量を計算し、self.results に追記
+        pass
+
+    def finalize(self) -> Dict[str, torch.Tensor]:
+        # 全バッチの統計量を結合して返す
+        pass
 ```
 
 > **重要: Collator の分析モード互換性**
