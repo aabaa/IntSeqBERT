@@ -226,6 +226,8 @@ class IntSeqForPreTraining(nn.Module):
             
             # NLL = 0.5 * log(sigma^2) + (y - mu)^2 / (2 * sigma^2)
             #     = 0.5 * log_var + (y - mu)^2 * 0.5 * exp(-log_var)
+            # Clamp log_var to prevent numerical instability (exp overflow/underflow)
+            pred_log_var = torch.clamp(pred_log_var, config.LOG_VAR_CLIP_MIN, config.LOG_VAR_CLIP_MAX)
             precision = torch.exp(-pred_log_var)
             loss_mag = 0.5 * pred_log_var + 0.5 * (target_mag - pred_mu)**2 * precision
             loss_mag = loss_mag.mean()
