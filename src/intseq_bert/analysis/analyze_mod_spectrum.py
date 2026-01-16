@@ -323,12 +323,34 @@ def collect_predictions(
         }
     """
     all_logits, all_targets, all_masks, all_ids = [], [], [], []
+    max_len = config.MAX_SEQUENCE_LENGTH
     
     for batch in tqdm(dataloader, desc="Predicting"):
         preds = model.predict(batch)
-        all_logits.append(preds["mod_logits"].cpu())
-        all_targets.append(batch["mod_labels"].cpu())
-        all_masks.append(batch["mask_matrix"].cpu())
+        logits = preds["mod_logits"].cpu()
+        targets = batch["mod_labels"].cpu()
+        masks = batch["mask_matrix"].cpu()
+        
+        B, L = masks.shape
+        
+        # Pad to max_len if needed
+        if L < max_len:
+            pad_len = max_len - L
+            # Pad logits: (B, L, D) -> (B, max_len, D)
+            logits = F.pad(logits, (0, 0, 0, pad_len), value=0)
+            # Pad targets: (B, L, num_mods) -> (B, max_len, num_mods)
+            targets = F.pad(targets, (0, 0, 0, pad_len), value=config.IGNORE_INDEX)
+            # Pad masks: (B, L) -> (B, max_len)
+            masks = F.pad(masks, (0, pad_len), value=False)
+        elif L > max_len:
+            # Truncate if longer than max_len
+            logits = logits[:, :max_len, :]
+            targets = targets[:, :max_len, :]
+            masks = masks[:, :max_len]
+        
+        all_logits.append(logits)
+        all_targets.append(targets)
+        all_masks.append(masks)
         all_ids.extend(batch["oeis_ids"])
     
     return {
