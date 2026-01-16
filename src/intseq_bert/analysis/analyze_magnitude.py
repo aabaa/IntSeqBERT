@@ -878,6 +878,11 @@ def collect_predictions(
         mag_labels = batch["mag_labels"]  # (B, L, 4) -> [log, s+, s-, s0]
         gt_mag = mag_labels[:, :, 0]  # Extract log value
         
+        # Filter out padding (0.00) from mask
+        # Even if masked by collator, if value is 0, it's padding/invalid for magnitude analysis
+        is_valid_value = (gt_mag.abs() > 1e-6)
+        batch["mask_matrix"] = batch["mask_matrix"] & is_valid_value
+        
         # Pad to MAX_SEQUENCE_LENGTH
         B, L = gt_mag.shape
         max_len = config.MAX_SEQUENCE_LENGTH
