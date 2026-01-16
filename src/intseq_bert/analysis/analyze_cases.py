@@ -357,8 +357,21 @@ def _compute_mod_confidences(
         probs_m = F.softmax(logits_m, dim=-1)  # (L, m)
         targets_m = mod_targets[:, idx].long().to(probs_m.device)  # (L,)
         
+        # Handle IGNORE_INDEX or out-of-bounds
+        # Create a safe index for gather, and a mask for valid entries
+        valid_mask = (targets_m >= 0) & (targets_m < m)
+        safe_targets = targets_m.clone()
+        safe_targets[~valid_mask] = 0  # Replace invalid with 0 to safely gather (will be masked later)
+        
         # Get probability of correct class
-        conf_m = probs_m.gather(1, targets_m.unsqueeze(1)).squeeze(1)
+        # probs_m: (L, m)
+        # safe_targets: (L,) -> (L, 1)
+        gathered = probs_m.gather(1, safe_targets.unsqueeze(1)).squeeze(1) # (L,)
+        
+        # Set confidence to 0.0 (or NaN) where target was invalid
+        conf_m = gathered.clone()
+        conf_m[~valid_mask] = 0.0
+        
         confidences.append(conf_m.cpu().numpy())
     
     return np.stack(confidences, axis=1)
