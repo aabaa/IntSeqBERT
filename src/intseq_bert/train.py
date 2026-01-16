@@ -398,6 +398,16 @@ def evaluate(
             labels = inputs["labels"]
             mask_map = labels["mask_map"]
             
+            # Filter out padding (0.0) from metrics even if masked
+            # Log scale 0.0 is effectively padding in this dataset context
+            mag_targets_raw = labels["mag_targets"]
+            is_valid_value = (mag_targets_raw.abs() > 1e-6)
+            
+            # Update mask (True only if originally masked AND value is valid)
+            mask_map = mask_map & is_valid_value
+            # Update labels for consistency in later usages
+            labels["mask_map"] = mask_map
+            
             if not mask_map.any():
                 continue
 
