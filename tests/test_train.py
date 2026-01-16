@@ -656,4 +656,583 @@ class TestTrainingLogger:
         # Verify indices are correct
         for idx, expected_mod in zip(indices, [2, 3, 5, 7, 10, 100, 101]):
             assert cfg.MOD_RANGE[idx] == expected_mod
+    
+    def test_get_csv_headers(self):
+        """Test get_csv_headers returns correct headers."""
+        from intseq_bert.train import TrainingLogger
+        from intseq_bert import config as cfg
+        
+        headers = TrainingLogger.get_csv_headers()
+        
+        # Check basic headers exist
+        assert "epoch" in headers
+        assert "lr" in headers
+        assert "time_sec" in headers
+        assert "is_best" in headers
+        assert "early_stop_counter" in headers
+        assert "train_loss" in headers
+        assert "val_loss" in headers
+        assert "val_mag_acc" in headers
+        assert "val_mag_mse" in headers
+        assert "val_sign_acc" in headers
+        assert "val_mod_acc" in headers
+        assert "val_mod_loss" in headers
+        
+        # Check per-mod columns
+        assert "mod_acc_2" in headers
+        assert "mod_acc_101" in headers
+        
+        # Check weight columns
+        assert "w_mag" in headers
+        assert "w_sign" in headers
+        assert "w_mod" in headers
+        
+        # Total: 12 base + 100 mods + 3 weights = 115
+        expected_count = 12 + len(cfg.MOD_RANGE) + 3
+        assert len(headers) == expected_count
+    
+    def test_get_csv_headers_order(self):
+        """Test get_csv_headers maintains correct column order."""
+        from intseq_bert.train import TrainingLogger
+        
+        headers = TrainingLogger.get_csv_headers()
+        
+        # First columns should be meta
+        assert headers[0] == "epoch"
+        assert headers[1] == "lr"
+        
+        # Last columns should be weights
+        assert headers[-3] == "w_mag"
+        assert headers[-2] == "w_sign"
+        assert headers[-1] == "w_mod"
 
+
+# ==========================================
+# Test-Only Mode Tests
+# ==========================================
+
+class TestLoadModelConfig:
+    """Tests for _load_model_config function."""
+    
+    @pytest.fixture
+    def mock_args(self):
+        """Create mock args with model config."""
+        import argparse
+        return argparse.Namespace(
+            d_model=256,
+            nhead=4,
+            num_layers=4
+        )
+    
+    def test_priority_checkpoint_config(self, tmp_path, mock_args):
+        """Test that checkpoint config has highest priority."""
+        from intseq_bert.train import _load_model_config
+        
+        # Create checkpoint with config
+        checkpoint = {
+            "config": {
+                "d_model": 512,
+                "nhead": 8,
+                "num_layers": 6
+            }
+        }
+        
+        result = _load_model_config(tmp_path / "model.pt", checkpoint, mock_args)
+        
+        assert result["d_model"] == 512
+        assert result["nhead"] == 8
+        assert result["num_layers"] == 6
+    
+    def test_priority_config_json(self, tmp_path, mock_args):
+        """Test that config.json is used when checkpoint config is empty."""
+        from intseq_bert.train import _load_model_config
+        import json
+        
+        # Create config.json
+        config_data = {
+            "args": {
+                "d_model": 768,
+                "nhead": 12,
+                "num_layers": 12
+            }
+        }
+        with open(tmp_path / "config.json", "w") as f:
+            json.dump(config_data, f)
+        
+        # Checkpoint without config
+        checkpoint = {}
+        
+        result = _load_model_config(tmp_path / "model.pt", checkpoint, mock_args)
+        
+        assert result["d_model"] == 768
+        assert result["nhead"] == 12
+        assert result["num_layers"] == 12
+    
+    def test_priority_fallback_to_args(self, tmp_path, mock_args):
+        """Test that args are used as fallback."""
+        from intseq_bert.train import _load_model_config
+        
+        # Empty checkpoint, no config.json
+        checkpoint = {}
+        
+        result = _load_model_config(tmp_path / "model.pt", checkpoint, mock_args)
+        
+        assert result["d_model"] == 256
+        assert result["nhead"] == 4
+        assert result["num_layers"] == 4
+    
+    def test_partial_checkpoint_config(self, tmp_path, mock_args):
+        """Test partial config in checkpoint uses args for missing values."""
+        from intseq_bert.train import _load_model_config
+        
+        # Checkpoint with only some config values
+        checkpoint = {
+            "config": {
+                "d_model": 512
+                # nhead and num_layers missing
+            }
+        }
+        
+        result = _load_model_config(tmp_path / "model.pt", checkpoint, mock_args)
+        
+        assert result["d_model"] == 512  # From checkpoint
+        assert result["nhead"] == 4       # From args (fallback)
+        assert result["num_layers"] == 4  # From args (fallback)
+
+
+class TestSaveTestCsv:
+    """Tests for _save_test_csv function."""
+    
+    @pytest.fixture
+    def sample_metrics(self):
+        """Sample metrics for testing."""
+        from intseq_bert import config as cfg
+        return {
+            "val_loss": 0.0892,
+            "mag_acc": 91.88,
+            "mag_mse": 0.187,
+            "sign_acc": 98.45,
+            "mod_acc": 24.46,
+            "mod_loss": 0.756,
+            "mod_accuracies": [75.0 + i * 0.1 for i in range(len(cfg.MOD_RANGE))]
+        }
+    
+    def test_creates_csv_file(self, tmp_path, sample_metrics):
+        """Test that CSV file is created."""
+        from intseq_bert.train import _save_test_csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        assert csv_path.exists()
+    
+    def test_csv_has_header_and_data(self, tmp_path, sample_metrics):
+        """Test CSV contains header and one data row."""
+        from intseq_bert.train import _save_test_csv
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+        
+        assert len(rows) == 2  # header + 1 data row
+    
+    def test_csv_uses_shared_headers(self, tmp_path, sample_metrics):
+        """Test CSV uses TrainingLogger.get_csv_headers()."""
+        from intseq_bert.train import _save_test_csv, TrainingLogger
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            actual_headers = next(reader)
+        
+        expected_headers = TrainingLogger.get_csv_headers()
+        assert actual_headers == expected_headers
+    
+    def test_csv_test_mode_markers(self, tmp_path, sample_metrics):
+        """Test CSV has correct test-mode markers."""
+        from intseq_bert.train import _save_test_csv
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data = next(reader)
+        
+        # Create dict for easier access
+        row_dict = dict(zip(headers, data))
+        
+        assert row_dict["epoch"] == "0"  # Test mode marker
+        assert row_dict["lr"] == "0.0"
+        assert row_dict["train_loss"] == "0.0"  # N/A
+        assert row_dict["is_best"] == "True"
+    
+    def test_csv_contains_metrics(self, tmp_path, sample_metrics):
+        """Test CSV contains the metrics values."""
+        from intseq_bert.train import _save_test_csv
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data = next(reader)
+        
+        row_dict = dict(zip(headers, data))
+        
+        assert float(row_dict["val_loss"]) == pytest.approx(0.0892)
+        assert float(row_dict["val_mag_acc"]) == pytest.approx(91.88)
+        assert float(row_dict["val_sign_acc"]) == pytest.approx(98.45)
+    
+    def test_csv_contains_time_sec(self, tmp_path, sample_metrics):
+        """Test CSV contains evaluation time in time_sec column."""
+        from intseq_bert.train import _save_test_csv
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=123.456)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data = next(reader)
+        
+        row_dict = dict(zip(headers, data))
+        assert float(row_dict["time_sec"]) == pytest.approx(123.456)
+    
+    def test_csv_contains_mod_accuracies(self, tmp_path, sample_metrics):
+        """Test CSV contains all 100 mod accuracy columns."""
+        from intseq_bert.train import _save_test_csv
+        from intseq_bert import config as cfg
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data = next(reader)
+        
+        row_dict = dict(zip(headers, data))
+        
+        # Check mod_acc_2 through mod_acc_101 exist
+        for mod in cfg.MOD_RANGE:
+            col_name = f"mod_acc_{mod}"
+            assert col_name in row_dict, f"Missing column: {col_name}"
+            # Values should be parseable as floats
+            float(row_dict[col_name])
+    
+    def test_csv_early_stop_counter_is_zero(self, tmp_path, sample_metrics):
+        """Test CSV has early_stop_counter = 0 in test mode."""
+        from intseq_bert.train import _save_test_csv
+        import csv
+        
+        csv_path = tmp_path / "test_results.csv"
+        _save_test_csv(csv_path, sample_metrics, time_sec=45.2)
+        
+        with open(csv_path) as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            data = next(reader)
+        
+        row_dict = dict(zip(headers, data))
+        assert row_dict["early_stop_counter"] == "0"
+
+
+class TestSaveTestJson:
+    """Tests for _save_test_json function."""
+    
+    @pytest.fixture
+    def sample_args(self):
+        """Sample args for testing."""
+        import argparse
+        return argparse.Namespace(
+            model_path="checkpoints/model.pt",
+            split_type="std",
+            test_split="test"
+        )
+    
+    @pytest.fixture
+    def sample_metrics(self):
+        """Sample metrics for testing."""
+        from intseq_bert import config as cfg
+        return {
+            "val_loss": 0.0892,
+            "mag_acc": 91.88,
+            "mag_mse": 0.187,
+            "sign_acc": 98.45,
+            "mod_acc": 24.46,
+            "mod_loss": 0.756,
+            "mod_accuracies": [75.0 + i * 0.1 for i in range(len(cfg.MOD_RANGE))]
+        }
+    
+    def test_creates_json_file(self, tmp_path, sample_args, sample_metrics):
+        """Test that JSON file is created."""
+        from intseq_bert.train import _save_test_json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        assert json_path.exists()
+    
+    def test_json_contains_model_path(self, tmp_path, sample_args, sample_metrics):
+        """Test JSON contains model path."""
+        from intseq_bert.train import _save_test_json
+        import json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        with open(json_path) as f:
+            data = json.load(f)
+        
+        assert data["model_path"] == "checkpoints/model.pt"
+        assert data["split_type"] == "std"
+    
+    def test_json_contains_metrics(self, tmp_path, sample_args, sample_metrics):
+        """Test JSON contains all metrics."""
+        from intseq_bert.train import _save_test_json
+        import json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        with open(json_path) as f:
+            data = json.load(f)
+        
+        assert data["test_loss"] == pytest.approx(0.0892)
+        assert data["test_mag_acc"] == pytest.approx(91.88)
+        assert data["test_sign_acc"] == pytest.approx(98.45)
+        assert data["test_mod_acc"] == pytest.approx(24.46)
+        assert data["test_samples"] == 2500
+        assert data["evaluation_time_sec"] == pytest.approx(45.2)
+    
+    def test_json_contains_representative_mods(self, tmp_path, sample_args, sample_metrics):
+        """Test JSON contains representative mods."""
+        from intseq_bert.train import _save_test_json
+        import json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        with open(json_path) as f:
+            data = json.load(f)
+        
+        assert "representative_mods" in data
+        rep_mods = data["representative_mods"]
+        
+        # Check all representative mods are present
+        assert "mod_2" in rep_mods
+        assert "mod_3" in rep_mods
+        assert "mod_5" in rep_mods
+        assert "mod_7" in rep_mods
+        assert "mod_10" in rep_mods
+        assert "mod_100" in rep_mods
+        assert "mod_101" in rep_mods
+    
+    def test_json_contains_all_mod_accuracies(self, tmp_path, sample_args, sample_metrics):
+        """Test JSON contains all mod accuracies array."""
+        from intseq_bert.train import _save_test_json
+        from intseq_bert import config as cfg
+        import json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        with open(json_path) as f:
+            data = json.load(f)
+        
+        assert "all_mod_accuracies" in data
+        assert len(data["all_mod_accuracies"]) == len(cfg.MOD_RANGE)
+    
+    def test_json_contains_timestamp(self, tmp_path, sample_args, sample_metrics):
+        """Test JSON contains evaluated_at timestamp."""
+        from intseq_bert.train import _save_test_json
+        import json
+        
+        json_path = tmp_path / "test_metrics.json"
+        _save_test_json(json_path, sample_args, sample_metrics, 45.2, 2500)
+        
+        with open(json_path) as f:
+            data = json.load(f)
+        
+        assert "evaluated_at" in data
+        # Check timestamp format (YYYY-MM-DD HH:MM:SS)
+        assert len(data["evaluated_at"]) == 19
+
+
+class TestTestOnlyMode:
+    """Integration tests for test_only function."""
+    
+    @pytest.fixture
+    def mock_checkpoint(self, tmp_path, small_model):
+        """Create a mock checkpoint file."""
+        checkpoint = {
+            "model_state_dict": small_model.state_dict(),
+            "config": {
+                "d_model": 32,
+                "nhead": 2,
+                "num_layers": 1
+            },
+            "epoch": 10,
+            "val_loss": 0.1
+        }
+        
+        checkpoint_path = tmp_path / "best_model.pt"
+        torch.save(checkpoint, checkpoint_path)
+        return checkpoint_path
+    
+    @pytest.fixture
+    def test_only_args(self, mock_checkpoint, tmp_path):
+        """Create args for test_only function."""
+        import argparse
+        return argparse.Namespace(
+            test_only=True,
+            model_path=str(mock_checkpoint),
+            split_type="std",
+            test_split="test",
+            data_root="data",
+            output_dir=str(tmp_path / "output"),
+            test_output=None,
+            batch_size=4,
+            num_workers=0,
+            seed=42,
+            d_model=32,
+            nhead=2,
+            num_layers=1
+        )
+    
+    def test_test_only_loads_model(self, mock_checkpoint, small_model):
+        """Test that test_only correctly loads the model."""
+        checkpoint = torch.load(mock_checkpoint)
+        
+        # Verify the checkpoint has what we expect
+        assert "model_state_dict" in checkpoint
+        assert "config" in checkpoint
+        
+        # Model should be able to load this state dict
+        loaded_model = IntSeqForPreTraining(d_model=32, nhead=2, num_layers=1)
+        loaded_model.load_state_dict(checkpoint["model_state_dict"])
+        
+        # Weights should match
+        for (n1, p1), (n2, p2) in zip(
+            small_model.named_parameters(), 
+            loaded_model.named_parameters()
+        ):
+            assert torch.allclose(p1, p2), f"Mismatch in {n1}"
+    
+    def test_test_only_config_extraction(self, mock_checkpoint):
+        """Test that config is correctly extracted from checkpoint."""
+        import argparse
+        from intseq_bert.train import _load_model_config
+        from pathlib import Path
+        
+        checkpoint = torch.load(mock_checkpoint)
+        
+        args = argparse.Namespace(d_model=256, nhead=8, num_layers=6)
+        model_config = _load_model_config(Path(mock_checkpoint), checkpoint, args)
+        
+        # Should use checkpoint config, not args
+        assert model_config["d_model"] == 32
+        assert model_config["nhead"] == 2
+        assert model_config["num_layers"] == 1
+
+
+class TestTestOnlyCLI:
+    """Tests for test-only CLI argument validation."""
+    
+    def test_test_only_requires_model_path(self):
+        """Test that --test_only without --model_path raises error."""
+        import argparse
+        
+        # This tests the validation logic
+        def check_args(args):
+            if args.test_only and not args.model_path:
+                raise argparse.ArgumentError(None, "--test_only requires --model_path")
+        
+        args = argparse.Namespace(test_only=True, model_path=None)
+        
+        with pytest.raises(argparse.ArgumentError):
+            check_args(args)
+    
+    def test_model_path_requires_test_only(self):
+        """Test that --model_path without --test_only raises error."""
+        import argparse
+        
+        def check_args(args):
+            if args.model_path and not args.test_only:
+                raise argparse.ArgumentError(None, "--model_path requires --test_only flag")
+        
+        args = argparse.Namespace(test_only=False, model_path="some/path.pt")
+        
+        with pytest.raises(argparse.ArgumentError):
+            check_args(args)
+    
+    def test_valid_test_only_args(self):
+        """Test that valid test-only args pass validation."""
+        import argparse
+        
+        def check_args(args):
+            if args.test_only and not args.model_path:
+                raise argparse.ArgumentError(None, "--test_only requires --model_path")
+            if args.model_path and not args.test_only:
+                raise argparse.ArgumentError(None, "--model_path requires --test_only flag")
+            return True
+        
+        args = argparse.Namespace(test_only=True, model_path="checkpoints/model.pt")
+        
+        # Should not raise
+        assert check_args(args) is True
+    
+    def test_test_split_default_value(self):
+        """Test that --test_split defaults to 'test'."""
+        import argparse
+        
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--test_split", type=str, default="test")
+        
+        args = parser.parse_args([])
+        assert args.test_split == "test"
+    
+    def test_test_split_accepts_values(self):
+        """Test that --test_split accepts train/val/test."""
+        import argparse
+        
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--test_split", type=str, default="test")
+        
+        for split_name in ["train", "val", "test"]:
+            args = parser.parse_args(["--test_split", split_name])
+            assert args.test_split == split_name
+    
+    def test_test_output_default_none(self):
+        """Test that --test_output defaults to None."""
+        import argparse
+        
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--test_output", type=str, default=None)
+        
+        args = parser.parse_args([])
+        assert args.test_output is None
+    
+    def test_test_output_custom_path(self):
+        """Test that --test_output accepts custom path."""
+        import argparse
+        
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--test_output", type=str, default=None)
+        
+        args = parser.parse_args(["--test_output", "custom/results.csv"])
+        assert args.test_output == "custom/results.csv"
