@@ -372,8 +372,9 @@ class TestWorstKAnalysis:
         k = 10
         df = extract_worst_k_samples(
             sample_gt_values, 
-            sample_pred_values, 
-            sample_oeis_ids,
+            sample_pred_values,
+            mask=None, 
+            oeis_ids=sample_oeis_ids,
             k=k
         )
         
@@ -390,8 +391,9 @@ class TestWorstKAnalysis:
         
         df = extract_worst_k_samples(
             sample_gt_values, 
-            sample_pred_values, 
-            sample_oeis_ids,
+            sample_pred_values,
+            mask=None,
+            oeis_ids=sample_oeis_ids,
             k=5
         )
         
@@ -405,8 +407,9 @@ class TestWorstKAnalysis:
         
         df = extract_worst_k_samples(
             sample_gt_values, 
-            sample_pred_values, 
-            sample_oeis_ids,
+            sample_pred_values,
+            mask=None, 
+            oeis_ids=sample_oeis_ids,
             k=5
         )
         
@@ -698,8 +701,9 @@ class TestWorstKWithTag:
         
         df = extract_worst_k_samples(
             sample_gt_values, 
-            sample_pred_values, 
-            sample_oeis_ids,
+            sample_pred_values,
+            mask=None,
+            oeis_ids=sample_oeis_ids,
             id_to_tags=sample_id_to_tags,
             k=5
         )
