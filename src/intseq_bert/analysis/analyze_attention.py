@@ -424,8 +424,50 @@ def main(args=None):
     model = create_model_wrapper(args.model_type, args.checkpoint, device)
     
     # Setup attention extractor
+    # Patch model to enable attention weights
+    _patch_attention_layers(model.model)
+    
+    # Setup attention extractor
     extractor = AttentionExtractor(model.model)
     extractor.register_hooks()
+    
+    
+def _patch_attention_layers(model: torch.nn.Module):
+    """
+    Monkey-patch TransformerEncoderLayer._sa_block to force need_weights=True.
+    Standard PyTorch implementation hardcodes need_weights=False for efficiency.
+    """
+    import types
+    
+    def _get_layers(model):
+        if hasattr(model, 'bert'):
+            return model.bert.encoder.layers
+        elif hasattr(model, 'encoder'):
+             # Check if encoder is directly the TransformerEncoder
+             if hasattr(model.encoder, 'layers'):
+                 return model.encoder.layers
+             # Fallback for nested structure: IntSeqModel -> encoder -> layers
+             elif hasattr(model.encoder, 'encoder'):
+                 return model.encoder.encoder.layers
+        raise ValueError("Cannot find encoder layers to patch")
+
+    layers = _get_layers(model)
+    
+    def _sa_block_patched(self, x, attn_mask, key_padding_mask, is_causal=False):
+        # Force need_weights=True to capture attention
+        x = self.self_attn(x, x, x,
+                           attn_mask=attn_mask,
+                           key_padding_mask=key_padding_mask,
+                           need_weights=True,
+                           is_causal=is_causal)[0]
+        return self.dropout1(x)
+
+    logging.info(f"Patching {len(layers)} encoder layers to capture attention weights...")
+    for layer in layers:
+        # Check signature of _sa_block to be safe (PyTorch version compat)
+        # Assuming standard signature as implemented above
+        # Monkey patch the instance method
+        layer._sa_block = types.MethodType(_sa_block_patched, layer)
     
     results = []
     
