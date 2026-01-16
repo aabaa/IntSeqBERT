@@ -890,11 +890,6 @@ def collect_predictions(
         mag_labels = batch["mag_labels"]  # (B, L, 4) -> [log, s+, s-, s0]
         gt_mag = mag_labels[:, :, 0]  # Extract log value
         
-        # Filter out padding (0.00) from mask
-        is_valid_value = (gt_mag.abs() > 1e-6)
-        
-        batch["mask_matrix"] = batch["mask_matrix"] & is_valid_value
-        
         # Pad to MAX_SEQUENCE_LENGTH
         B, L = gt_mag.shape
         max_len = config.MAX_SEQUENCE_LENGTH
@@ -902,8 +897,8 @@ def collect_predictions(
         if L < max_len:
             pad_len = max_len - L
             # Pad dims: (left, right, top, bottom) -> (0, pad_len, 0, 0)
-            gt_mag = F.pad(gt_mag, (0, pad_len), value=0)
-            preds_mu = F.pad(preds["mag_mu"].cpu(), (0, pad_len), value=0)
+            gt_mag = F.pad(gt_mag, (0, pad_len), value=config.PAD_VALUE_FEATURE)
+            preds_mu = F.pad(preds["mag_mu"].cpu(), (0, pad_len), value=config.PAD_VALUE_FEATURE)
             mask_matrix = F.pad(batch["mask_matrix"].cpu(), (0, pad_len), value=False)
         else:
             gt_mag = gt_mag[:, :max_len]
@@ -916,7 +911,7 @@ def collect_predictions(
         if "mag_log_var" in preds:
             log_var = preds["mag_log_var"].cpu()
             if L < max_len:
-                 log_var = F.pad(log_var, (0, max_len - L), value=0)
+                 log_var = F.pad(log_var, (0, max_len - L), value=config.PAD_VALUE_FEATURE)
             else:
                  log_var = log_var[:, :max_len]
                  

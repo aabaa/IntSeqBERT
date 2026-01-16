@@ -52,7 +52,7 @@ class OEISCollator:
         mod_int_list = [item[config.KEY_MOD_INTEGERS] for item in batch]
 
         # 2. Padding
-        # Features are padded with 0.0 (config.PAD_VALUE_FEATURE)
+        # Features are padded with sentinel value (config.PAD_VALUE_FEATURE)
         mag_padded = pad_sequence(mag_list, batch_first=True, padding_value=config.PAD_VALUE_FEATURE)
         mod_padded = pad_sequence(mod_list, batch_first=True, padding_value=config.PAD_VALUE_FEATURE)
         
@@ -62,9 +62,10 @@ class OEISCollator:
         batch_size, max_len, _ = mag_padded.size()
 
         # 3. Create Attention Mask (Valid positions = 1, Padding = 0)
-        lengths = torch.tensor([len(x) for x in mag_list])
-        # (B, L) boolean mask where True indicates valid token
-        valid_mask_bool = torch.arange(max_len).expand(batch_size, max_len) < lengths.unsqueeze(1)
+        # Identify padding by checking against sentinel value
+        # Note: We check the first channel [0] which is the log value
+        valid_mask_bool = (mag_padded[..., 0] != config.PAD_VALUE_FEATURE)
+        
         attention_mask = valid_mask_bool.long()
 
         # 4. Generate Mask Matrix (Bernoulli sampling)

@@ -398,16 +398,6 @@ def evaluate(
             labels = inputs["labels"]
             mask_map = labels["mask_map"]
             
-            # Filter out padding (0.0) from metrics even if masked
-            # Log scale 0.0 is effectively padding in this dataset context
-            mag_targets_raw = labels["mag_targets"]
-            is_valid_value = (mag_targets_raw.abs() > 1e-6)
-            
-            # Update mask (True only if originally masked AND value is valid)
-            mask_map = mask_map & is_valid_value
-            # Update labels for consistency in later usages
-            labels["mask_map"] = mask_map
-            
             if not mask_map.any():
                 continue
 
@@ -622,21 +612,6 @@ def train(args):
             # Prepare inputs & labels
             inputs = prepare_labels(raw_batch, device)
             
-            # --- Filter out padding from training mask ---
-            # Similar to validation, we should not compute loss on padding (0.00)
-            # even if the collator masked it.
-            train_labels = inputs["labels"]
-            train_mask = train_labels["mask_map"]
-            mag_targets_raw = train_labels["mag_targets"]
-            is_valid_train = (mag_targets_raw.abs() > 1e-6)
-            
-            train_mask = train_mask & is_valid_train
-            train_labels["mask_map"] = train_mask
-            
-            # If batch becomes empty after filtering (rare), skip or proceed (loss will be 0/nan if not handled)
-            if not train_mask.any():
-                continue
-                
             # Forward
             with autocast(device_type=device.type):
                 outputs = model(

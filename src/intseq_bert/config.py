@@ -82,7 +82,8 @@ MASK_PROB = 0.15
 IGNORE_INDEX = -100
 
 # Padding value for floating point feature tensors
-PAD_VALUE_FEATURE = 0.0
+# Using a sentinel value unlikely to appear in data (10^-9999).
+PAD_VALUE_FEATURE = -9999.0
 
 # ==========================================
 # 7. Model Hyperparameters
