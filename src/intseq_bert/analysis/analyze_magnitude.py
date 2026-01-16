@@ -878,10 +878,17 @@ def collect_predictions(
         gt_mag = mag_labels[:, :, 0]  # Extract log value
         
         all_gt.append(gt_mag.cpu())
-        all_pred.append(preds["mag_pred"].cpu())
+        all_pred.append(preds["mag_mu"].cpu())
         
-        if "mag_sigma" in preds:
-            all_sigma.append(preds["mag_sigma"].cpu())
+        if "mag_log_var" in preds:
+            log_var = preds["mag_log_var"].cpu()
+            log_var_clipped = torch.clamp(
+                log_var, 
+                min=config.LOG_VAR_CLIP_MIN, 
+                max=config.LOG_VAR_CLIP_MAX
+            )
+            sigma = torch.sqrt(torch.exp(log_var_clipped))
+            all_sigma.append(sigma)
         
         all_masks.append(batch["mask_matrix"].cpu())
         all_ids.extend(batch["oeis_id"])
