@@ -891,7 +891,7 @@ def collect_predictions(
             all_sigma.append(sigma)
         
         all_masks.append(batch["mask_matrix"].cpu())
-        all_ids.extend(batch["oeis_id"])
+        all_ids.extend(batch["oeis_ids"])
     
     result = {
         "gt_mag": torch.cat(all_gt, dim=0),
