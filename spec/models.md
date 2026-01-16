@@ -7,7 +7,8 @@ HuggingFace Transformers の設計思想を踏襲し、**埋め込み層 (`Embed
 
 特徴:
 - **FiLM (Feature-wise Linear Modulation)** によるデュアルストリーム統合
-- **Heteroscedastic Regression** による不確実性推定
+- **Heteroscedastic Regression** による不確実性推定（Huber損失ベース）
+- **FP32強制演算** による数値安定性確保（極端なlog値対応）
 - **Automatic Weighted Loss** によるマルチタスク学習の安定化
 
 ---
@@ -83,21 +84,29 @@ nn.init.zeros_(self.film_scale.bias)
 #### 処理フロー
 
 ```
-1. Projection:
-   h_mag = mag_proj(mag_features)          # (B, L, d_model)
+1. Projection (FP32強制):
+   # FP16オーバーフロー防止のため、mag_projはautocast無効で実行
+   mag_features = mag_features.float()
+   with torch.amp.autocast(enabled=False):
+       h_mag = mag_proj(mag_features)      # (B, L, d_model), FP32
    h_mod = ReLU(mod_proj(mod_features))    # (B, L, d_model)
 
 2. FiLM Parameter Generation:
    γ = film_scale(h_mod)                   # (B, L, d_model)
    β = film_shift(h_mod)                   # (B, L, d_model)
 
-3. Modulation:
+3. Modulation (FP32):
+   γ = γ.float()
+   β = β.float()
    h_fused = (1 + γ) ⊙ h_mag + β           # Element-wise
 
 4. Post-Process:
-   h_out = LayerNorm(h_fused + PosEncoding[:L])
+   h_out = LayerNorm(h_fused + PosEncoding[:L].float())
    h_out = Dropout(h_out)
 ```
+
+> **Note:** OEISデータには `10^210` レベルの極端な数値が含まれる（log値 = 210）。
+> FP16の最大値（約65504）を超える中間計算が発生するため、Magnitude関連の演算はFP32を強制する。
 
 ---
 
@@ -148,13 +157,15 @@ encoder:    nn.TransformerEncoder(
 
 #### 予測ヘッド構成
 
-| ヘッド | 構造 | 出力 |
-|--------|------|------|
-| `mag_head` | `Linear(d_model, d_model) → ReLU → Linear(d_model, 2)` | `[μ, log(σ²)]` |
-| `sign_head` | `Linear(d_model, 3)` | Logits for `[Positive, Negative, Zero]` |
-| `mod_head` | `Linear(d_model, sum(MOD_RANGE))` | 全 Modulo ロジット結合 (~5150次元) |
+| ヘッド | 構造 | 出力 | 精度 |
+|--------|------|------|------|
+| `mag_head` | `Linear(d_model, d_model) → ReLU → Linear(d_model, 2)` | `[μ, log(σ²)]` | **FP32強制** |
+| `sign_head` | `Linear(d_model, 3)` | Logits for `[Positive, Negative, Zero]` | FP16/FP32 |
+| `mod_head` | `Linear(d_model, sum(MOD_RANGE))` | 全 Modulo ロジット結合 (~5150次元) | FP16/FP32 |
 
 > **Note:** `sign_head` のクラス順序は `config.SIGN_POSITIVE=0`, `SIGN_NEGATIVE=1`, `SIGN_ZERO=2` に対応。
+>
+> **Note:** `mag_head` は `torch.amp.autocast(enabled=False)` 内で実行され、入力を `.float()` でFP32に変換する。これにより極端なlog値（最大210）の処理時でも数値安定性を確保する。
 
 #### 固定損失重み
 
@@ -214,13 +225,32 @@ loss_weights: register_buffer(torch.tensor([1.0, 1.0, 2.0]))  # [w_mag, w_sign, 
 
 マスクされた位置 (`mask_map == True`) のみを対象に計算。
 
-### 4.1. Magnitude Loss (Heteroscedastic Gaussian NLL)
+### 4.1. Magnitude Loss (Huber + Heteroscedastic)
 
-```
-L_mag = (1/2) * log(σ²) + (μ - y)² / (2σ²)
+従来の二乗誤差ではなく、**Huber損失（Smooth L1）** を採用。
+極端な log 値（最大210）による勾配爆発を防止する。
+
+```python
+# FP32強制（FP16オーバーフロー防止）
+target_mag = labels["mag_targets"][mask_map].float()
+pred_mu = mag_mu[mask_map].float()
+pred_log_var = mag_log_var[mask_map].float()
+
+# log_var をクランプして数値安定性を確保
+pred_log_var = clamp(pred_log_var, LOG_VAR_CLIP_MIN, LOG_VAR_CLIP_MAX)  # [-10, 10]
+precision = exp(-pred_log_var)
+
+# Huber損失（|error| > 1.0 で線形、それ以外で二乗）
+huber_loss = smooth_l1_loss(pred_mu, target_mag, beta=1.0)
+
+# Per-sample 損失をクランプ（極端値によるNaN防止）
+loss_mag_per_sample = 0.5 * pred_log_var + huber_loss * precision
+loss_mag_per_sample = clamp(loss_mag_per_sample, max=100.0)
+L_mag = mean(loss_mag_per_sample)
 ```
 
-σ² = exp(log_var) として数値安定性を確保。
+> **変更理由:** 訓練初期に `pred_mu ≈ 0` で `target_mag = 210` のような場合、
+> 二乗誤差 `(210 - 0)² = 44100` が爆発する。Huber損失では `|error|` に比例するため安定。
 
 ### 4.2. Sign Loss
 

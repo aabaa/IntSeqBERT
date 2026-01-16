@@ -144,8 +144,15 @@ def prepare_labels(batch: Dict) -> Dict:
 * Dataset (`load_dataset`), Collator, DataLoader の初期化
 * Model の初期化（GPU転送）
 * Optimizer (`AdamW`), Scheduler (`OneCycleLR`)
-* Scaler (`torch.amp.GradScaler`)
 * Early Stopping カウンタ初期化
+
+> [!IMPORTANT]
+> **AMP (Mixed Precision) は無効化されている。**
+> OEISデータには `10^{210}` レベルの極端な数値が含まれる（log値 = 210）。
+> FP16 の最大値（約65504）を超える中間計算が発生し、勾配がNaN/Infになるため、
+> `autocast` と `GradScaler` は使用せず、FP32で訓練する。
+>
+> 詳細は `spec/models.md` の数値安定性セクションを参照。
 
 **ループ処理 (Epoch単位):**
 
@@ -181,7 +188,7 @@ def prepare_labels(batch: Dict) -> Dict:
 
 * **Losses:**
   * `train/total_loss`
-  * `train/raw_loss_mag` (Gaussian NLL)
+  * `train/raw_loss_mag` (Huber + Heteroscedastic, 詳細は `spec/models.md` 参照)
   * `train/raw_loss_sign` (CE)
   * `train/raw_loss_mod` (CE)
   * `val/total_loss`

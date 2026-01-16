@@ -136,10 +136,13 @@ mask_matrix = torch.bernoulli(prob_matrix).bool()
 **Mask Flag Strategy:**
 
 ```
+Unmasked (Valid):  [log_val, sign+, sign-, sign0, 0]
+Masked (Valid):    [0,       0,     0,     0,     1]
+Padding:           [0,       0,     0,     0,     0]  (※ 全てゼロ化される)
 ```
-Unmasked: [log_val, sign+, sign-, sign0, 0]
-Masked:   [0,       0,     0,     0,     1]
-Padding:  [-9999.0, -9999.0, ...,        0]  (※ is_masked フラグは 0)
+
+> **Note:** パディング位置のコンテンツも明示的にゼロ化する。
+> これにより、`PAD_VALUE_FEATURE = -9999.0` のようなセンチネル値がモデルに流入することを防ぐ。
 ```
 
 ```python
@@ -150,8 +153,10 @@ is_masked_channel[mask_matrix] = 1.0
 # 2. 連結して 5 次元に拡張
 mag_inputs = torch.cat([mag_padded, is_masked_channel], dim=2)
 
-# 3. マスク位置のコンテンツ (0:4) をゼロ化
-content_keep_mask = (~mask_matrix).unsqueeze(-1).float()
+# 3. マスク位置およびパディング位置のコンテンツ (0:4) をゼロ化
+# 重要: パディング位置も含めてゼロ化することで、センチネル値 (-9999.0) のリークを防ぐ
+valid_unmasked = valid_mask_bool & (~mask_matrix)  # 有効かつ非マスクのみ True
+content_keep_mask = valid_unmasked.unsqueeze(-1).float()
 mag_inputs[..., :4] *= content_keep_mask
 ```
 
