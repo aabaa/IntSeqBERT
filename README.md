@@ -2,24 +2,27 @@
 
 **IntSeqBERT** is a neuro-symbolic Transformer framework designed to learn deep mathematical representations of integer sequences.
 
-Unlike standard language models that treat numbers as text tokens, IntSeqBERT utilizes a **Dual Stream Architecture** that simultaneously processes:
-
-1. **Magnitude Stream:** Log10-scale absolute values with one-hot sign encoding (4 dims).
-2. **Mod Spectrum Stream:** Sin/Cos embeddings for residues across moduli 2 to 101 (200 dims).
+Unlike standard language models that treat numbers as discrete text tokens, IntSeqBERT utilizes a **Dual Stream Architecture** that simultaneously processes both the "magnitude" (scale) and "periodicity" (modulo properties) of numbers.
 
 ## 🏗 Architecture
 
 ### Dual Stream Encoder
 
-A BERT-style encoder that fuses two distinct feature streams into a unified latent representation.
+The model fuses two distinct feature streams into a unified latent representation using **FiLM (Feature-wise Linear Modulation)**.
 
-* **Inputs:**
-  * **Magnitude Stream (4 dims):** `[1 + log10(|x|), sign+, sign-, sign0]`
-  * **Mod Spectrum Stream (200 dims):** Sin/Cos pairs for $x \pmod m$ where $m \in [2, 101]$.
-* **Mechanism:** Additive Fusion + Transformer Encoder.
-* **Masking Strategy:** 
-  * Magnitude: 5th channel `is_masked` flag distinguishes zeros from masked positions.
-  * Modulo: Masked positions shifted to origin `(0, 0)` on unit circle.
+*   **Inputs:**
+    *   **Magnitude Stream (5 dims):** `[1 + log10(|x|), sign+, sign-, sign0, is_masked]`
+    *   **Mod Spectrum Stream (200 dims):** Sin/Cos embeddings for $x \pmod m$ where $m \in [2, 101]$.
+*   **Fusion Mechanism:** FiLM (Feature-wise Linear Modulation). The Mod spectrum stream modulates the Magnitude stream, allowing the model to "understand" how periodicity interacts with scale.
+*   **Backbone:** Standard Transformer Encoder (BERT-style).
+
+### Output Streams
+
+The model performs multi-task learning with three simultaneous objectives:
+
+1.  **Magnitude (Regression):** Predicts `log10(|x|)` using Heteroscedastic Regression (predicting both mean $\mu$ and variance $\sigma^2$).
+2.  **Sign (Classification):** Predicts the sign of the number (+, -, or 0).
+3.  **Modulo (Classification):** Predicts the residue $x \pmod m$ for all 100 moduli simultaneously.
 
 ---
 
@@ -100,14 +103,69 @@ uv run python -m intseq_bert.preprocess split-dataset \
 uv run python -m intseq_bert.preprocess split-dataset \
   -j data/oeis/data.jsonl \
   -f data/oeis/features \
-  -o data/oeis/splits/strict \
-  --include-tags core,easy,nice \
+  -o data/oeis/splits/std \
   --exclude-tags cons,base,word,fini,dead,dumb,unkn,less
 ```
 
+### 3. Training
+
+Train the IntSeqBERT model using the `train.py` script. This script handles the multi-task learning loop, automatically balancing losses for Magnitude, Sign, and Modulo tasks.
+
+```bash
+uv run python -m intseq_bert.train \
+  --split_type std \
+  --output_dir checkpoints/intseq_std \
+  --epochs 20 \
+  --batch_size 32 \
+  --num_workers 4
+```
+
+**Loss Weighting:**
+To prevent task collapse, we use fixed loss weights:
+*   Magnitude: 1.0
+*   Sign: 1.0
+*   Modulo: 2.0 (Emphasized to encourage learning arithmetic structure)
+
 ---
 
-## � Project Structure
+## 📈 Analysis
+
+We provide a suite of analysis tools to evaluate the model's mathematical understanding.
+
+### Modulo Spectrum Analysis (`analyze_mod_spectrum`)
+
+Evaluates how well the model understands different moduli (2 to 101). It produces a "Normalized Information Gain (NIG)" ranking, showing which arithmetic properties the model has learned best (e.g., parity, mod-10 patterns).
+
+```bash
+uv run python -m intseq_bert.analysis.analyze_mod_spectrum \
+  --checkpoint checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --output_dir results/analysis_mod \
+  --model_type intseq
+```
+
+### Magnitude Analysis (`analyze_magnitude`)
+
+Analyzes the regression performance across different scales (from small integers to astronomical numbers).
+
+*   **Scale-wise Analysis:** Breaking down error by order of magnitude.
+*   **Calibration:** Checking if the model's predicted uncertainty matches its actual error.
+
+```bash
+uv run python -m intseq_bert.analysis.analyze_magnitude \
+  --checkpoint checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --output_dir results/analysis_mag \
+  --model_type intseq
+```
+
+Other tools include:
+*   `analyze_attention`: Visualizes attention maps to see if the model attends to mathematically relevant positions.
+*   `analyze_cases`: Deep dive into specific sequences or error cases.
+
+---
+
+## 📁 Project Structure
 
 ```text
 src/intseq_bert/
@@ -116,14 +174,16 @@ src/intseq_bert/
 ├── features.py         # Feature extraction (Mag + Mod Spectrum)
 ├── preprocess.py       # CLI: build-jsonl, extract-features, split-dataset
 ├── loader.py           # OEISDataset, load_dataset, create_splits
-└── collator.py         # OEISCollator (dynamic masking, dimension extension)
+├── collator.py         # OEISCollator (dynamic masking, dimension extension)
+├── models.py           # IntSeqEmbeddings (FiLM), IntSeqModel, Heads
+├── train.py            # Training loop & Validation
+└── analysis/           # Analysis tools
+    ├── analyze_mod_spectrum.py
+    ├── analyze_magnitude.py
+    ├── analyze_attention.py
+    └── analyze_cases.py
 
 tests/                  # Unit tests
-├── test_schemas.py
-├── test_features.py
-├── test_loader.py
-├── test_collator.py
-└── test_preprocess.py
 ```
 
 ## 🧪 Testing
@@ -145,6 +205,7 @@ Key constants in `config.py`:
 | `MAX_SEQUENCE_LENGTH` | 128 | Truncation limit |
 | `MIN_SEQUENCE_LENGTH` | 10 | Minimum for feature extraction |
 | `SEED` | 42 | Random seed for reproducibility |
+| `MASK_PROB` | 0.15 | Masking probability for BERT training |
 
 ## 📄 License
 
