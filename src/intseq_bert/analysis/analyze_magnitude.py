@@ -877,11 +877,31 @@ def collect_predictions(
         mag_labels = batch["mag_labels"]  # (B, L, 4) -> [log, s+, s-, s0]
         gt_mag = mag_labels[:, :, 0]  # Extract log value
         
-        all_gt.append(gt_mag.cpu())
-        all_pred.append(preds["mag_mu"].cpu())
+        # Pad to MAX_SEQUENCE_LENGTH
+        B, L = gt_mag.shape
+        max_len = config.MAX_SEQUENCE_LENGTH
+        
+        if L < max_len:
+            pad_len = max_len - L
+            # Pad dims: (left, right, top, bottom) -> (0, pad_len, 0, 0)
+            gt_mag = F.pad(gt_mag, (0, pad_len), value=0)
+            preds_mu = F.pad(preds["mag_mu"].cpu(), (0, pad_len), value=0)
+            mask_matrix = F.pad(batch["mask_matrix"].cpu(), (0, pad_len), value=False)
+        else:
+            gt_mag = gt_mag[:, :max_len]
+            preds_mu = preds["mag_mu"].cpu()[:, :max_len]
+            mask_matrix = batch["mask_matrix"].cpu()[:, :max_len]
+
+        all_gt.append(gt_mag)
+        all_pred.append(preds_mu)
         
         if "mag_log_var" in preds:
             log_var = preds["mag_log_var"].cpu()
+            if L < max_len:
+                 log_var = F.pad(log_var, (0, max_len - L), value=0)
+            else:
+                 log_var = log_var[:, :max_len]
+                 
             log_var_clipped = torch.clamp(
                 log_var, 
                 min=config.LOG_VAR_CLIP_MIN, 
@@ -890,7 +910,7 @@ def collect_predictions(
             sigma = torch.sqrt(torch.exp(log_var_clipped))
             all_sigma.append(sigma)
         
-        all_masks.append(batch["mask_matrix"].cpu())
+        all_masks.append(mask_matrix)
         all_ids.extend(batch["oeis_ids"])
     
     result = {
