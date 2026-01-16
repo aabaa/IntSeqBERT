@@ -464,3 +464,451 @@ Epoch 1 Results:
 | `train.log` | **追記** | セッション間のログを連結 |
 
 > **Note:** 再開時は `config.json` の `resume_from` フィールドに元のチェックポイントパスを記録する。
+
+---
+
+## 10. テスト専用モード (`--test-only`)
+
+既に学習済みのモデルをテストデータで評価するための専用モードを提供する。
+学習ループをスキップし、`history.csv` と同等のフォーマットで評価結果を出力する。
+
+### 10.1. 追加コマンドライン引数
+
+| 引数 | 型 | デフォルト | 説明 |
+|------|-----|-----------|------|
+| `--test_only` | flag | `False` | テスト専用モードを有効化 |
+| `--model_path` | str | `None` | 評価するモデルのパス (`*.pt` ファイル)。`--test_only` 時は必須 |
+| `--test_split` | str | `"test"` | 評価に使用する分割 (`train`/`val`/`test`) |
+| `--test_output` | str | `None` | 評価結果の出力先 (省略時: `output_dir/test_results.csv`) |
+
+> [!IMPORTANT]
+> `--test_only` フラグと `--model_path` 引数は相互依存関係にある。
+> - `--test_only` が指定された場合、`--model_path` は必須
+> - `--model_path` のみ指定された場合もエラー（`--test_only` を忘れた可能性）
+
+### 10.2. 動作仕様
+
+**1. 引数検証:**
+
+```python
+if args.test_only and not args.model_path:
+    parser.error("--test_only requires --model_path")
+if args.model_path and not args.test_only:
+    parser.error("--model_path requires --test_only flag")
+```
+
+**2. 処理フロー:**
+
+1. **設定復元:** チェックポイントまたは `config.json` からモデルパラメータを復元
+2. モデル読み込み（`model_path` から `model_state_dict` をロード）
+3. データセット読み込み（`split_name=args.test_split`）
+4. `evaluate()` 関数でデータを評価
+5. 結果を CSV 形式で出力
+
+**3. 不要なコンポーネント（スキップされる項目）:**
+
+- Optimizer / Scheduler の初期化
+- GradScaler の初期化
+- Early Stopping
+- 学習ループ全体
+- `best_model.pt` / `last_checkpoint.pt` の保存
+- `train.log` へのログ出力
+
+### 10.3. 出力形式
+
+#### CSV 出力 (`test_results.csv`)
+
+`history.csv` と互換性のあるカラム構成。学習関連の列は適切なデフォルト値で埋められる。
+
+| カテゴリ | カラム名 | テストモード時の値 |
+| --- | --- | --- |
+| **Meta** | `epoch` | `0` (テストモードを示す特別な値) |
+|  | `lr` | `0.0` |
+|  | `time_sec` | 評価にかかった時間（秒） |
+|  | `is_best` | `True` |
+|  | `early_stop_counter` | `0` |
+| **Loss** | `train_loss` | `0.0` (該当なし) |
+|  | `val_loss` | テストデータでの損失 |
+| **Metrics** | `val_mag_acc` 〜 `mod_acc_101` | テストデータでの評価値 |
+| **Weights** | `w_mag`, `w_sign`, `w_mod` | 設定値（参考情報） |
+
+#### コンソール出力
+
+```
+========================================
+Test-Only Mode Evaluation
+========================================
+Model: checkpoints/intseq_std/best_model.pt
+Split: std (test)
+Samples: 2500
+----------------------------------------
+Test Loss:   0.0892
+Mag Acc:     91.88% (MSE: 0.187)
+Sign Acc:    98.45%
+Mod Acc:     24.46% (Mean of 100 mods)
+  mod2: 92.5%, mod3: 78.2%, mod5: 65.1%, mod7: 52.3%, mod10: 48.7%, mod100: 15.2%, mod101: 14.8%
+----------------------------------------
+Results saved to: checkpoints/intseq_std/test_results.csv
+========================================
+```
+
+#### JSON 出力 (`test_metrics.json`)
+
+CSV に加えて、詳細なメトリクス JSON も出力する。
+
+```json
+{
+  "model_path": "checkpoints/intseq_std/best_model.pt",
+  "split_type": "std",
+  "test_samples": 2500,
+  "evaluation_time_sec": 45.2,
+  "test_loss": 0.0892,
+  "test_mag_acc": 91.88,
+  "test_mag_mse": 0.187,
+  "test_sign_acc": 98.45,
+  "test_mod_acc": 24.46,
+  "representative_mods": {
+    "mod_2": 92.5,
+    "mod_3": 78.2,
+    "mod_5": 65.1,
+    "mod_7": 52.3,
+    "mod_10": 48.7,
+    "mod_100": 15.2,
+    "mod_101": 14.8
+  },
+  "all_mod_accuracies": [92.5, 78.2, ...],
+  "evaluated_at": "2026-01-16 14:00:00"
+}
+```
+
+### 10.4. モデルパラメータ復元の優先順位
+
+モデルのハイパーパラメータ（`d_model`, `nhead`, `num_layers`）は、学習時と異なる値で初期化すると `load_state_dict` でサイズ不一致エラーが発生する。
+そのため、以下の優先順位で設定を復元する。
+
+| 優先度 | ソース | 説明 |
+|--------|--------|------|
+| 1 (最優先) | `checkpoint["config"]` | チェックポイント内に保存された設定 |
+| 2 | `model_path/../config.json` | 同じディレクトリの `config.json` |
+| 3 (最終手段) | コマンドライン引数 | `--d_model` 等のCLI引数 |
+
+```python
+def _load_model_config(model_path: Path, checkpoint: Dict, args) -> Dict:
+    """
+    Load model configuration with fallback priority.
+    
+    Priority:
+    1. checkpoint['config'] (strongest)
+    2. config.json in same directory
+    3. args (fallback)
+    """
+    # 1. Try checkpoint config first
+    ckpt_config = checkpoint.get("config", {})
+    if ckpt_config:
+        logger.info("Using config from checkpoint")
+        return {
+            "d_model": ckpt_config.get("d_model", args.d_model),
+            "nhead": ckpt_config.get("nhead", args.nhead),
+            "num_layers": ckpt_config.get("num_layers", args.num_layers)
+        }
+    
+    # 2. Try config.json in same directory
+    config_path = model_path.parent / "config.json"
+    if config_path.exists():
+        logger.info(f"Using config from {config_path}")
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved_config = json.load(f)
+            saved_args = saved_config.get("args", {})
+            return {
+                "d_model": saved_args.get("d_model", args.d_model),
+                "nhead": saved_args.get("nhead", args.nhead),
+                "num_layers": saved_args.get("num_layers", args.num_layers)
+            }
+    
+    # 3. Fallback to args (with warning)
+    logger.warning("No saved config found. Using command-line args (may cause size mismatch).")
+    return {
+        "d_model": args.d_model,
+        "nhead": args.nhead,
+        "num_layers": args.num_layers
+    }
+```
+
+### 10.5. `TrainingLogger` への追加メソッド
+
+CSV ヘッダの重複定義を避けるため、`TrainingLogger` クラスに静的メソッドを追加する。
+
+```python
+class TrainingLogger:
+    # ... existing code ...
+    
+    @staticmethod
+    def get_csv_headers() -> list:
+        """
+        Get CSV column headers for history.csv / test_results.csv.
+        
+        Returns:
+            List of column header strings.
+        """
+        headers = [
+            "epoch", "lr", "time_sec", "is_best", "early_stop_counter",
+            "train_loss", "val_loss",
+            "val_mag_acc", "val_mag_mse", "val_sign_acc",
+            "val_mod_acc", "val_mod_loss"
+        ]
+        
+        # Add per-mod accuracy columns (mod_acc_2 through mod_acc_101)
+        for m in config.MOD_RANGE:
+            headers.append(f"mod_acc_{m}")
+        
+        # Add weight columns
+        headers.extend(["w_mag", "w_sign", "w_mod"])
+        
+        return headers
+```
+
+> [!NOTE]
+> `_create_csv_header()` メソッドも内部でこの `get_csv_headers()` を呼び出すようにリファクタリングする。
+
+### 10.6. 実装イメージ
+
+```python
+def test_only(args):
+    """Test-only mode: evaluate pre-trained model on test/val/train data."""
+    import time
+    import json
+    
+    set_seed(args.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Using device: {device}")
+    
+    # Header
+    logger.info("=" * 40)
+    logger.info("Test-Only Mode Evaluation")
+    logger.info("=" * 40)
+    logger.info(f"Model: {args.model_path}")
+    logger.info(f"Split: {args.split_type} ({args.test_split})")
+    
+    # 1. Load Checkpoint
+    logger.info("Loading model...")
+    checkpoint = torch.load(args.model_path, map_location=device)
+    
+    # 2. Restore model config with fallback priority
+    model_config = _load_model_config(Path(args.model_path), checkpoint, args)
+    
+    model = models.IntSeqForPreTraining(
+        d_model=model_config["d_model"],
+        nhead=model_config["nhead"],
+        num_layers=model_config["num_layers"]
+    )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(device)
+    model.eval()
+    
+    # 3. Load Dataset (using --test_split argument)
+    logger.info(f"Loading {args.test_split} dataset...")
+    test_dataset = loader.load_dataset(
+        split_type=args.split_type,
+        split_name=args.test_split,  # train / val / test
+        data_root=args.data_root
+    )
+    logger.info(f"Samples: {len(test_dataset)}")
+    
+    collator_fn = collator.OEISCollator(mask_prob=config.MASK_PROB)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=collator_fn,
+        pin_memory=True
+    )
+    
+    # 4. Evaluate
+    logger.info("-" * 40)
+    start_time = time.time()
+    test_metrics = evaluate(model, test_loader, device)
+    eval_time = time.time() - start_time
+    
+    # 5. Log Results
+    logger.info(f"Loss:        {test_metrics['val_loss']:.4f}")
+    logger.info(f"Mag Acc:     {test_metrics['mag_acc']:.2f}% (MSE: {test_metrics['mag_mse']:.4f})")
+    logger.info(f"Sign Acc:    {test_metrics['sign_acc']:.2f}%")
+    logger.info(f"Mod Acc:     {test_metrics['mod_acc']:.2f}% (Mean of {config.NUM_MODULI} mods)")
+    
+    # Representative mods
+    mod_accs = test_metrics.get("mod_accuracies", [])
+    if mod_accs:
+        rep_indices = TrainingLogger.get_representative_mod_indices()
+        rep_strs = []
+        for idx in rep_indices:
+            if idx < len(mod_accs):
+                mod_val = config.MOD_RANGE[idx]
+                rep_strs.append(f"mod{mod_val}: {mod_accs[idx]:.1f}%")
+        logger.info(f"  {', '.join(rep_strs)}")
+    
+    # 6. Save Results
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # CSV output (using TrainingLogger.get_csv_headers())
+    csv_path = Path(args.test_output) if args.test_output else output_dir / "test_results.csv"
+    _save_test_csv(csv_path, test_metrics, eval_time)
+    
+    # JSON output
+    json_path = output_dir / "test_metrics.json"
+    _save_test_json(json_path, args, test_metrics, eval_time, len(test_dataset))
+    
+    logger.info("-" * 40)
+    logger.info(f"Results saved to: {csv_path}")
+    logger.info("=" * 40)
+
+
+def _save_test_csv(path: Path, metrics: Dict, time_sec: float) -> None:
+    """Save test results in history.csv compatible format."""
+    import csv
+    
+    # Use shared header definition for consistency
+    headers = TrainingLogger.get_csv_headers()
+    
+    row = [
+        0,          # epoch (test mode marker)
+        0.0,        # lr
+        time_sec,
+        True,       # is_best
+        0,          # early_stop_counter
+        0.0,        # train_loss (N/A)
+        metrics["val_loss"],
+        metrics["mag_acc"],
+        metrics["mag_mse"],
+        metrics["sign_acc"],
+        metrics["mod_acc"],
+        metrics["mod_loss"]
+    ]
+    row.extend(metrics.get("mod_accuracies", [0.0] * config.NUM_MODULI))
+    row.extend([config.LOSS_WEIGHT_MAG, config.LOSS_WEIGHT_SIGN, config.LOSS_WEIGHT_MOD])
+    
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerow(row)
+
+
+def _save_test_json(
+    path: Path, 
+    args: argparse.Namespace, 
+    metrics: Dict, 
+    time_sec: float,
+    num_samples: int
+) -> None:
+    """Save detailed test metrics as JSON."""
+    import json
+    from datetime import datetime
+    
+    mod_accs = metrics.get("mod_accuracies", [])
+    rep_mods = {}
+    for mod in config.REPRESENTATIVE_MODS:
+        idx = TrainingLogger._mod_to_index(mod)
+        if idx is not None and idx < len(mod_accs):
+            rep_mods[f"mod_{mod}"] = mod_accs[idx]
+    
+    data = {
+        "model_path": args.model_path,
+        "split_type": args.split_type,
+        "test_samples": num_samples,
+        "evaluation_time_sec": time_sec,
+        "test_loss": metrics["val_loss"],
+        "test_mag_acc": metrics["mag_acc"],
+        "test_mag_mse": metrics["mag_mse"],
+        "test_sign_acc": metrics["sign_acc"],
+        "test_mod_acc": metrics["mod_acc"],
+        "representative_mods": rep_mods,
+        "all_mod_accuracies": mod_accs,
+        "evaluated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+```
+
+### 10.7. `main()` 関数の変更
+
+```python
+def main():
+    parser = argparse.ArgumentParser(description="Train IntSeqBERT Encoder")
+    
+    # ... existing arguments ...
+    
+    # Test-Only Mode
+    parser.add_argument("--test_only", action="store_true", 
+                       help="Run evaluation on test data only (skip training)")
+    parser.add_argument("--model_path", type=str, default=None,
+                       help="Path to model checkpoint for test-only mode")
+    parser.add_argument("--test_split", type=str, default="test",
+                       help="Split name to evaluate (train/val/test)")
+    parser.add_argument("--test_output", type=str, default=None,
+                       help="Custom output path for test results CSV")
+    
+    args = parser.parse_args()
+    
+    # Validation
+    if args.test_only and not args.model_path:
+        parser.error("--test_only requires --model_path")
+    if args.model_path and not args.test_only:
+        parser.error("--model_path requires --test_only flag")
+    
+    # Dispatch
+    if args.test_only:
+        test_only(args)
+    else:
+        train(args)
+```
+
+### 10.8. 使用例
+
+**基本的な使用方法:**
+
+```bash
+# テストデータでモデルを評価（デフォルト）
+python -m intseq_bert.train \
+  --test_only \
+  --model_path checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --output_dir checkpoints/intseq_std/
+
+# 検証データで評価（過学習確認など）
+python -m intseq_bert.train \
+  --test_only \
+  --model_path checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --test_split val \
+  --output_dir checkpoints/intseq_std/
+
+# 学習データで評価（過学習具合の確認）
+python -m intseq_bert.train \
+  --test_only \
+  --model_path checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --test_split train \
+  --output_dir checkpoints/intseq_std/
+
+# カスタム出力パス
+python -m intseq_bert.train \
+  --test_only \
+  --model_path checkpoints/intseq_std/best_model.pt \
+  --split_type std \
+  --output_dir results/ \
+  --test_output results/my_test_results.csv
+```
+
+**異なる分割タイプでの評価:**
+
+```bash
+# easy split でトレーニングしたモデルを std split のテストデータで評価
+python -m intseq_bert.train \
+  --test_only \
+  --model_path checkpoints/intseq_easy/best_model.pt \
+  --split_type std \
+  --test_split test \
+  --output_dir cross_eval/easy_on_std/
+```
