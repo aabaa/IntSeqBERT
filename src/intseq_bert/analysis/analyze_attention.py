@@ -61,8 +61,9 @@ class AttentionExtractor:
     def _hook_fn(self, module, input, output):
         """Store attention weights from output[1]."""
         if isinstance(output, tuple) and len(output) > 1:
-            attn_weights = output[1]  # (B, num_heads, L, L)
+            attn_weights = output[1]
             if attn_weights is not None:
+                logging.debug(f"Captured attention shape: {attn_weights.shape}")
                 self.attention_weights.append(attn_weights.detach().cpu())
     
     def _get_encoder_layers(self):
@@ -414,10 +415,12 @@ def _patch_attention_layers(model: torch.nn.Module):
     
     def _sa_block_patched(self, x, attn_mask, key_padding_mask, is_causal=False):
         # Force need_weights=True to capture attention
+        # Force average_attn_weights=False to get per-head attention
         x = self.self_attn(x, x, x,
                            attn_mask=attn_mask,
                            key_padding_mask=key_padding_mask,
                            need_weights=True,
+                           average_attn_weights=False,
                            is_causal=is_causal)[0]
         return self.dropout1(x)
 
