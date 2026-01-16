@@ -329,7 +329,7 @@ def collect_predictions(
         all_logits.append(preds["mod_logits"].cpu())
         all_targets.append(batch["mod_labels"].cpu())
         all_masks.append(batch["mask_matrix"].cpu())
-        all_ids.extend(batch["oeis_id"])
+        all_ids.extend(batch["oeis_ids"])
     
     return {
         "mod_logits": torch.cat(all_logits, dim=0),
