@@ -140,7 +140,7 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
     sequence = record["values"]
     features = extract_features(sequence)
     
-    return {
+
     mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
     # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
     if mag_tensor.size(-1) == 4:
@@ -161,7 +161,7 @@ def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str
     
     features = extract_features(sequence)
     
-    return {
+
     mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
     # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
     if mag_tensor.size(-1) == 4:
