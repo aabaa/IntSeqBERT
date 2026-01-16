@@ -420,13 +420,21 @@ def main(args=None):
     logging.info("Collecting predictions...")
     preds = collect_predictions(model, dataloader)
     
+    # Debug: Check tensor shapes
+    print(f"DEBUG: mod_logits shape = {preds['mod_logits'].shape}", flush=True)
+    print(f"DEBUG: mod_targets shape = {preds['mod_targets'].shape}", flush=True)
+    print(f"DEBUG: mask_map shape = {preds['mask_map'].shape}", flush=True)
+    print(f"DEBUG: oeis_ids count = {len(preds['oeis_ids'])}", flush=True)
+    
     # Compute metrics
     logging.info("Computing per-modulus metrics...")
+    print("DEBUG: Starting compute_mod_metrics...", flush=True)
     metrics_df = compute_mod_metrics(
         preds["mod_logits"],
         preds["mod_targets"],
         preds["mask_map"]
     )
+    print("DEBUG: compute_mod_metrics completed", flush=True)
     metrics_df["interpretation"] = metrics_df["modulus"].apply(get_interpretation)
     metrics_df = metrics_df.sort_values("nig_score", ascending=False)
     metrics_df.to_csv(output_dir / "nig_ranking.csv", index=False)
