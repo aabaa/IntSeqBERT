@@ -18,8 +18,8 @@ from intseq_bert import config
 # ==========================================
 
 # Clip range for log variance to prevent numerical issues
-LOG_VAR_CLIP_MIN = -10
-LOG_VAR_CLIP_MAX = 10
+LOG_VAR_CLIP_MIN = config.LOG_VAR_CLIP_MIN
+LOG_VAR_CLIP_MAX = config.LOG_VAR_CLIP_MAX
 
 
 # ==========================================

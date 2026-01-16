@@ -58,10 +58,10 @@ INTERPRETATION_MAP = {
 }
 
 # Base-10 related moduli (excluded from non_base10_acc calculation)
-BASE10_RELATED_MODS = frozenset({10, 20, 50, 100})
+BASE10_RELATED_MODS = config.BASE10_RELATED_MODS
 
 # Minimum number of samples per tag for stratified analysis
-MIN_TAG_SAMPLES = 10
+MIN_TAG_SAMPLES = config.MIN_TAG_SAMPLES
 
 
 def is_prime(n: int) -> bool:
@@ -171,8 +171,8 @@ def bootstrap_ci(
     mod_logits: torch.Tensor,
     mod_targets: torch.Tensor,
     mask_map: torch.Tensor,
-    n_samples: int = 1000,
-    ci_level: float = 0.95,
+    n_samples: int = config.BOOTSTRAP_SAMPLES_DEFAULT,
+    ci_level: float = config.CI_LEVEL_DEFAULT,
     seed: int = None,
     quiet: bool = False
 ) -> pd.DataFrame:

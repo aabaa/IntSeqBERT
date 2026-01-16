@@ -137,3 +137,47 @@ DEFAULT_WARMUP_RATIO = 0.1
 DEFAULT_PATIENCE = 5
 DEFAULT_NUM_WORKERS = 4
 DEFAULT_EPOCHS = 20
+
+# ==========================================
+# 9. Analysis Constants
+# ==========================================
+# Minimum samples for statistically reliable analysis
+MIN_RELIABLE_SAMPLES = 30  # For scale-wise bucket analysis
+MIN_TAG_SAMPLES = 10       # For tag-stratified analysis
+
+# Bootstrap CI parameters
+BOOTSTRAP_SAMPLES_DEFAULT = 1000
+CI_LEVEL_DEFAULT = 0.95
+
+# Worst-K analysis
+WORST_K_DEFAULT = 100
+
+# Calibration binning
+CALIBRATION_BINS_DEFAULT = 10
+
+# Log variance clipping for numerical stability
+LOG_VAR_CLIP_MIN = -10
+LOG_VAR_CLIP_MAX = 10
+
+# Tolerance accuracy thresholds (log10 scale)
+# 0.5 -> ±3.16x, 0.1 -> ±1.26x, 0.05 -> ±1.12x
+TOLERANCE_THRESHOLDS = [0.5, 0.1, 0.05]
+
+# Magnitude scale buckets [low, high, name] (log10 scale)
+MAGNITUDE_BUCKETS = [
+    (0, 2, "Small"),       # 1 ~ 100
+    (2, 5, "Medium"),      # 100 ~ 100,000
+    (5, 20, "Large"),      # 10^5 ~ 10^20
+    (20, 50, "Huge"),      # 10^20 ~ 10^50
+    (50, float('inf'), "Astronomical"),  # 10^50+
+]
+
+# Base-10 related moduli (excluded from non_base10_acc calculation)
+BASE10_RELATED_MODS = frozenset({10, 20, 50, 100})
+
+# Numerical stability constants
+EPSILON = 1e-6
+
+# Plot defaults
+SCATTER_SAMPLE_SIZE = 10000  # Max points for scatter plots
+HISTOGRAM_BINS = 50

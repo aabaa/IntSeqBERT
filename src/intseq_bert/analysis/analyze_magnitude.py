@@ -42,15 +42,9 @@ logger = logging.getLogger(__name__)
 # Constants
 # ==========================================
 
-BUCKET_BOUNDS = [
-    (0, 2, "Small"),
-    (2, 5, "Medium"),
-    (5, 20, "Large"),
-    (20, 50, "Huge"),
-    (50, float('inf'), "Astronomical"),
-]
+BUCKET_BOUNDS = config.MAGNITUDE_BUCKETS
 
-MIN_RELIABLE_SAMPLES = 30
+MIN_RELIABLE_SAMPLES = config.MIN_RELIABLE_SAMPLES
 
 
 # ==========================================
@@ -126,7 +120,7 @@ def compute_nll(
     
     NLL = 0.5 * (log(2*pi) + log(sigma^2) + (y - pred)^2 / sigma^2)
     """
-    sigma = sigma.clamp(min=1e-6)  # Avoid log(0)
+    sigma = sigma.clamp(min=config.EPSILON)  # Avoid log(0)
     nll = 0.5 * (np.log(2 * np.pi) + 2 * torch.log(sigma) + ((gt - pred) ** 2) / (sigma ** 2))
     return nll.mean().item()
 
@@ -179,7 +173,7 @@ def compute_calibration_data(
     gt: torch.Tensor,
     pred: torch.Tensor,
     sigma: torch.Tensor,
-    n_bins: int = 10
+    n_bins: int = config.CALIBRATION_BINS_DEFAULT
 ) -> pd.DataFrame:
     """
     Compute calibration data for plotting.
@@ -307,8 +301,8 @@ def bootstrap_ci(
     gt: np.ndarray,
     pred: np.ndarray,
     metric_fn,
-    n_samples: int = 1000,
-    ci: float = 0.95
+    n_samples: int = config.BOOTSTRAP_SAMPLES_DEFAULT,
+    ci: float = config.CI_LEVEL_DEFAULT
 ) -> Tuple[float, float]:
     """
     Estimate confidence interval via Bootstrap.
@@ -389,7 +383,7 @@ def compute_sign_magnitude_consistency(
     consistent = (
         ((pred_mag > 0) & (pred_sign == SIGN_POSITIVE)) |
         ((pred_mag < 0) & (pred_sign == SIGN_NEGATIVE)) |
-        ((pred_mag.abs() < 1e-6) & (pred_sign == SIGN_ZERO))
+        ((pred_mag.abs() < config.EPSILON) & (pred_sign == SIGN_ZERO))
     )
     
     return consistent.float().mean().item() * 100
@@ -442,7 +436,7 @@ def extract_worst_k_samples(
     gt: torch.Tensor,
     pred: torch.Tensor,
     oeis_ids: List[str],
-    k: int = 100,
+    k: int = config.WORST_K_DEFAULT,
     id_to_tags: Optional[Dict[str, List[str]]] = None
 ) -> pd.DataFrame:
     """
@@ -526,7 +520,7 @@ def compute_tag_stratified_metrics(
     mask: torch.Tensor,
     oeis_ids: List[str],
     id_to_tags: Dict[str, List[str]],
-    min_samples: int = 10
+    min_samples: int = config.MIN_TAG_SAMPLES
 ) -> pd.DataFrame:
     """
     Compute metrics stratified by OEIS tags.
@@ -634,7 +628,7 @@ def plot_prediction_scatter(
     pred: torch.Tensor,
     mask: torch.Tensor,
     output_path: Path,
-    sample_size: int = 10000
+    sample_size: int = config.SCATTER_SAMPLE_SIZE
 ) -> None:
     """
     Plot GT vs Prediction scatter plot with diagonal line.
@@ -755,7 +749,7 @@ def plot_error_histogram(
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Histogram with KDE
-    sns.histplot(errors_np, kde=True, ax=ax, color='#3498db', bins=50)
+    sns.histplot(errors_np, kde=True, ax=ax, color='#3498db', bins=config.HISTOGRAM_BINS)
     
     # Statistics
     mean = np.mean(errors_np)
