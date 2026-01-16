@@ -28,7 +28,7 @@ from . import config
 | 定数 | 値 | 用途 |
 |------|------|------|
 | `MASK_PROB` | 0.15 | マスク確率 |
-| `PAD_VALUE_FEATURE` | 0.0 | 特徴量のパディング値 |
+| `PAD_VALUE_FEATURE` | -9999.0 | 特徴量のパディング値 (Sentinel Value) |
 | `IGNORE_INDEX` | -100 | 損失計算で無視するラベル値 |
 | `MAG_RAW_DIM` | 4 | 入力 Magnitude 次元 |
 | `MAG_EXTENDED_DIM` | 5 | マスクフラグ付き Magnitude 次元 |
@@ -106,9 +106,9 @@ for key in required_keys:
 ### Step 2: パディング
 
 ```python
-# 特徴量は 0.0 でパディング
-mag_padded = pad_sequence(mag_list, batch_first=True, padding_value=0.0)
-mod_padded = pad_sequence(mod_list, batch_first=True, padding_value=0.0)
+# 特徴量は Sentinel Value でパディング
+mag_padded = pad_sequence(mag_list, batch_first=True, padding_value=config.PAD_VALUE_FEATURE)
+mod_padded = pad_sequence(mod_list, batch_first=True, padding_value=config.PAD_VALUE_FEATURE)
 
 # 整数ラベルは IGNORE_INDEX でパディング
 mod_int_padded = pad_sequence(mod_int_list, batch_first=True, padding_value=-100)
@@ -117,8 +117,9 @@ mod_int_padded = pad_sequence(mod_int_list, batch_first=True, padding_value=-100
 ### Step 3: Attention Mask 生成
 
 ```python
-lengths = [len(x) for x in mag_list]
-valid_mask_bool = arange(max_len).expand(B, L) < lengths.unsqueeze(1)
+# Sentinel Value をチェックして有効位置を判定
+# Magの第1チャネル (log_val) を確認
+valid_mask_bool = (mag_padded[..., 0] != config.PAD_VALUE_FEATURE)
 attention_mask = valid_mask_bool.long()  # 1=valid, 0=padding
 ```
 
@@ -135,8 +136,10 @@ mask_matrix = torch.bernoulli(prob_matrix).bool()
 **Mask Flag Strategy:**
 
 ```
+```
 Unmasked: [log_val, sign+, sign-, sign0, 0]
 Masked:   [0,       0,     0,     0,     1]
+Padding:  [-9999.0, -9999.0, ...,        0]  (※ is_masked フラグは 0)
 ```
 
 ```python
@@ -183,7 +186,8 @@ mod_labels[~mask_matrix] = IGNORE_INDEX
 ### 5.1. なぜ Mask Flag が必要か
 
 **問題:** Magnitude Stream で値 `0` が有効なデータ（例: x=0 のとき log_val=0）として存在する。
-単純なゼロ化では「0という値」と「マスク」が区別できない。
+単純なゼロパディングでは「0という値」と「パディング」が区別できない。また Sentinel Value を導入しても、
+「マスクされたトークン」をどう表現するかという問題は残る。
 
 **解決:** 5番目のチャネル `is_masked` を追加:
 - `is_masked=0`: この位置は有効なデータ
