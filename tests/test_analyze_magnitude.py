@@ -554,24 +554,27 @@ class TestBootstrapCI:
         """Test bootstrap_ci returns (lower, upper) tuple."""
         from intseq_bert.analysis.analyze_magnitude import bootstrap_ci
         
-        data = np.random.randn(100)
-        lower, upper = bootstrap_ci(data, np.mean, n_samples=100)
+        gt = np.random.randn(100)
+        pred = gt + np.random.randn(100) * 0.1  # Add small noise
+        lower, upper = bootstrap_ci(gt, pred, lambda g, p: ((g - p) ** 2).mean(), n_samples=100)
         
         assert lower < upper
     
     @requires_analyze_magnitude
     def test_bootstrap_ci_contains_mean(self):
-        """Test bootstrap CI typically contains the sample mean."""
+        """Test bootstrap CI typically contains the sample MSE."""
         from intseq_bert.analysis.analyze_magnitude import bootstrap_ci
         
         np.random.seed(42)
-        data = np.random.randn(100)
-        lower, upper = bootstrap_ci(data, np.mean, n_samples=500)
+        gt = np.random.randn(100)
+        pred = gt + np.random.randn(100) * 0.1
         
-        sample_mean = np.mean(data)
-        # The CI should typically contain the sample mean
-        # (though not guaranteed for any single sample)
-        assert lower <= sample_mean <= upper
+        mse_fn = lambda g, p: ((g - p) ** 2).mean()
+        lower, upper = bootstrap_ci(gt, pred, mse_fn, n_samples=500)
+        
+        sample_mse = mse_fn(gt, pred)
+        # The CI should typically contain the sample MSE
+        assert lower <= sample_mse <= upper
 
 
 # ==========================================
