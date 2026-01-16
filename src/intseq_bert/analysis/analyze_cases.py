@@ -87,8 +87,14 @@ def load_single_sequence(
     pt_path = features_dir / f"{oeis_id}.pt"
     if pt_path.exists():
         data = torch.load(pt_path, weights_only=False)
+        mag_tensor = data["mag_features"]
+        # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
+        if mag_tensor.size(-1) == 4:
+            padding = torch.zeros(mag_tensor.size(0), 1)
+            mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
+            
         return {
-            "mag_inputs": data["mag_features"].unsqueeze(0),
+            "mag_inputs": mag_tensor.unsqueeze(0),
             "mod_inputs": data["mod_features"].unsqueeze(0),
             "attention_mask": torch.ones(1, data["mag_features"].size(0)),
             "oeis_id": oeis_id
