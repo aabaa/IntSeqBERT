@@ -622,6 +622,21 @@ def train(args):
             # Prepare inputs & labels
             inputs = prepare_labels(raw_batch, device)
             
+            # --- Filter out padding from training mask ---
+            # Similar to validation, we should not compute loss on padding (0.00)
+            # even if the collator masked it.
+            train_labels = inputs["labels"]
+            train_mask = train_labels["mask_map"]
+            mag_targets_raw = train_labels["mag_targets"]
+            is_valid_train = (mag_targets_raw.abs() > 1e-6)
+            
+            train_mask = train_mask & is_valid_train
+            train_labels["mask_map"] = train_mask
+            
+            # If batch becomes empty after filtering (rare), skip or proceed (loss will be 0/nan if not handled)
+            if not train_mask.any():
+                continue
+                
             # Forward
             with autocast(device_type=device.type):
                 outputs = model(
