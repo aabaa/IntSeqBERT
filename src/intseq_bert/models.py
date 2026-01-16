@@ -71,8 +71,13 @@ class IntSeqEmbeddings(nn.Module):
         Returns:
             embeddings: (B, L, d_model)
         """
-        # 1. Projection
-        h_mag = self.mag_proj(mag_features) # (B, L, D)
+        # IMPORTANT: Force FP32 for magnitude stream to prevent FP16 overflow
+        # Extreme log values (up to 210) cause overflow in half precision
+        mag_features = mag_features.float()
+        
+        # 1. Projection - disable autocast to keep computation in FP32
+        with torch.amp.autocast(device_type='cuda', enabled=False):
+            h_mag = self.mag_proj(mag_features) # (B, L, D)
         
         # Modulo stream passes through ReLU to increase expressivity before generating FiLM params
         h_mod = torch.relu(self.mod_proj(mod_features)) # (B, L, D)
@@ -83,11 +88,14 @@ class IntSeqEmbeddings(nn.Module):
         
         # 3. Modulation (Feature-wise Affine Transformation)
         # h_fused = (1 + gamma) * h_mag + beta
+        # Ensure h_mod is float before fusion
+        gamma = gamma.float()
+        beta = beta.float()
         h_fused = (1.0 + gamma) * h_mag + beta
         
         # 4. Add Position Encoding
         seq_len = h_fused.size(1)
-        h_out = h_fused + self.pos_encoding[:, :seq_len, :]
+        h_out = h_fused + self.pos_encoding[:, :seq_len, :].float()
         
         # 5. Norm & Dropout
         h_out = self.layer_norm(h_out)
@@ -195,9 +203,12 @@ class IntSeqForPreTraining(nn.Module):
         hidden_state = self.bert(mag_features, mod_features, src_key_padding_mask)
         
         # 2. Predictions
-        mag_preds = self.mag_head(hidden_state)      # (B, L, 2)
-        mag_mu = mag_preds[..., 0]
-        mag_log_var = mag_preds[..., 1]
+        # IMPORTANT: Run magnitude head in FP32 to prevent FP16 overflow
+        # with extreme log values (up to 210 in training data)
+        with torch.amp.autocast(device_type='cuda', enabled=False):
+            mag_preds = self.mag_head(hidden_state.float())  # (B, L, 2)
+            mag_mu = mag_preds[..., 0]
+            mag_log_var = mag_preds[..., 1]
         
         sign_logits = self.sign_head(hidden_state)   # (B, L, 3)
         
@@ -220,17 +231,28 @@ class IntSeqForPreTraining(nn.Module):
             # This flattens the tensors: (N_masked, ...)
             
             # --- A. Magnitude Loss (Gaussian NLL) ---
-            target_mag = labels["mag_targets"][mask_map]
-            pred_mu = mag_mu[mask_map]
-            pred_log_var = mag_log_var[mask_map]
+            # IMPORTANT: Use FP32 for magnitude loss to prevent FP16 overflow
+            # Extreme log values (up to 210) cause overflow in half precision
+            target_mag = labels["mag_targets"][mask_map].float()
+            pred_mu = mag_mu[mask_map].float()
+            pred_log_var = mag_log_var[mask_map].float()
             
             # NLL = 0.5 * log(sigma^2) + (y - mu)^2 / (2 * sigma^2)
-            #     = 0.5 * log_var + (y - mu)^2 * 0.5 * exp(-log_var)
+            # Modified: Use Huber loss instead of squared error for robustness to extreme values
+            # This prevents gradient explosion when target_mag >> pred_mu (e.g., 210 vs 0)
             # Clamp log_var to prevent numerical instability (exp overflow/underflow)
             pred_log_var = torch.clamp(pred_log_var, config.LOG_VAR_CLIP_MIN, config.LOG_VAR_CLIP_MAX)
             precision = torch.exp(-pred_log_var)
-            loss_mag = 0.5 * pred_log_var + 0.5 * (target_mag - pred_mu)**2 * precision
-            loss_mag = loss_mag.mean()
+            
+            # Use Huber loss (smooth L1) instead of squared error
+            # Huber loss is linear for |error| > delta, quadratic otherwise
+            huber_loss = nn.functional.smooth_l1_loss(pred_mu, target_mag, reduction='none', beta=1.0)
+            
+            # Clamp per-sample loss to prevent extreme values causing NaN
+            # Max = 100.0 is much larger than random prediction loss, allowing normal gradients
+            loss_mag_per_sample = 0.5 * pred_log_var + huber_loss * precision
+            loss_mag_per_sample = torch.clamp(loss_mag_per_sample, max=100.0)
+            loss_mag = loss_mag_per_sample.mean()
             
             # --- B. Sign Loss (CrossEntropy) ---
             target_sign = labels["sign_targets"][mask_map]

@@ -89,9 +89,11 @@ class OEISCollator:
         # Concatenate to form the extended vector: [Content, MaskFlag]
         mag_inputs = torch.cat([mag_padded, is_masked_channel], dim=2)
         
-        # Zero out the content channels (indices 0 to MAG_RAW_DIM-1) at masked positions
-        # Create a broadcastable mask for content: 0.0 at masked, 1.0 at unmasked
-        content_keep_mask = (~mask_matrix).unsqueeze(-1).type_as(mag_padded) # (B, L, 1)
+        # Zero out the content channels (indices 0 to MAG_RAW_DIM-1) at masked OR padding positions
+        # This prevents sentinel values (-9999.0) from flowing into the embedding layer
+        # Create broadcastable mask: 0.0 at masked/padding, 1.0 at valid unmasked
+        valid_unmasked = valid_mask_bool & (~mask_matrix)  # True only for valid AND unmasked
+        content_keep_mask = valid_unmasked.unsqueeze(-1).type_as(mag_padded) # (B, L, 1)
         
         # Apply mask to the content part only
         mag_inputs[..., :config.MAG_RAW_DIM] = mag_inputs[..., :config.MAG_RAW_DIM] * content_keep_mask

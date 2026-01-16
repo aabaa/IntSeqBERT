@@ -401,14 +401,13 @@ def evaluate(
             if not mask_map.any():
                 continue
 
-            # Forward
-            with autocast(device_type=device.type):
-                outputs = model(
-                    mag_features=inputs["mag_features"],
-                    mod_features=inputs["mod_features"],
-                    src_key_padding_mask=inputs["src_key_padding_mask"],
-                    labels=labels
-                )
+            # Forward (FP32 - AMP disabled due to FP16 overflow issues)
+            outputs = model(
+                mag_features=inputs["mag_features"],
+                mod_features=inputs["mod_features"],
+                src_key_padding_mask=inputs["src_key_padding_mask"],
+                labels=labels
+            )
             
             loss = outputs["loss"]
             total_loss += loss.item()
@@ -613,24 +612,23 @@ def train(args):
             inputs = prepare_labels(raw_batch, device)
             
             # Forward
-            with autocast(device_type=device.type):
-                outputs = model(
-                    mag_features=inputs["mag_features"],
-                    mod_features=inputs["mod_features"],
-                    src_key_padding_mask=inputs["src_key_padding_mask"],
-                    labels=inputs["labels"]
-                )
-                loss = outputs["loss"] / args.accum_steps
+            # NOTE: AMP disabled due to FP16 overflow with extreme log values (up to 210)
+            # TODO: Consider enabling AMP with proper scaling if training speed becomes an issue
+            outputs = model(
+                mag_features=inputs["mag_features"],
+                mod_features=inputs["mod_features"],
+                src_key_padding_mask=inputs["src_key_padding_mask"],
+                labels=inputs["labels"]
+            )
+            loss = outputs["loss"] / args.accum_steps
             
-            # Backward
-            scaler.scale(loss).backward()
+            # Backward (FP32)
+            loss.backward()
             
             if (step + 1) % args.accum_steps == 0:
-                scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.GRAD_CLIP_NORM)
                 
-                scaler.step(optimizer)
-                scaler.update()
+                optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
             
