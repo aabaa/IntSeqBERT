@@ -467,12 +467,6 @@ def extract_worst_k_samples(
             # Get sequence for context
             seq_gt = gt[seq_idx].tolist()
             context = format_context(seq_gt, pos_idx)
-
-            # DEBUG: Check if we picked a zero GT
-            gt_val_item = gt[seq_idx, pos_idx].item()
-            if abs(gt_val_item) < 1e-6:
-                 mask_val = mask[seq_idx, pos_idx].item() if mask is not None else "None"
-                 logger.warning(f"Picked zero GT at rank {rank}. Mask value: {mask_val}. Error: {error_val.item()}")
             
             # Get tag
             
@@ -899,14 +893,7 @@ def collect_predictions(
         # Filter out padding (0.00) from mask
         is_valid_value = (gt_mag.abs() > 1e-6)
         
-        # DEBUG: Check how many checks are triggered
-        initial_mask_sum = batch["mask_matrix"].sum().item()
-        
         batch["mask_matrix"] = batch["mask_matrix"] & is_valid_value
-        
-        final_mask_sum = batch["mask_matrix"].sum().item()
-        if initial_mask_sum != final_mask_sum:
-             logger.debug(f"Filtered {initial_mask_sum - final_mask_sum} padding items from mask.")
         
         # Pad to MAX_SEQUENCE_LENGTH
         B, L = gt_mag.shape
