@@ -17,6 +17,17 @@ from collections import defaultdict
 from tqdm import tqdm
 from scipy import stats
 
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend for server
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    HAS_PLOTTING = True
+except ImportError:
+    HAS_PLOTTING = False
+    plt = None
+    sns = None
+
 from intseq_bert import config
 from intseq_bert.analysis.common import (
     ModelWrapper,
@@ -566,6 +577,235 @@ def compute_tag_stratified_metrics(
 
 
 # ==========================================
+# Plotting Functions
+# ==========================================
+
+def plot_error_vs_scale(
+    scale_df: pd.DataFrame,
+    output_path: Path
+) -> None:
+    """
+    Plot error metrics vs scale (bucket).
+    
+    Args:
+        scale_df: DataFrame from compute_scale_wise_metrics
+        output_path: Path to save the figure
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    x = range(len(scale_df))
+    buckets = scale_df["bucket"].tolist()
+    mse = scale_df["mse"].tolist()
+    ci_lower = scale_df["mse_ci_lower"].tolist()
+    ci_upper = scale_df["mse_ci_upper"].tolist()
+    is_reliable = scale_df["is_reliable"].tolist()
+    
+    # Plot with different styles for reliable/unreliable buckets
+    colors = ['#2ecc71' if r else '#e74c3c' for r in is_reliable]
+    alphas = [1.0 if r else 0.3 for r in is_reliable]
+    
+    for i, (xi, yi, lower, upper, color, alpha) in enumerate(zip(x, mse, ci_lower, ci_upper, colors, alphas)):
+        ax.bar(xi, yi, color=color, alpha=alpha, edgecolor='black', linewidth=1)
+        ax.errorbar(xi, yi, yerr=[[yi - lower], [upper - yi]], fmt='none', color='black', capsize=5)
+    
+    ax.set_xticks(x)
+    ax.set_xticklabels(buckets, rotation=45, ha='right')
+    ax.set_xlabel('Scale (Log10)')
+    ax.set_ylabel('MSE')
+    ax.set_title('Error vs Scale')
+    
+    # Add count annotations
+    for i, (xi, yi, count) in enumerate(zip(x, mse, scale_df["count"].tolist())):
+        ax.annotate(f'N={count}', (xi, yi), textcoords="offset points", 
+                   xytext=(0, 5), ha='center', fontsize=8)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+def plot_prediction_scatter(
+    gt: torch.Tensor,
+    pred: torch.Tensor,
+    mask: torch.Tensor,
+    output_path: Path,
+    sample_size: int = 10000
+) -> None:
+    """
+    Plot GT vs Prediction scatter plot with diagonal line.
+    
+    Args:
+        gt: Ground truth values
+        pred: Predicted values
+        mask: Mask tensor
+        output_path: Path to save the figure
+        sample_size: Max number of points to plot (for performance)
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    # Flatten and apply mask
+    if gt.dim() > 1:
+        gt_flat = gt[mask.bool()].numpy()
+        pred_flat = pred[mask.bool()].numpy()
+    else:
+        gt_flat = gt.numpy()
+        pred_flat = pred.numpy()
+    
+    # Sample if too many points
+    if len(gt_flat) > sample_size:
+        indices = np.random.choice(len(gt_flat), sample_size, replace=False)
+        gt_flat = gt_flat[indices]
+        pred_flat = pred_flat[indices]
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    
+    ax.scatter(gt_flat, pred_flat, alpha=0.3, s=5, c='#3498db')
+    
+    # Diagonal line
+    min_val = min(gt_flat.min(), pred_flat.min())
+    max_val = max(gt_flat.max(), pred_flat.max())
+    ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='y=x')
+    
+    ax.set_xlabel('Ground Truth (Log Scale)')
+    ax.set_ylabel('Prediction (Log Scale)')
+    ax.set_title('Prediction vs Ground Truth')
+    ax.legend()
+    
+    # Add R² annotation
+    r2 = 1 - np.sum((gt_flat - pred_flat)**2) / np.sum((gt_flat - gt_flat.mean())**2)
+    ax.text(0.05, 0.95, f'R² = {r2:.4f}', transform=ax.transAxes, 
+           fontsize=12, verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat'))
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+def plot_calibration(
+    calibration_df: pd.DataFrame,
+    output_path: Path
+) -> None:
+    """
+    Plot calibration curve (predicted sigma vs actual RMSE).
+    
+    Args:
+        calibration_df: DataFrame from compute_calibration_data
+        output_path: Path to save the figure
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    
+    mean_sigma = calibration_df["mean_sigma"].values
+    rmse = calibration_df["rmse"].values
+    
+    ax.scatter(mean_sigma, rmse, c='#3498db', s=100, zorder=3)
+    ax.plot(mean_sigma, rmse, 'b-', alpha=0.5, zorder=2)
+    
+    # y=x line (perfect calibration)
+    min_val = min(mean_sigma.min(), rmse.min())
+    max_val = max(mean_sigma.max(), rmse.max())
+    ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='Perfect Calibration')
+    
+    ax.set_xlabel('Predicted σ (Mean)')
+    ax.set_ylabel('Actual RMSE')
+    ax.set_title('Uncertainty Calibration')
+    ax.legend()
+    
+    # Add regions annotation
+    ax.fill_between([min_val, max_val], [min_val, max_val], max_val,
+                   alpha=0.1, color='red', label='Overconfident')
+    ax.fill_between([min_val, max_val], min_val, [min_val, max_val],
+                   alpha=0.1, color='blue', label='Underconfident')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+def plot_error_histogram(
+    errors: torch.Tensor,
+    output_path: Path
+) -> None:
+    """
+    Plot error distribution histogram.
+    
+    Args:
+        errors: Error values (gt - pred)
+        output_path: Path to save the figure
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    errors_np = errors.numpy() if isinstance(errors, torch.Tensor) else errors
+    errors_np = errors_np.flatten()
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Histogram with KDE
+    sns.histplot(errors_np, kde=True, ax=ax, color='#3498db', bins=50)
+    
+    # Statistics
+    mean = np.mean(errors_np)
+    median = np.median(errors_np)
+    std = np.std(errors_np)
+    
+    ax.axvline(mean, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean:.4f}')
+    ax.axvline(median, color='green', linestyle='--', linewidth=2, label=f'Median: {median:.4f}')
+    
+    ax.set_xlabel('Error (GT - Pred)')
+    ax.set_ylabel('Frequency')
+    ax.set_title(f'Error Distribution (σ={std:.4f})')
+    ax.legend()
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+def plot_error_qq(
+    errors: torch.Tensor,
+    output_path: Path
+) -> None:
+    """
+    Plot Q-Q plot to assess normality of errors.
+    
+    Args:
+        errors: Error values (gt - pred)
+        output_path: Path to save the figure
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    errors_np = errors.numpy() if isinstance(errors, torch.Tensor) else errors
+    errors_np = errors_np.flatten()
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    
+    stats.probplot(errors_np, dist="norm", plot=ax)
+    ax.set_title('Q-Q Plot (Normal Distribution)')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+# ==========================================
 # Overall Metrics
 # ==========================================
 
@@ -799,6 +1039,26 @@ def main(args=None):
     consistency_data = {"sign_mag_consistency": "N/A - requires sign predictions"}
     consistency_df = pd.DataFrame([consistency_data])
     consistency_df.to_csv(output_dir / "consistency_report.csv", index=False)
+    
+    # 8. Generate figures
+    logger.info("Generating figures...")
+    
+    # 8.1 Error vs Scale plot
+    if len(scale_df) > 0:
+        plot_error_vs_scale(scale_df, figures_dir / "error_vs_scale.png")
+    
+    # 8.2 Prediction scatter plot
+    plot_prediction_scatter(gt_mag, pred_mag, mask, figures_dir / "prediction_scatter.png")
+    
+    # 8.3 Calibration plot (if sigma available)
+    if pred_sigma is not None and 'cal_df' in locals():
+        plot_calibration(cal_df, figures_dir / "calibration_plot.png")
+    
+    # 8.4 Error histogram
+    plot_error_histogram(errors, figures_dir / "error_histogram.png")
+    
+    # 8.5 Error QQ plot
+    plot_error_qq(errors, figures_dir / "error_qq_plot.png")
     
     # Save config
     config_data = {
