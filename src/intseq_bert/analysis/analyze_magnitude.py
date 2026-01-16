@@ -436,6 +436,7 @@ def format_context(sequence: List[float], position: int, window: int = 2) -> str
 def extract_worst_k_samples(
     gt: torch.Tensor,
     pred: torch.Tensor,
+    mask: Optional[torch.Tensor],
     oeis_ids: List[str],
     k: int = config.WORST_K_DEFAULT,
     id_to_tags: Optional[Dict[str, List[str]]] = None
@@ -449,6 +450,10 @@ def extract_worst_k_samples(
     if gt.dim() == 2:
         N, L = gt.shape
         errors = (gt - pred).abs()
+        
+        # Mask invalid errors (set to 0 so they aren't picked as top-k)
+        if mask is not None:
+             errors = errors * mask.float()
         
         # Find top-K errors
         flat_errors = errors.flatten()
@@ -482,6 +487,11 @@ def extract_worst_k_samples(
     else:
         # 1D case
         errors = (gt - pred).abs()
+        
+        # Mask invalid errors
+        if mask is not None:
+             errors = errors * mask.float()
+             
         topk_values, topk_indices = torch.topk(errors, min(k, len(errors)))
         
         results = []
@@ -1051,7 +1061,7 @@ def main(args=None):
                 record = json.loads(line)
                 id_to_tags[record["oeis_id"]] = record.get("keywords", [])
     
-    worst_df = extract_worst_k_samples(gt_mag, pred_mag, oeis_ids, k=args.worst_k, id_to_tags=id_to_tags)
+    worst_df = extract_worst_k_samples(gt_mag, pred_mag, mask, oeis_ids, k=args.worst_k, id_to_tags=id_to_tags)
     worst_df.to_csv(output_dir / "worst_k_samples.csv", index=False)
     logger.info(f"Saved: {output_dir / 'worst_k_samples.csv'}")
     
