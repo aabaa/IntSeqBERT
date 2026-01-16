@@ -355,7 +355,7 @@ def _compute_mod_confidences(
         idx = get_mod_index(m)
         logits_m = split_logits_list[idx]  # (L, m)
         probs_m = F.softmax(logits_m, dim=-1)  # (L, m)
-        targets_m = mod_targets[:, idx].long()  # (L,)
+        targets_m = mod_targets[:, idx].long().to(probs_m.device)  # (L,)
         
         # Get probability of correct class
         conf_m = probs_m.gather(1, targets_m.unsqueeze(1)).squeeze(1)
