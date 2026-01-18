@@ -389,8 +389,9 @@ class TestTrainingIntegration:
         """Test optimizer can update parameters."""
         optimizer = torch.optim.AdamW(small_model.parameters(), lr=1e-3)
         
-        # Get initial weights
-        initial_weight = small_model.bert.embeddings.mag_proj.weight.clone()
+        # Get initial weights (using film_scale which is always Linear)
+        # Note: mag_proj may be Sequential in v3, so we use a known Linear layer
+        initial_weight = small_model.bert.embeddings.film_scale.weight.clone()
         
         inputs = prepare_labels(mock_collator_output, device)
         outputs = small_model(
@@ -405,7 +406,7 @@ class TestTrainingIntegration:
         optimizer.step()
         
         # Weights should have changed
-        updated_weight = small_model.bert.embeddings.mag_proj.weight
+        updated_weight = small_model.bert.embeddings.film_scale.weight
         assert not torch.allclose(initial_weight, updated_weight)
 
 

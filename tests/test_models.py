@@ -374,3 +374,128 @@ class TestIntegration:
             
             outputs = model(mag, mod, mask)
             assert outputs["predictions"]["mag_mu"].shape == (2, seq_len)
+
+
+# ==========================================
+# V3 Config Option Tests
+# ==========================================
+
+class TestV3ConfigOptions:
+    """Tests for v3 model configuration options."""
+    
+    def test_input_proj_mlp_structure(self, d_model):
+        """Test MLP projection creates correct structure."""
+        original = config.INPUT_PROJ_TYPE
+        config.INPUT_PROJ_TYPE = 'mlp'
+        try:
+            embeddings = IntSeqEmbeddings(d_model=d_model)
+            assert isinstance(embeddings.mag_proj, torch.nn.Sequential)
+            assert len(embeddings.mag_proj) == 3  # Linear, GELU, Linear
+            assert isinstance(embeddings.mag_proj[0], torch.nn.Linear)
+            assert isinstance(embeddings.mag_proj[1], torch.nn.GELU)
+            assert isinstance(embeddings.mag_proj[2], torch.nn.Linear)
+        finally:
+            config.INPUT_PROJ_TYPE = original
+    
+    def test_input_proj_linear_structure(self, d_model):
+        """Test linear projection creates correct structure."""
+        original = config.INPUT_PROJ_TYPE
+        config.INPUT_PROJ_TYPE = 'linear'
+        try:
+            embeddings = IntSeqEmbeddings(d_model=d_model)
+            assert isinstance(embeddings.mag_proj, torch.nn.Linear)
+        finally:
+            config.INPUT_PROJ_TYPE = original
+    
+    def test_input_proj_mlp_output_shape(self, sample_inputs, d_model, batch_size, seq_len):
+        """Test MLP projection produces correct output shape."""
+        original = config.INPUT_PROJ_TYPE
+        config.INPUT_PROJ_TYPE = 'mlp'
+        try:
+            mag, mod = sample_inputs
+            embeddings = IntSeqEmbeddings(d_model=d_model)
+            output = embeddings(mag, mod)
+            assert output.shape == (batch_size, seq_len, d_model)
+        finally:
+            config.INPUT_PROJ_TYPE = original
+    
+    def test_pre_film_dropout_in_training(self, sample_inputs, d_model):
+        """Test Pre-FiLM dropout causes variance when enabled."""
+        original = config.USE_PRE_FILM_DROPOUT
+        config.USE_PRE_FILM_DROPOUT = True
+        try:
+            mag, mod = sample_inputs
+            embeddings = IntSeqEmbeddings(d_model=d_model, dropout=0.5)
+            embeddings.train()
+            
+            out1 = embeddings(mag, mod)
+            out2 = embeddings(mag, mod)
+            # Outputs should differ due to dropout
+            assert not torch.allclose(out1, out2)
+        finally:
+            config.USE_PRE_FILM_DROPOUT = original
+    
+    def test_mag_loss_type_huber(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
+        """Test Huber loss type produces valid loss."""
+        original = config.MAG_LOSS_TYPE
+        config.MAG_LOSS_TYPE = 'huber'
+        try:
+            mag, mod = sample_inputs
+            model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
+            outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
+            assert not torch.isnan(outputs["loss"])
+            assert not torch.isinf(outputs["loss"])
+        finally:
+            config.MAG_LOSS_TYPE = original
+    
+    def test_mag_loss_type_mse(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
+        """Test MSE loss type produces valid loss."""
+        original = config.MAG_LOSS_TYPE
+        config.MAG_LOSS_TYPE = 'mse'
+        try:
+            mag, mod = sample_inputs
+            model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
+            outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
+            assert not torch.isnan(outputs["loss"])
+            assert not torch.isinf(outputs["loss"])
+        finally:
+            config.MAG_LOSS_TYPE = original
+    
+    def test_mag_loss_type_l1(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
+        """Test L1 loss type produces valid loss."""
+        original = config.MAG_LOSS_TYPE
+        config.MAG_LOSS_TYPE = 'l1'
+        try:
+            mag, mod = sample_inputs
+            model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
+            outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
+            assert not torch.isnan(outputs["loss"])
+            assert not torch.isinf(outputs["loss"])
+        finally:
+            config.MAG_LOSS_TYPE = original
+    
+    def test_heteroscedastic_off(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
+        """Test heteroscedastic loss OFF produces valid loss."""
+        original = config.USE_HETEROSCEDASTIC_LOSS
+        config.USE_HETEROSCEDASTIC_LOSS = False
+        try:
+            mag, mod = sample_inputs
+            model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
+            outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
+            assert not torch.isnan(outputs["loss"])
+            assert outputs["loss"].item() >= 0  # Deterministic loss should be non-negative
+        finally:
+            config.USE_HETEROSCEDASTIC_LOSS = original
+    
+    def test_heteroscedastic_on(self, sample_inputs, sample_padding_mask, sample_labels, d_model):
+        """Test heteroscedastic loss ON produces valid loss."""
+        original = config.USE_HETEROSCEDASTIC_LOSS
+        config.USE_HETEROSCEDASTIC_LOSS = True
+        try:
+            mag, mod = sample_inputs
+            model = IntSeqForPreTraining(d_model=d_model, nhead=2, num_layers=2)
+            outputs = model(mag, mod, sample_padding_mask, labels=sample_labels)
+            assert not torch.isnan(outputs["loss"])
+        finally:
+            config.USE_HETEROSCEDASTIC_LOSS = original
+

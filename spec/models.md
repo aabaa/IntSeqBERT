@@ -36,6 +36,21 @@ SIGN_NEGATIVE = 1  # sign- column in features
 SIGN_ZERO = 2      # sign0 column in features
 ```
 
+### v3 アーキテクチャ設定
+
+| 定数 | デフォルト | 用途 |
+|------|------------|------|
+| `INPUT_PROJ_TYPE` | `'mlp'` | 入力射影の種類 (`'linear'` or `'mlp'`) |
+| `USE_PRE_FILM_DROPOUT` | `True` | FiLM融合前のドロップアウト有無 |
+| `DROPOUT` | `0.2` | デフォルトドロップアウト率 (v3で増加) |
+
+### v3 損失設定
+
+| 定数 | デフォルト | 用途 |
+|------|------------|------|
+| `MAG_LOSS_TYPE` | `'huber'` | Magnitude損失種類 (`'huber'`, `'mse'`, `'l1'`) |
+| `USE_HETEROSCEDASTIC_LOSS` | `False` | 不確実性推定の有無 |
+
 ---
 
 ## 3. クラス設計
@@ -55,7 +70,12 @@ SIGN_ZERO = 2      # sign0 column in features
 #### ネットワーク構成
 
 ```python
-mag_proj:    Linear(MAG_EXTENDED_DIM, d_model)
+# mag_proj: config.INPUT_PROJ_TYPE で決定
+if INPUT_PROJ_TYPE == 'mlp':
+    mag_proj = Sequential(Linear(5, d_model), GELU(), Linear(d_model, d_model))
+else:  # 'linear'
+    mag_proj = Linear(MAG_EXTENDED_DIM, d_model)
+
 mod_proj:    Linear(MOD_FEATURE_DIM, d_model)
 film_scale:  Linear(d_model, d_model)  # γ生成
 film_shift:  Linear(d_model, d_model)  # β生成
@@ -90,6 +110,12 @@ nn.init.zeros_(self.film_scale.bias)
    with torch.amp.autocast(enabled=False):
        h_mag = mag_proj(mag_features)      # (B, L, d_model), FP32
    h_mod = ReLU(mod_proj(mod_features))    # (B, L, d_model)
+
+1.5. Pre-FiLM Dropout (v3):
+   # USE_PRE_FILM_DROPOUT が True の場合のみ
+   if config.USE_PRE_FILM_DROPOUT:
+       h_mag = dropout(h_mag)
+       h_mod = dropout(h_mod)
 
 2. FiLM Parameter Generation:
    γ = film_scale(h_mod)                   # (B, L, d_model)
@@ -225,10 +251,19 @@ loss_weights: register_buffer(torch.tensor([1.0, 1.0, 2.0]))  # [w_mag, w_sign, 
 
 マスクされた位置 (`mask_map == True`) のみを対象に計算。
 
-### 4.1. Magnitude Loss (Huber + Heteroscedastic)
+### 4.1. Magnitude Loss (v3: 設定可能)
 
-従来の二乗誤差ではなく、**Huber損失（Smooth L1）** を採用。
-極端な log 値（最大210）による勾配爆発を防止する。
+損失関数と不確実性推定はconfig経由で切り替え可能。
+
+#### 損失タイプ (`config.MAG_LOSS_TYPE`)
+
+| 値 | 損失関数 | 特徴 |
+|----|---------|------|
+| `'huber'` | SmoothL1Loss | デフォルト、外れ値にロバスト |
+| `'mse'` | MSELoss | 二乗誤差 |
+| `'l1'` | L1Loss | 絶対値誤差 |
+
+#### 処理フロー
 
 ```python
 # FP32強制（FP16オーバーフロー防止）
@@ -236,21 +271,29 @@ target_mag = labels["mag_targets"][mask_map].float()
 pred_mu = mag_mu[mask_map].float()
 pred_log_var = mag_log_var[mask_map].float()
 
-# log_var をクランプして数値安定性を確保
-pred_log_var = clamp(pred_log_var, LOG_VAR_CLIP_MIN, LOG_VAR_CLIP_MAX)  # [-10, 10]
-precision = exp(-pred_log_var)
+# 再構成損失の計算（config.MAG_LOSS_TYPE に応じて分岐）
+if config.MAG_LOSS_TYPE == 'huber':
+    recon_loss = smooth_l1_loss(pred_mu, target_mag, beta=1.0)
+elif config.MAG_LOSS_TYPE == 'mse':
+    recon_loss = mse_loss(pred_mu, target_mag)
+elif config.MAG_LOSS_TYPE == 'l1':
+    recon_loss = l1_loss(pred_mu, target_mag)
 
-# Huber損失（|error| > 1.0 で線形、それ以外で二乗）
-huber_loss = smooth_l1_loss(pred_mu, target_mag, beta=1.0)
-
-# Per-sample 損失をクランプ（極端値によるNaN防止）
-loss_mag_per_sample = 0.5 * pred_log_var + huber_loss * precision
-loss_mag_per_sample = clamp(loss_mag_per_sample, max=100.0)
-L_mag = mean(loss_mag_per_sample)
+# 不確実性推定（config.USE_HETEROSCEDASTIC_LOSS で切り替え）
+if config.USE_HETEROSCEDASTIC_LOSS:
+    # Gaussian NLL with learned variance
+    pred_log_var = clamp(pred_log_var, -10, 10)
+    precision = exp(-pred_log_var)
+    loss_mag_per_sample = 0.5 * pred_log_var + recon_loss * precision
+    loss_mag_per_sample = clamp(loss_mag_per_sample, max=100.0)
+    L_mag = mean(loss_mag_per_sample)
+else:
+    # Simple deterministic loss (pred_log_var ignored)
+    L_mag = mean(recon_loss)
 ```
 
-> **変更理由:** 訓練初期に `pred_mu ≈ 0` で `target_mag = 210` のような場合、
-> 二乗誤差 `(210 - 0)² = 44100` が爆発する。Huber損失では `|error|` に比例するため安定。
+> **v3変更:** `USE_HETEROSCEDASTIC_LOSS = False` がデフォルト。
+> 安定性確保のため、不確実性推定はオプションに変更された。
 
 ### 4.2. Sign Loss
 

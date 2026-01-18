@@ -89,13 +89,31 @@ PAD_VALUE_FEATURE = -9999.0
 # 7. Model Hyperparameters
 # ==========================================
 # Default model architecture parameters
-D_MODEL = 128
-NHEAD = 4
-NUM_LAYERS = 6
-DROPOUT = 0.1
+D_MODEL = 512
+NHEAD = 8
+NUM_LAYERS = 8
+DROPOUT = 0.2  # v3: Increased from 0.1 for regularization
 
 # Feedforward layer hidden dim multiplier (d_model * this value)
 FEEDFORWARD_MULTIPLIER = 4
+
+# --- Model Architecture Config (v3) ---
+# Input Projection Type: 'linear' or 'mlp'
+# 'linear': Single Linear layer (5 -> d_model)
+# 'mlp': Linear -> GELU -> Linear (v3 default, more expressive)
+INPUT_PROJ_TYPE = 'mlp'
+
+# Extra Dropout: Apply dropout to streams before FiLM fusion
+USE_PRE_FILM_DROPOUT = True
+
+# --- Loss Configuration (v3) ---
+# Magnitude loss type: 'huber', 'mse', or 'l1'
+MAG_LOSS_TYPE = 'huber'
+
+# Whether to use Heteroscedastic Loss (Uncertainty Estimation)
+# True: Gaussian NLL with learned variance (pred_log_var used)
+# False: Simple deterministic loss (pred_log_var ignored)
+USE_HETEROSCEDASTIC_LOSS = False
 
 # Sign classification classes
 NUM_SIGN_CLASSES = 3

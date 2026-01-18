@@ -35,8 +35,17 @@ class IntSeqEmbeddings(nn.Module):
     def __init__(self, d_model: int = config.D_MODEL, dropout: float = config.DROPOUT, max_len: int = config.MAX_SEQUENCE_LENGTH):
         super().__init__()
         
-        # Projections
-        self.mag_proj = nn.Linear(config.MAG_EXTENDED_DIM, d_model)
+        # Projections (config-driven: v3 adds MLP option)
+        if config.INPUT_PROJ_TYPE == 'mlp':
+            self.mag_proj = nn.Sequential(
+                nn.Linear(config.MAG_EXTENDED_DIM, d_model),
+                nn.GELU(),
+                nn.Linear(d_model, d_model)
+            )
+        else:
+            # 'linear' (v2 style)
+            self.mag_proj = nn.Linear(config.MAG_EXTENDED_DIM, d_model)
+        
         self.mod_proj = nn.Linear(config.MOD_FEATURE_DIM, d_model)
         
         # FiLM Generators (Conditioning on Modulo stream)
@@ -59,8 +68,15 @@ class IntSeqEmbeddings(nn.Module):
         nn.init.zeros_(self.film_shift.weight)
         nn.init.zeros_(self.film_shift.bias)
         
-        # Standard init for projections
-        nn.init.xavier_uniform_(self.mag_proj.weight)
+        # Standard init for projections (handle both Linear and Sequential)
+        if isinstance(self.mag_proj, nn.Sequential):
+            for module in self.mag_proj:
+                if isinstance(module, nn.Linear):
+                    nn.init.xavier_uniform_(module.weight)
+                    if module.bias is not None:
+                        nn.init.zeros_(module.bias)
+        else:
+            nn.init.xavier_uniform_(self.mag_proj.weight)
         nn.init.xavier_uniform_(self.mod_proj.weight)
 
     def forward(self, mag_features: torch.Tensor, mod_features: torch.Tensor) -> torch.Tensor:
@@ -81,6 +97,11 @@ class IntSeqEmbeddings(nn.Module):
         
         # Modulo stream passes through ReLU to increase expressivity before generating FiLM params
         h_mod = torch.relu(self.mod_proj(mod_features)) # (B, L, D)
+        
+        # 1.5. Pre-FiLM Dropout (v3: regularization before fusion)
+        if config.USE_PRE_FILM_DROPOUT:
+            h_mag = self.dropout(h_mag)
+            h_mod = self.dropout(h_mod)
         
         # 2. FiLM Generation
         gamma = self.film_scale(h_mod) # (B, L, D)
@@ -230,29 +251,34 @@ class IntSeqForPreTraining(nn.Module):
             # Filter targets and predictions by mask to compute loss only on masked tokens
             # This flattens the tensors: (N_masked, ...)
             
-            # --- A. Magnitude Loss (Gaussian NLL) ---
+            # --- A. Magnitude Loss ---
             # IMPORTANT: Use FP32 for magnitude loss to prevent FP16 overflow
             # Extreme log values (up to 210) cause overflow in half precision
             target_mag = labels["mag_targets"][mask_map].float()
             pred_mu = mag_mu[mask_map].float()
             pred_log_var = mag_log_var[mask_map].float()
             
-            # NLL = 0.5 * log(sigma^2) + (y - mu)^2 / (2 * sigma^2)
-            # Modified: Use Huber loss instead of squared error for robustness to extreme values
-            # This prevents gradient explosion when target_mag >> pred_mu (e.g., 210 vs 0)
-            # Clamp log_var to prevent numerical instability (exp overflow/underflow)
-            pred_log_var = torch.clamp(pred_log_var, config.LOG_VAR_CLIP_MIN, config.LOG_VAR_CLIP_MAX)
-            precision = torch.exp(-pred_log_var)
+            # Compute reconstruction loss based on config.MAG_LOSS_TYPE
+            if config.MAG_LOSS_TYPE == 'huber':
+                recon_loss = nn.functional.smooth_l1_loss(pred_mu, target_mag, reduction='none', beta=1.0)
+            elif config.MAG_LOSS_TYPE == 'mse':
+                recon_loss = nn.functional.mse_loss(pred_mu, target_mag, reduction='none')
+            elif config.MAG_LOSS_TYPE == 'l1':
+                recon_loss = nn.functional.l1_loss(pred_mu, target_mag, reduction='none')
+            else:
+                raise ValueError(f"Unknown MAG_LOSS_TYPE: {config.MAG_LOSS_TYPE}")
             
-            # Use Huber loss (smooth L1) instead of squared error
-            # Huber loss is linear for |error| > delta, quadratic otherwise
-            huber_loss = nn.functional.smooth_l1_loss(pred_mu, target_mag, reduction='none', beta=1.0)
-            
-            # Clamp per-sample loss to prevent extreme values causing NaN
-            # Max = 100.0 is much larger than random prediction loss, allowing normal gradients
-            loss_mag_per_sample = 0.5 * pred_log_var + huber_loss * precision
-            loss_mag_per_sample = torch.clamp(loss_mag_per_sample, max=100.0)
-            loss_mag = loss_mag_per_sample.mean()
+            # Apply heteroscedastic weighting if enabled (v3: toggleable)
+            if config.USE_HETEROSCEDASTIC_LOSS:
+                # Gaussian NLL with learned variance
+                pred_log_var = torch.clamp(pred_log_var, config.LOG_VAR_CLIP_MIN, config.LOG_VAR_CLIP_MAX)
+                precision = torch.exp(-pred_log_var)
+                loss_mag_per_sample = 0.5 * pred_log_var + recon_loss * precision
+                loss_mag_per_sample = torch.clamp(loss_mag_per_sample, max=100.0)
+                loss_mag = loss_mag_per_sample.mean()
+            else:
+                # Simple deterministic loss (pred_log_var ignored)
+                loss_mag = recon_loss.mean()
             
             # --- B. Sign Loss (CrossEntropy) ---
             target_sign = labels["sign_targets"][mask_map]

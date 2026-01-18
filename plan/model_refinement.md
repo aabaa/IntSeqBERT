@@ -1,42 +1,4 @@
-### 1. Magnitude入力の表現力強化 (Input Projection)
-
-**現状:** `mag_proj: Linear(5, 512)`
-**課題:** 入力の次元数「5」は情報量が少なく、単純な線形変換だけでは 512次元の空間にリッチに展開できない可能性があります（ランク不足）。
-
-**改善案 (Section 3.1. IntSeqEmbeddings):**
-
-Magnitude入力に対して、**MLP (Multi-Layer Perceptron)** を通すことで、特徴量を非線形に膨らませてから FiLM に渡すようにします。
-
-```python
-# 変更前
-self.mag_proj = nn.Linear(MAG_EXTENDED_DIM, d_model)
-
-# 変更後
-self.mag_proj = nn.Sequential(
-    nn.Linear(MAG_EXTENDED_DIM, d_model),
-    nn.GELU(),  # 非線形性
-    nn.Linear(d_model, d_model)
-)
-
-```
-
-これにより、単なる数値のスケーリングだけでなく、数値間の複雑な関係性を埋め込みベクトルに反映しやすくなります。
-
----
-
-### 2. 正則化の強化 (Dropout)
-
-過学習（Loss悪化・Acc向上）の傾向が見られた場合、モデル定義レベルで Dropout の適用箇所を念入りに確認します。
-
-**確認事項:**
-
-* `IntSeqEmbeddings`: 最後の `Dropout` は必須。
-* `IntSeqModel`: EncoderLayer 内の `dropout` 引数は必須。
-* **追加提案:** `IntSeqEmbeddings` の `h_mag` と `h_mod` が融合する前（FiLM適用前）にも Dropout を入れると、片方のストリームへの過度な依存を防げる場合があります。
-
----
-
-### 3. Vanilla Baseline のトークナイザ制限
+### 1. Vanilla Baseline のトークナイザ制限
 
 **課題:**
 仕様書 7.5 にて `VANILLA_VOCAB_SIZE = 10003` とありますが、これだと `10000` を超える数値はすべて `[UNK]` になり、Magnitude（大きさ）の比較ができなくなります。
