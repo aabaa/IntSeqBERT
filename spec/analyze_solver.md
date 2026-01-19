@@ -84,8 +84,7 @@ python -m intseq_bert.analysis.analyze_solver \
 | `--data_root` | str | | `config.DATA_ROOT` | データルートディレクトリ |
 | `--max_samples` | int | | `1000` | 評価する最大サンプル数 |
 | `--top_k` | int | | `5` | Solver が返す候補数 |
-| `--filter_magnitude` | str | | `None` | 特定桁数範囲のみテスト (`small`, `medium`, `large`, `huge`) |
-| `--batch_size` | int | | `1` | バッチサイズ（現在は1件ずつ処理） |
+| `--filter_magnitude` | str | | `None` | 特定桁数範囲のみテスト (`small`, `medium`, `large`, `huge`, `astronomical`) |
 | `--device` | str | | `auto` | デバイス指定 (`cuda`, `cpu`, `auto`) |
 
 ---
@@ -173,18 +172,24 @@ for sample in tqdm(samples):
         "pred_top1": candidates[0]["value"] if candidates else None,
         "match_rank": match_rank,
         "solver_mode": candidates[0]["method"] if candidates else "none",
-        "mag_log10": math.log10(abs(sample["target"])) if sample["target"] != 0 else 0,
+        "mag_log10": get_log10_magnitude(sample["target"]),
         "score_top1": candidates[0]["score"] if candidates else None,
-        "sign_pred": args[2],  # sign_idx
-        "sign_true": 2 if sample["target"] == 0 else (0 if sample["target"] > 0 else 1)
+        "sign_pred": get_sign_idx(pred_top1),  # 予測結果からの符号
+        "sign_true": get_sign_idx(sample["target"])
     })
 ```
 
-> **Note:** マスク位置について
+> **Note:** マスク処理について
 > 
-> IntSeqBERT は「マスクされた位置の次の項」を予測する設計。
-> 評価時は、**入力系列の最後の位置**が「次の項を予測する位置」として扱われる。
-> Collator のマスク処理は使わず、最後の位置の予測を直接使用する。
+> 入力系列の末尾にダミートークン (0) を追加後、その位置を **明示的にマスク** する。
+> これにより Data Leakage を防止し、モデルはダミー値を見ることなく予測を行う。
+> 
+> ```python
+> # マスキング処理 (collator.py と同じ方式)
+> batch["mag_inputs"][:, -1, :config.MAG_RAW_DIM] = 0.0  # コンテンツをゼロ化
+> batch["mag_inputs"][:, -1, -1] = 1.0  # is_masked フラグを1に
+> batch["mod_inputs"][:, -1, :] = 0.0  # Sin/Cos をゼロ化
+> ```
 
 ### 4.4. Step 3: 結果の集計
 
