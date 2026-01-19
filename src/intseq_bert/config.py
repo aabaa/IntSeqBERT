@@ -200,3 +200,18 @@ EPSILON = 1e-6
 # Plot defaults
 SCATTER_SAMPLE_SIZE = 10000  # Max points for scatter plots
 HISTOGRAM_BINS = 50
+
+# ==========================================
+# 10. Solver Constants
+# ==========================================
+# Mode switching thresholds
+SOLVER_DENSE_THRESHOLD = 1_000_000           # Mode A (dense) → Mode AB (sieve)
+SOLVER_SIEVE_THRESHOLD = 100_000_000_000_000  # Mode AB → Mode B (CRT), 10^14
+
+# Anchored Sieve parameters
+SOLVER_SIEVE_TARGET = 100_000   # Target candidate count after sieving
+SOLVER_MAX_ANCHORS = 20         # Maximum number of anchor moduli
+
+# Beam Search parameters
+SOLVER_BEAM_WIDTH = 10          # Beam width for CRT candidate generation
+SOLVER_TOP_K_DEFAULT = 5        # Default number of candidates to return
