@@ -255,7 +255,7 @@ def bootstrap_ci(data, metric_fn, n_samples=1000, ci=0.95):
 ## 6. 出力ファイル構成
 
 ```text
-results/mag_analysis/
+results/analysis/mag/
 ├── overall_metrics.csv        # 全体の MSE, MAE, R², Acc, CI
 ├── scale_wise_metrics.csv     # 桁数ごとの MSE 推移 (N列を含む)
 ├── tag_wise_metrics.csv       # タグごとの MSE

@@ -440,7 +440,7 @@ def _compute_non_base10_acc(metrics: pd.DataFrame) -> float:
 ### 8.1. ディレクトリ構成
 
 ```text
-results/analysis/
+results/analysis/mod/
 ├── mod_spectrum_ranking.csv      # 法別 NIG ランキング
 ├── mod_spectrum_with_ci.csv      # Bootstrap 信頼区間付き
 ├── tag_performance.csv           # タグ別層別分析

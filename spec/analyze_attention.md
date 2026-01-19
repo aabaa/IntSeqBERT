@@ -512,7 +512,7 @@ def main(args):
 ### 8.1. ディレクトリ構成
 
 ```text
-results/attention_analysis/
+results/analysis/attention/
 ├── A000045_layerwise.png        # 全層の Attention Grid
 ├── A000045_heads_last.png       # 最終層の各ヘッド
 ├── A000045_aggregated.png       # 集約ビュー + 再帰分析

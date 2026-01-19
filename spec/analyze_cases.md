@@ -635,7 +635,7 @@ def generate_comparison_figure(
 ### 9.1. ディレクトリ構成
 
 ```text
-results/case_studies/
+results/analysis/cases/
 ├── A000045_fibonacci.png         # 4パネル図
 ├── A000040_primes.png
 ├── A000290_squares.png
