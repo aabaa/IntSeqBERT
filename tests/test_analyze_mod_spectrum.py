@@ -252,7 +252,7 @@ class TestTagStratifiedAnalysis:
     """Tests for tag_stratified_analysis_from_stats function."""
     
     def test_output_structure(self):
-        """Test output DataFrame has expected structure."""
+        """Test output DataFrame has expected structure including v3 extended columns."""
         from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
         
         N = 50
@@ -270,8 +270,132 @@ class TestTagStratifiedAnalysis:
         
         df = tag_stratified_analysis_from_stats(stats, id_to_tags)
         
-        expected_cols = {"tag", "count", "overall_acc", "non_trivial_acc", "nig_score", "top_modulus"}
-        assert set(df.columns) == expected_cols
+        # Check base columns exist
+        base_cols = {"tag", "count", "overall_acc", "non_base10_acc", "nig_score", "top_modulus"}
+        assert base_cols.issubset(set(df.columns)), f"Missing base columns: {base_cols - set(df.columns)}"
+        
+        # Check extended columns (v3)
+        extended_cols = {
+            "acc_mod_2", "acc_mod_3", "acc_mod_5", "acc_mod_10", "acc_mod_100",
+            "base10_bias", "top_5_mods_nig", "worst_5_mods_nig",
+            "mag_mse", "mag_acc"
+        }
+        assert extended_cols.issubset(set(df.columns)), f"Missing extended columns: {extended_cols - set(df.columns)}"
+    
+    def test_acc_mod_columns_have_values(self):
+        """Test acc_mod_* columns have correct accuracy values."""
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
+        
+        N = 50
+        num_mods = len(config.MOD_RANGE)
+        
+        # Create stats with known acc_sum values
+        acc_sum = torch.zeros(N, num_mods)
+        # Set mod 2 (index 0) accuracy to 80 correct out of 100 tokens per sample
+        acc_sum[:, 0] = 8.0  # 8 correct per sample, 10 tokens per sample -> 80%
+        
+        stats = {
+            "loss_sum": torch.rand(N, num_mods) * 0.5,
+            "acc_sum": acc_sum,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
+        
+        id_to_tags = {oid: ["test_tag"] for oid in stats["oeis_ids"]}
+        
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        assert len(df) > 0
+        row = df.iloc[0]
+        # acc_mod_2 should be around 80% (8/10 * 100)
+        assert abs(row["acc_mod_2"] - 80.0) < 1e-6
+    
+    def test_base10_bias_calculation(self):
+        """Test base10_bias is correctly calculated."""
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
+        
+        N = 50
+        num_mods = len(config.MOD_RANGE)
+        
+        # Create controlled accuracy: mod 10 high, non-base10 low
+        acc_sum = torch.ones(N, num_mods) * 2.0  # 20% baseline
+        # Boost mod 10 (index 8, since MOD_RANGE starts at 2)
+        mod_10_idx = config.MOD_RANGE.index(10)
+        acc_sum[:, mod_10_idx] = 9.0  # 90%
+        
+        stats = {
+            "loss_sum": torch.rand(N, num_mods) * 0.5,
+            "acc_sum": acc_sum,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
+        
+        id_to_tags = {oid: ["bias_test"] for oid in stats["oeis_ids"]}
+        
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        assert len(df) > 0
+        row = df.iloc[0]
+        # base10_bias = acc_mod_10 - non_base10_acc
+        # acc_mod_10 = 90, non_base10_acc should be around 20
+        assert row["base10_bias"] > 60  # Should be significantly positive
+    
+    def test_top_5_worst_5_format(self):
+        """Test top_5_mods_nig and worst_5_mods_nig format."""
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
+        
+        N = 50
+        num_mods = len(config.MOD_RANGE)
+        
+        stats = {
+            "loss_sum": torch.rand(N, num_mods) * 0.5,
+            "acc_sum": torch.rand(N, num_mods) * 100,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
+        
+        id_to_tags = {oid: ["format_test"] for oid in stats["oeis_ids"]}
+        
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        assert len(df) > 0
+        row = df.iloc[0]
+        
+        # Check format: "2(0.85); 3(0.78); ..."
+        top_5 = row["top_5_mods_nig"]
+        worst_5 = row["worst_5_mods_nig"]
+        
+        assert isinstance(top_5, str)
+        assert isinstance(worst_5, str)
+        assert "; " in top_5  # Separator
+        assert "(" in top_5 and ")" in top_5  # Contains scores
+        
+        # Should have 5 entries
+        assert len(top_5.split("; ")) == 5
+        assert len(worst_5.split("; ")) == 5
+    
+    def test_mag_placeholders_are_none(self):
+        """Test mag_mse and mag_acc are None (placeholder)."""
+        from intseq_bert.analysis.analyze_mod_spectrum import tag_stratified_analysis_from_stats
+        
+        N = 50
+        num_mods = len(config.MOD_RANGE)
+        
+        stats = {
+            "loss_sum": torch.rand(N, num_mods),
+            "acc_sum": torch.rand(N, num_mods) * 100,
+            "counts": torch.ones(N) * 10,
+            "oeis_ids": [f"A{i:06d}" for i in range(N)]
+        }
+        
+        id_to_tags = {oid: ["test"] for oid in stats["oeis_ids"]}
+        
+        df = tag_stratified_analysis_from_stats(stats, id_to_tags)
+        
+        assert len(df) > 0
+        row = df.iloc[0]
+        assert row["mag_mse"] is None
+        assert row["mag_acc"] is None
     
     def test_filters_small_tags(self):
         """Test that tags with < MIN_TAG_SAMPLES are filtered out."""

@@ -470,12 +470,27 @@ modulus,nig_mean,nig_lower,nig_upper,accuracy_mean
 
 ### 8.4. `tag_performance.csv`
 
+拡張されたタグ別メトリクス。
+
+| カラム | 説明 |
+|--------|------|
+| `tag` | タグ名 |
+| `count` | サンプル数 |
+| `overall_acc` | 全法平均正解率 |
+| `non_base10_acc` | Base-10除外平均正解率 |
+| `nig_score` | 平均NIGスコア |
+| `top_modulus` | 最高スコアの法 |
+| `acc_mod_2`, `acc_mod_3`, `acc_mod_5`, `acc_mod_10`, `acc_mod_100` | 主要法の個別正解率 |
+| `base10_bias` | 十進法バイアス (`acc_mod_10` - `non_base10_acc`) |
+| `top_5_mods_nig` | NIG上位5法 (例: "2(0.85); 3(0.78); ...") |
+| `worst_5_mods_nig` | NIG下位5法 |
+| `mag_mse` | Magnitude MSE (将来拡張用、現在は N/A) |
+| `mag_acc` | Magnitude 正解率 (将来拡張用、現在は N/A) |
+
 ```csv
-tag,count,overall_acc,non_base10_acc,nig_score,top_modulus
-mult,850,65.2,60.5,0.68,2
-prime,400,55.0,52.0,0.60,2
-base,1200,85.4,20.1,0.35,10
-word,300,88.0,15.0,0.20,10
+tag,count,overall_acc,non_base10_acc,nig_score,top_modulus,acc_mod_2,acc_mod_3,acc_mod_5,acc_mod_10,acc_mod_100,base10_bias,top_5_mods_nig,worst_5_mods_nig,mag_mse,mag_acc
+mult,850,65.2,60.5,0.68,2,92.5,78.2,65.0,42.1,35.0,18.4,"2(0.85); 3(0.78); 4(0.72); 6(0.70); 8(0.68)","98(0.10); 99(0.12); 97(0.15); 101(0.18); 95(0.20)",,
+prime,400,55.0,52.0,0.60,2,88.0,70.5,55.0,38.0,28.0,14.0,"2(0.80); 3(0.68); ...",...,,
 ...
 ```
 

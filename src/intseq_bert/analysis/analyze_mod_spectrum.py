@@ -268,11 +268,23 @@ def tag_stratified_analysis_from_stats(
 ) -> pd.DataFrame:
     """
     Compute metrics stratified by tags using stats.
+    
+    Extended output includes:
+    - Per-modulus accuracy for key moduli (2, 3, 5, 10, 100)
+    - Base-10 bias calculation
+    - Top 5 / Worst 5 moduli by NIG
+    - Placeholder for magnitude metrics (mag_mse, mag_acc)
     """
     oeis_ids = stats["oeis_ids"]
     loss_sum = stats["loss_sum"] # (N, 100)
     acc_sum = stats["acc_sum"]   # (N, 100)
     counts = stats["counts"]     # (N,)
+    
+    # Target moduli for detailed accuracy reporting
+    TARGET_MODS = [2, 3, 5, 10, 100]
+    
+    # Build modulus -> index mapping for fast lookup
+    mod_to_idx = {m: i for i, m in enumerate(config.MOD_RANGE)}
     
     # Map tag -> list of indices
     tag_to_indices = defaultdict(list)
@@ -301,10 +313,18 @@ def tag_stratified_analysis_from_stats(
         tag_loss = tag_loss_sum / tag_counts
         tag_acc = (tag_acc_sum / tag_counts) * 100
         
-        # Calculate per-modulus NIG
-        tag_nigs = []
+        # Calculate per-modulus NIG and build metrics DataFrame
+        tag_nig_data = []
         for i, m in enumerate(config.MOD_RANGE):
-            tag_nigs.append(compute_nig(tag_loss[i].item(), m))
+            nig = compute_nig(tag_loss[i].item(), m)
+            tag_nig_data.append({
+                "modulus": m,
+                "accuracy": tag_acc[i].item(),
+                "nig_score": nig
+            })
+        
+        tag_metrics_df = pd.DataFrame(tag_nig_data)
+        tag_nigs = tag_metrics_df["nig_score"].tolist()
         
         # Summary metrics
         overall_acc = tag_acc.mean().item()
@@ -314,7 +334,7 @@ def tag_stratified_analysis_from_stats(
         best_idx = np.argmax(tag_nigs)
         top_modulus = config.MOD_RANGE[best_idx]
         
-        # Non-trivial accuracy (exclude Base-10)
+        # Non-trivial accuracy (exclude Base-10 related)
         non_base10_accs = [
             tag_acc[i].item() 
             for i, m in enumerate(config.MOD_RANGE) 
@@ -322,14 +342,55 @@ def tag_stratified_analysis_from_stats(
         ]
         non_trivial_acc = np.mean(non_base10_accs) if non_base10_accs else 0.0
         
-        results.append({
+        # --- NEW: Per-modulus accuracy for target moduli ---
+        acc_per_mod = {}
+        for m in TARGET_MODS:
+            if m in mod_to_idx:
+                idx = mod_to_idx[m]
+                acc_per_mod[f"acc_mod_{m}"] = tag_acc[idx].item()
+            else:
+                acc_per_mod[f"acc_mod_{m}"] = None
+        
+        # --- NEW: Base-10 Bias ---
+        acc_mod_10 = acc_per_mod.get("acc_mod_10", 0.0) or 0.0
+        base10_bias = acc_mod_10 - non_trivial_acc
+        
+        # --- NEW: Top 5 / Worst 5 moduli by NIG ---
+        sorted_metrics = tag_metrics_df.sort_values("nig_score", ascending=False)
+        
+        top_5_rows = sorted_metrics.head(5)
+        top_5_str = "; ".join([
+            f"{int(row['modulus'])}({row['nig_score']:.2f})" 
+            for _, row in top_5_rows.iterrows()
+        ])
+        
+        worst_5_rows = sorted_metrics.tail(5)
+        worst_5_str = "; ".join([
+            f"{int(row['modulus'])}({row['nig_score']:.2f})" 
+            for _, row in worst_5_rows.iterrows()
+        ])
+        
+        # Build result row
+        result_row = {
             "tag": tag,
             "count": len(indices),
             "overall_acc": overall_acc,
-            "non_trivial_acc": non_trivial_acc,
+            "non_base10_acc": non_trivial_acc,  # Renamed for clarity
             "nig_score": mean_nig,
-            "top_modulus": top_modulus
-        })
+            "top_modulus": top_modulus,
+            # Per-modulus accuracy
+            **acc_per_mod,
+            # Magnitude metrics (placeholder - requires mag data pipeline)
+            "mag_mse": None,
+            "mag_acc": None,
+            # Base-10 bias
+            "base10_bias": base10_bias,
+            # Top/Worst moduli
+            "top_5_mods_nig": top_5_str,
+            "worst_5_mods_nig": worst_5_str
+        }
+        
+        results.append(result_row)
         
     df = pd.DataFrame(results)
     if len(df) > 0:
