@@ -66,7 +66,7 @@ class IntSeqWrapper(ModelWrapper):
     
     def __init__(self, checkpoint_path: str, device: str):
         import torch
-        from intseq_bert.models import IntSeqForPreTraining
+        from intseq_bert.intseq_models import IntSeqForPreTraining
         
         # Load checkpoint
         checkpoint = torch.load(checkpoint_path, map_location=device)

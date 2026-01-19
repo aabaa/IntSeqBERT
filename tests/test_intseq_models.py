@@ -9,8 +9,8 @@ import torch
 import math
 
 from intseq_bert import config
-from intseq_bert.models import (
-    _generate_sinusoidal_encoding,
+from intseq_bert.base_models import generate_sinusoidal_encoding
+from intseq_bert.intseq_models import (
     IntSeqEmbeddings,
     IntSeqModel,
     IntSeqForPreTraining
@@ -77,14 +77,14 @@ class TestSinusoidalEncoding:
         """Test output has correct shape."""
         max_len = 64
         d_model = 128
-        pe = _generate_sinusoidal_encoding(max_len, d_model)
+        pe = generate_sinusoidal_encoding(max_len, d_model)
         assert pe.shape == (1, max_len, d_model)
     
     def test_sin_cos_alternation(self):
         """Test that even indices use sin, odd indices use cos."""
         max_len = 10
         d_model = 8
-        pe = _generate_sinusoidal_encoding(max_len, d_model)
+        pe = generate_sinusoidal_encoding(max_len, d_model)
         
         # Position 0 should have [sin(0), cos(0), ...] = [0, 1, 0, 1, ...]
         pos0 = pe[0, 0, :]
@@ -93,7 +93,7 @@ class TestSinusoidalEncoding:
     
     def test_different_positions_differ(self):
         """Test that different positions have different encodings."""
-        pe = _generate_sinusoidal_encoding(100, 64)
+        pe = generate_sinusoidal_encoding(100, 64)
         assert not torch.allclose(pe[0, 0], pe[0, 1])
         assert not torch.allclose(pe[0, 0], pe[0, 50])
 

@@ -1,4 +1,4 @@
-# `src/intseq_bert/models.py` 実装仕様書
+# `src/intseq_bert/intseq_models.py` 実装仕様書
 
 ## 1. 概要
 

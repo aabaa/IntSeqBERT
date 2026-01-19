@@ -215,3 +215,11 @@ SOLVER_MAX_ANCHORS = 20         # Maximum number of anchor moduli
 # Beam Search parameters
 SOLVER_BEAM_WIDTH = 10          # Beam width for CRT candidate generation
 SOLVER_TOP_K_DEFAULT = 5        # Default number of candidates to return
+
+# ==========================================
+# 11. Vanilla Transformer Constants
+# ==========================================
+VANILLA_VOCAB_SIZE = 30000      # Token vocabulary size
+VANILLA_PAD_TOKEN_ID = 0        # Padding token ID
+VANILLA_UNK_TOKEN_ID = 2        # Unknown token ID
+VANILLA_MASK_TOKEN_ID = 1       # Mask token ID

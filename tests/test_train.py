@@ -15,7 +15,7 @@ from intseq_bert.train import (
     prepare_labels,
     evaluate
 )
-from intseq_bert.models import IntSeqForPreTraining
+from intseq_bert.intseq_models import IntSeqForPreTraining
 
 
 # ==========================================
