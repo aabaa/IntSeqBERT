@@ -5,6 +5,8 @@
 本モジュールは、IntSeqBERT のニューラルネットワーク定義を担当する。
 HuggingFace Transformers の設計思想を踏襲し、**埋め込み層 (`Embeddings`)**、**ベースモデル (`Model`)**、**事前学習用モデル (`ForPreTraining`)** の3層クラス構成とする。
 
+> **関連仕様:** 共通コンポーネント（基底クラス、損失計算）は [base_models.md](./base_models.md) を参照。
+
 特徴:
 - **FiLM (Feature-wise Linear Modulation)** によるデュアルストリーム統合
 - **Heteroscedastic Regression** による不確実性推定（Huber損失ベース）

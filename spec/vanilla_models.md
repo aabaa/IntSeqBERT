@@ -7,14 +7,15 @@
 3. [クラス設計](#3-クラス設計)
 4. [入出力形状](#4-入出力形状)
 5. [損失計算](#5-損失計算)
-6. [共通コンポーネント](#6-共通コンポーネント)
-7. [ヘルパーメソッド](#7-ヘルパーメソッド)
+6. [ヘルパーメソッド](#6-ヘルパーメソッド)
 
 ---
 
 ## 1. 概要
 
 **対象ファイル:** `src/intseq_bert/vanilla_models.py`
+
+> **関連仕様:** 共通コンポーネント（基底クラス、損失計算、`_split_mod_logits`）は [base_models.md](./base_models.md) を参照。
 
 **目的:**
 IntSeqBERT との比較実験（Baseline）用として、以下の3つのクラスを実装する。
@@ -23,7 +24,7 @@ IntSeqBERT との比較実験（Baseline）用として、以下の3つのクラ
 | クラス | 役割 |
 |--------|------|
 | `VanillaEmbeddings` | 数値IDの埋め込みと位置エンコーディング |
-| `VanillaTransformerModel` | Transformer Encoder バックボーン |
+| `VanillaModel` | Transformer Encoder バックボーン |
 | `VanillaTransformerForPreTraining` | 学習用ヘッド（ID予測 + 診断用ヘッド） |
 
 ---
@@ -169,37 +170,13 @@ IntSeqBERT と同じ **Masked Language Model (MLM)** 方式:
 
 ---
 
-## 6. 共通コンポーネント
+## 6. ヘルパーメソッド
 
-### 6.1. Positional Encoding
+### 6.1. `from_checkpoint`
 
-`models.py` 内の `_generate_sinusoidal_encoding()` 関数を両モデルで共有。
+`BasePreTrainedModel.from_checkpoint` を継承。詳細は [base_models.md](./base_models.md) 参照。
 
-### 6.2. `_split_mod_logits`
-
-IntSeqBERT と同一のロジック。Mixin またはコピーで実装。
-
-```python
-def _split_mod_logits(self, logits: torch.Tensor) -> List[torch.Tensor]:
-    return torch.split(logits, config.MOD_RANGE, dim=-1)
-```
-
----
-
-## 7. ヘルパーメソッド
-
-### 7.1. `from_checkpoint`
-
-```python
-@classmethod
-def from_checkpoint(cls, path: str, device: str = "cpu"):
-    checkpoint = torch.load(path, map_location=device)
-    model = cls(**checkpoint.get("config", {}))
-    model.load_state_dict(checkpoint["model_state_dict"])
-    return model.to(device).eval()
-```
-
-### 7.2. トークン化
+### 6.2. トークン化
 
 数値 → トークンID 変換:
 
@@ -209,3 +186,4 @@ def tokenize_number(n: int) -> int:
         return n
     return VANILLA_UNK_TOKEN_ID  # 範囲外は UNK
 ```
+
