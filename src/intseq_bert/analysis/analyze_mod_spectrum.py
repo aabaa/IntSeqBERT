@@ -419,8 +419,8 @@ def main(args=None):
     metrics_df = compute_mod_metrics_from_stats(stats)
     metrics_df["interpretation"] = metrics_df["modulus"].apply(get_interpretation)
     metrics_df = metrics_df.sort_values("nig_score", ascending=False)
-    metrics_df.to_csv(output_dir / "nig_ranking.csv", index=False)
-    logging.info(f"Saved: {output_dir / 'nig_ranking.csv'}")
+    metrics_df.to_csv(output_dir / "mod_spectrum_ranking.csv", index=False)
+    logging.info(f"Saved: {output_dir / 'mod_spectrum_ranking.csv'}")
     
     # Bootstrap CI
     if args.bootstrap_samples > 0:
@@ -431,8 +431,8 @@ def main(args=None):
             seed=args.seed,
             quiet=args.quiet
         )
-        ci_df.to_csv(output_dir / "nig_ci.csv", index=False)
-        logging.info(f"Saved: {output_dir / 'nig_ci.csv'}")
+        ci_df.to_csv(output_dir / "mod_spectrum_with_ci.csv", index=False)
+        logging.info(f"Saved: {output_dir / 'mod_spectrum_with_ci.csv'}")
     
     # Tag-stratified analysis
     if Path(args.jsonl_path).exists():
@@ -442,8 +442,8 @@ def main(args=None):
             stats,
             id_to_tags
         )
-        tag_df.to_csv(output_dir / "tag_analysis.csv", index=False)
-        logging.info(f"Saved: {output_dir / 'tag_analysis.csv'}")
+        tag_df.to_csv(output_dir / "tag_performance.csv", index=False)
+        logging.info(f"Saved: {output_dir / 'tag_performance.csv'}")
     
     # Save config
     config_data = {
