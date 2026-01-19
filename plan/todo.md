@@ -1,10 +1,6 @@
 # 残タスクリスト（優先度順）
 
-## 1. Solverの実装
-「Magnitude（大きさ）」と「Modulo（余り）」の予測値から、元の整数 $N$ を逆算するモジュール
-単に CRT を解くだけでなく、「Magnitudeの予測範囲内で、かつ信頼度の高いModulo予測を満たす整数を探索する」 アルゴリズムが必要
-
-## 2. 【必須】Vanilla Transformer (Baseline) の実装と学習
+## 1. 【必須】Vanilla Transformer (Baseline) の実装と学習
 
 「素のBERT」とおっしゃいましたが、テキスト用のトークナイザを使うBERTではなく、**「IntSeqBERTから『Dual Stream構造』と『FiLM』を取り除いた、ただの数値Transformer」** を用意する必要があります。
 
@@ -17,7 +13,7 @@
 
 * **期待される結果:** IntSeqBERTの方が、特に「周期性（Mod Acc）」や「収束速度」で圧勝することを確認する。
 
-## 3. 【必須】`analyze_magnitude.py` の実装
+## 2. 【必須】`analyze_magnitude.py` の実装
 
 先ほど話題に出た「大きさ（成長率）」の分析スクリプトです。`analyze_mod_spectrum.py` と対になる存在です。
 
@@ -28,14 +24,14 @@
 
 
 
-## 4. 【推奨】アブレーションモデル (No-Mod) の学習
+## 3. 【推奨】アブレーションモデル (No-Mod) の学習
 
 「Moduloストリーム（余りの情報）」が本当に必要だったのかを証明する実験です。
 
 * **構造:** v3 から Modulo Stream を物理的に切断したモデル。Magnitude入力だけで学習させる。
 * **目的:** 「偶奇性や素数判定能力は、Modulo入力があるからこそ獲得できた」と主張するため。
 
-## 5. 【推奨】可視化ツール (Visualization)
+## 4. 【推奨】可視化ツール (Visualization)
 
 数字の羅列（CSV）だけでは読者に響きません。以下の可視化スクリプトがあると完璧です。
 
