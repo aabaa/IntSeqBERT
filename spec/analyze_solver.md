@@ -78,7 +78,7 @@ python -m intseq_bert.analysis.analyze_solver \
 | 引数 | 型 | 必須 | デフォルト | 説明 |
 |------|------|------|-----------|------|
 | `--checkpoint` | str | ✅ | - | モデルチェックポイントパス |
-| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`) |
+| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
 | `--split_type` | str | ✅ | - | 分割タイプ (例: `std`, `easy`) |
 | `--split_name` | str | | `test` | 分割名 (`train`, `val`, `test`) |
 | `--output_dir` | str | ✅ | - | 出力ディレクトリ |

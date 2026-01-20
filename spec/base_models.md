@@ -5,7 +5,7 @@
 **対象ファイル:** `src/intseq_bert/base_models.py`
 
 **目的:**
-IntSeqBERT と Vanilla Transformer の共通インフラを提供する。
+IntSeqBERT、Vanilla Transformer、および Ablation Model の共通インフラを提供する。
 公平な比較実験のため、以下のコンポーネントを共有する。
 
 | コンポーネント | 役割 |

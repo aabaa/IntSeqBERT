@@ -11,6 +11,7 @@
 * **モデル:**
   - `src/intseq_bert/intseq_models.py` (`IntSeqForPreTraining`)
   - `src/intseq_bert/vanilla_models.py` (`VanillaTransformerForPreTraining`)
+  - `src/intseq_bert/ablation_models.py` (`AblationForPreTraining`)
   - `src/intseq_bert/models.py` (再エクスポート用)
 * **データ:** `src/intseq_bert/loader.py` (`load_dataset`), `src/intseq_bert/collator.py` (`OEISCollator`)
 * **設定:** `src/intseq_bert/config.py`
@@ -28,9 +29,10 @@
 
 ### モデル選択
 
-* `--model_type`: モデル種別 (`intseq`, `vanilla`) (default: `intseq`)
+* `--model_type`: モデル種別 (`intseq`, `vanilla`, `ablation`) (default: `intseq`)
   - `intseq`: IntSeqBERT (Dual Stream + FiLM 融合)
   - `vanilla`: Vanilla Transformer (標準トークン埋め込み)
+  - `ablation`: Ablation Model (Magnitude のみ、Modulo 入力なし)
 
 ### モデル構成 (Config上書き用)
 
