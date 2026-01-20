@@ -413,7 +413,7 @@ def evaluate(
                 continue
 
             # Forward (FP32 - AMP disabled due to FP16 overflow issues)
-            if model_type == "intseq":
+            if model_type == "intseq" or model_type == "ablation":
                 outputs = model(
                     mag_features=inputs["mag_features"],
                     mod_features=inputs["mod_features"],
@@ -588,6 +588,12 @@ def train(args):
             nhead=args.nhead,
             num_layers=args.num_layers
         )
+    elif args.model_type == "ablation":
+        model = models.AblationForPreTraining(
+            d_model=args.d_model,
+            nhead=args.nhead,
+            num_layers=args.num_layers
+        )
     else:
         raise ValueError(f"Unknown model_type: {args.model_type}")
     
@@ -642,7 +648,7 @@ def train(args):
             
             # Forward - dispatch based on model type
             # NOTE: AMP disabled due to FP16 overflow with extreme log values (up to 210)
-            if args.model_type == "intseq":
+            if args.model_type == "intseq" or args.model_type == "ablation":
                 outputs = model(
                     mag_features=inputs["mag_features"],
                     mod_features=inputs["mod_features"],
@@ -924,6 +930,12 @@ def test_only(args):
         )
     elif model_type == "vanilla":
         model = models.VanillaTransformerForPreTraining(
+            d_model=model_config["d_model"],
+            nhead=model_config["nhead"],
+            num_layers=model_config["num_layers"]
+        )
+    elif model_type == "ablation":
+        model = models.AblationForPreTraining(
             d_model=model_config["d_model"],
             nhead=model_config["nhead"],
             num_layers=model_config["num_layers"]

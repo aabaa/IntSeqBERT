@@ -5,6 +5,7 @@ Re-export module for backward compatibility and unified model access.
 This module provides a single import point for all model classes:
 - IntSeqBERT models (IntSeqForPreTraining, IntSeqModel, IntSeqEmbeddings)
 - Vanilla Transformer models (VanillaTransformerForPreTraining, VanillaModel, VanillaEmbeddings)
+- Ablation models (AblationForPreTraining, AblationModel, AblationEmbeddings)
 - Base classes (BaseForPreTraining, BaseTransformerModel, BaseEmbeddings, etc.)
 
 Usage:
@@ -38,6 +39,13 @@ from .vanilla_models import (
     VanillaTransformerForPreTraining,
 )
 
+# Ablation models (Magnitude only, no Modulo stream)
+from .ablation_models import (
+    AblationEmbeddings,
+    AblationModel,
+    AblationForPreTraining,
+)
+
 __all__ = [
     # Base models
     "ModLogitsMixin",
@@ -55,4 +63,8 @@ __all__ = [
     "VanillaEmbeddings",
     "VanillaModel",
     "VanillaTransformerForPreTraining",
+    # Ablation models
+    "AblationEmbeddings",
+    "AblationModel",
+    "AblationForPreTraining",
 ]
