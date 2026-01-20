@@ -1016,8 +1016,8 @@ def main():
     
     # Model Config
     parser.add_argument("--model_type", type=str, default="intseq",
-                       choices=["intseq", "vanilla"],
-                       help="Model type: intseq (IntSeqBERT) or vanilla (Vanilla Transformer)")
+                       choices=["intseq", "vanilla", "ablation"],
+                       help="Model type: intseq (IntSeqBERT), vanilla (Vanilla Transformer), or ablation (Ablation)")
     parser.add_argument("--d_model", type=int, default=config.D_MODEL)
     parser.add_argument("--nhead", type=int, default=config.NHEAD)
     parser.add_argument("--num_layers", type=int, default=config.NUM_LAYERS)
