@@ -122,7 +122,7 @@ def load_model_from_checkpoint(
     Load model from checkpoint using create_model_wrapper.
     
     Args:
-        model_type: Model type ('intseq' or 'vanilla')
+        model_type: Model type ('intseq', 'vanilla' or 'ablation')
         checkpoint_path: Path to checkpoint file
         device: Device to load model on
     
@@ -685,8 +685,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model_type", type=str, default="intseq",
-        choices=["intseq", "vanilla"],
-        help="Model type: intseq (IntSeqBERT) or vanilla (Vanilla Transformer)"
+        choices=["intseq", "vanilla", "ablation"],
+        help="Model type: intseq (IntSeqBERT), vanilla (Vanilla Transformer), or ablation (Ablation)"
     )
     
     return parser.parse_args()
