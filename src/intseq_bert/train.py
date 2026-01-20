@@ -320,9 +320,13 @@ def prepare_labels(batch: Dict, device: torch.device) -> Dict[str, torch.Tensor]
     Returns:
         Dictionary containing inputs moved to device and formatted labels
     """
-    # Move inputs to device
+    # Move IntSeq inputs to device
     mag_features = batch["mag_inputs"].to(device)
     mod_features = batch["mod_inputs"].to(device)
+    
+    # Move Vanilla inputs to device
+    token_ids = batch["token_ids"].to(device)
+    token_labels = batch["token_labels"].to(device)
     
     # Create padding mask (True where padding)
     # attention_mask is 1 for valid, 0 for pad -> invert for src_key_padding_mask
@@ -345,13 +349,19 @@ def prepare_labels(batch: Dict, device: torch.device) -> Dict[str, torch.Tensor]
     mod_targets = mod_labels
     
     return {
+        # IntSeqBERT inputs
         "mag_features": mag_features,
         "mod_features": mod_features,
+        # Vanilla inputs
+        "token_ids": token_ids,
+        "token_labels": token_labels,
+        # Common
         "src_key_padding_mask": src_key_padding_mask,
         "labels": {
             "mag_targets": mag_targets,
             "sign_targets": sign_targets,
             "mod_targets": mod_targets,
+            "token_targets": token_labels,  # For Vanilla LM loss
             "mask_map": mask_matrix
         }
     }
@@ -364,7 +374,8 @@ def prepare_labels(batch: Dict, device: torch.device) -> Dict[str, torch.Tensor]
 def evaluate(
     model: nn.Module, 
     dataloader: DataLoader, 
-    device: torch.device
+    device: torch.device,
+    model_type: str = "intseq"
 ) -> Dict[str, float]:
     """
     Run validation loop and calculate metrics.
@@ -402,12 +413,21 @@ def evaluate(
                 continue
 
             # Forward (FP32 - AMP disabled due to FP16 overflow issues)
-            outputs = model(
-                mag_features=inputs["mag_features"],
-                mod_features=inputs["mod_features"],
-                src_key_padding_mask=inputs["src_key_padding_mask"],
-                labels=labels
-            )
+            if model_type == "intseq":
+                outputs = model(
+                    mag_features=inputs["mag_features"],
+                    mod_features=inputs["mod_features"],
+                    src_key_padding_mask=inputs["src_key_padding_mask"],
+                    labels=labels
+                )
+            elif model_type == "vanilla":
+                outputs = model(
+                    input_ids=inputs["token_ids"],
+                    src_key_padding_mask=inputs["src_key_padding_mask"],
+                    labels=labels
+                )
+            else:
+                raise ValueError(f"Unknown model_type: {model_type}")
             
             loss = outputs["loss"]
             total_loss += loss.item()
@@ -620,15 +640,23 @@ def train(args):
             # Prepare inputs & labels
             inputs = prepare_labels(raw_batch, device)
             
-            # Forward
+            # Forward - dispatch based on model type
             # NOTE: AMP disabled due to FP16 overflow with extreme log values (up to 210)
-            # TODO: Consider enabling AMP with proper scaling if training speed becomes an issue
-            outputs = model(
-                mag_features=inputs["mag_features"],
-                mod_features=inputs["mod_features"],
-                src_key_padding_mask=inputs["src_key_padding_mask"],
-                labels=inputs["labels"]
-            )
+            if args.model_type == "intseq":
+                outputs = model(
+                    mag_features=inputs["mag_features"],
+                    mod_features=inputs["mod_features"],
+                    src_key_padding_mask=inputs["src_key_padding_mask"],
+                    labels=inputs["labels"]
+                )
+            elif args.model_type == "vanilla":
+                outputs = model(
+                    input_ids=inputs["token_ids"],
+                    src_key_padding_mask=inputs["src_key_padding_mask"],
+                    labels=inputs["labels"]
+                )
+            else:
+                raise ValueError(f"Unknown model_type: {args.model_type}")
             loss = outputs["loss"] / args.accum_steps
             
             # Backward (FP32)
@@ -653,7 +681,7 @@ def train(args):
         
         # --- Validation Phase ---
         logger.info(f"Validating Epoch {epoch+1}...")
-        val_metrics = evaluate(model, val_loader, device)
+        val_metrics = evaluate(model, val_loader, device, args.model_type)
         
         epoch_time = time.time() - epoch_start_time
         
@@ -929,7 +957,7 @@ def test_only(args):
     # 4. Evaluate
     logger.info("-" * 40)
     start_time = time.time()
-    test_metrics = evaluate(model, test_loader, device)
+    test_metrics = evaluate(model, test_loader, device, args.model_type)
     eval_time = time.time() - start_time
     
     # 5. Log Results

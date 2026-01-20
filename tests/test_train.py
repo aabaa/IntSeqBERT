@@ -73,10 +73,15 @@ def mock_collator_output(batch_size, seq_len):
         mask_matrix[b, length:] = False
     
     return {
+        # IntSeqBERT inputs
         "mag_inputs": mag_inputs,
         "mod_inputs": mod_inputs,
         "mag_labels": mag_labels,
         "mod_labels": mod_labels,
+        # Vanilla inputs
+        "token_ids": torch.randint(3, 10000, (batch_size, seq_len)),  # Random token IDs
+        "token_labels": torch.randint(3, 10000, (batch_size, seq_len)),  # Random token labels
+        # Common
         "attention_mask": attention_mask,
         "mask_matrix": mask_matrix,
         "oeis_ids": [f"A{100000 + i}" for i in range(batch_size)]
