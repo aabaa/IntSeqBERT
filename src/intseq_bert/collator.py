@@ -140,52 +140,50 @@ class OEISCollator:
         mod_inputs = mod_padded * content_keep_mask
 
         # --- Token ID Processing (for Vanilla Transformer) ---
-        # Extract original integer values from the sequence
-        # We need to get raw integers - they should be stored as the first modulo residue (mod 2)
-        # Actually, we need the original integers which are in features.py KEY_INTEGERS
-        # For now, we'll use the log magnitude to derive approximate integer values
-        # BUT: The proper approach is to have raw integers in the dataset
+        # Vectorized approach: derive approximate integers from log magnitude
+        # mag_padded[..., 0] contains log10(|value|+1)
+        # We reconstruct |value| = 10^log - 1, then convert to token IDs
         
-        # Token IDs: We'll generate from the magnitude head's target
-        # The mag_features[..., 0] contains log10(|value|+1)
-        # We can reconstruct approximate |value| from this for tokenization
-        # However, this loses sign and precision. Better approach: pass raw integers
+        # Special token offsets: PAD=0, MASK=1, UNK=2, integers start at 3
+        SPECIAL_TOKENS_OFFSET = 3
+        max_int = config.VANILLA_VOCAB_SIZE - SPECIAL_TOKENS_OFFSET - 1
         
-        # For now, use a simple mapping based on modulo integers (first column is value mod 2)
-        # This is a workaround - ideally we'd have raw integers in the dataset
+        # Reconstruct approximate absolute values from log magnitude
+        log_vals = mag_padded[..., 0]  # (B, L)
+        approx_abs = torch.pow(10.0, log_vals) - 1  # Approximate |value|
+        approx_abs = torch.clamp(approx_abs, min=0).long()  # Ensure non-negative
         
-        # Build token_ids tensor
-        token_ids = torch.zeros((batch_size, max_len), dtype=torch.long)
-        token_labels = torch.full((batch_size, max_len), config.IGNORE_INDEX, dtype=torch.long)
+        # Map to token IDs: values in [0, max_int] -> [3, vocab_size-1], else UNK
+        in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
+        token_ids = torch.where(
+            in_vocab_mask,
+            approx_abs + SPECIAL_TOKENS_OFFSET,
+            torch.full_like(approx_abs, config.VANILLA_UNK_TOKEN_ID)
+        )
         
-        # For each item in batch, we need raw integers
-        # Check if raw integers are available
-        if "integers" in batch[0]:
-            # Raw integers available
-            for b_idx, item in enumerate(batch):
-                integers = item["integers"]
-                seq_len = len(integers)
-                for i, val in enumerate(integers):
-                    if i < max_len:
-                        token_id = integer_to_token_id(int(val))
-                        token_ids[b_idx, i] = token_id
-                        # Labels: save original token_id for loss computation
-                        token_labels[b_idx, i] = token_id
-        else:
-            # No raw integers - use a placeholder approach
-            # Set all valid positions to UNK (2) as fallback
-            token_ids[valid_mask_bool] = config.VANILLA_UNK_TOKEN_ID
-            token_labels[valid_mask_bool] = config.VANILLA_UNK_TOKEN_ID
+        # Initialize token_labels from token_ids
+        token_labels = token_ids.clone()
         
         # Apply MASK token (ID=1) at masked positions for input
-        MASK_TOKEN_ID = 1
-        token_ids[mask_matrix] = MASK_TOKEN_ID
+        token_ids = torch.where(
+            mask_matrix,
+            torch.full_like(token_ids, config.VANILLA_MASK_TOKEN_ID),
+            token_ids
+        )
         
         # Set padding positions to PAD token (ID=0)
-        token_ids[~valid_mask_bool] = config.VANILLA_PAD_TOKEN_ID
+        token_ids = torch.where(
+            valid_mask_bool,
+            token_ids,
+            torch.full_like(token_ids, config.VANILLA_PAD_TOKEN_ID)
+        )
         
-        # Labels: only predict masked positions
-        token_labels[~mask_matrix] = config.IGNORE_INDEX
+        # Labels: only predict masked positions, set others to IGNORE_INDEX
+        token_labels = torch.where(
+            mask_matrix,
+            token_labels,
+            torch.full_like(token_labels, config.IGNORE_INDEX)
+        )
 
         # 6. Prepare Labels (Ground Truth)
         # For Magnitude Regression: We need original values. 

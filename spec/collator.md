@@ -2,7 +2,7 @@
 
 ## 1. 概要
 
-本モジュールは、Dual Stream Architecture における**動的マスキング**と**バッチ構築**を担当する。
+本モジュールは、IntSeqBERT および Vanilla Transformer 向けの**動的マスキング**と**バッチ構築**を担当する。
 `OEISDataset` から読み込んだ可変長サンプルをパディングし、Masked Language Modeling のためのマスク処理を適用する。
 
 ### 設計原則
@@ -10,6 +10,7 @@
 - **Dynamic Masking**: エポックごとに異なるマスクパターンを生成（データ拡張効果）
 - **Mask Flag Strategy**: 連続値ストリームで「0」と「マスク」を区別
 - **Origin Shift Strategy**: Sin/Cos ストリームで原点 (0, 0) をマスク表現に使用
+- **Dual Model Support**: IntSeqBERT と Vanilla Transformer の両方をサポート
 
 ---
 
@@ -38,6 +39,10 @@ from . import config
 | `KEY_MOD_FEATURES` | `"mod_features"` | データキー |
 | `KEY_MOD_INTEGERS` | `"mod_integers"` | データキー |
 | `KEY_OEIS_ID` | `"oeis_id"` | データキー |
+| `VANILLA_VOCAB_SIZE` | 10003 | Vanilla トークン語彙サイズ |
+| `VANILLA_PAD_TOKEN_ID` | 0 | パディングトークン ID |
+| `VANILLA_MASK_TOKEN_ID` | 1 | マスクトークン ID |
+| `VANILLA_UNK_TOKEN_ID` | 2 | 未知語トークン ID |
 
 ---
 
@@ -77,10 +82,17 @@ PyTorch DataLoader の `collate_fn` として使用するコラータ。
 
 ```python
 {
+    # IntSeqBERT 入力
     "mag_inputs":     Tensor(B, L, 5),    # MAG_EXTENDED_DIM
     "mod_inputs":     Tensor(B, L, 200),  # MOD_FEATURE_DIM
     "mag_labels":     Tensor(B, L, 4),    # MAG_RAW_DIM
     "mod_labels":     Tensor(B, L, 100),  # NUM_MODULI, Long
+    
+    # Vanilla Transformer 入力
+    "token_ids":      Tensor(B, L),       # Long, トークン ID
+    "token_labels":   Tensor(B, L),       # Long, マスク位置のみ有効
+    
+    # 共通
     "attention_mask": Tensor(B, L),       # Long, 1=valid, 0=padding
     "mask_matrix":    Tensor(B, L),       # Bool, True=masked
     "oeis_ids":       List[str]           # バッチ内の ID リスト
@@ -173,6 +185,43 @@ Masked:   [0,      0,      ...]  # 原点（単位円外）
 mod_inputs = mod_padded * content_keep_mask
 ```
 
+### Step 5.5: Token ID 処理 (Vanilla Transformer 用)
+
+**Vectorized Integer to Token ID Mapping:**
+
+```
+Token ID 構成:
+  0: PAD  - パディング位置
+  1: MASK - マスク位置（入力用）
+  2: UNK  - 語彙外の整数
+  3〜10002: 整数 0〜9999
+```
+
+```python
+# log magnitude から近似整数値を復元
+log_vals = mag_padded[..., 0]  # (B, L)
+approx_abs = torch.pow(10.0, log_vals) - 1  # |value| ≈ 10^log - 1
+approx_abs = torch.clamp(approx_abs, min=0).long()
+
+# トークン ID にマッピング
+max_int = VANILLA_VOCAB_SIZE - 3 - 1  # 9999
+in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
+token_ids = torch.where(
+    in_vocab_mask,
+    approx_abs + 3,  # オフセット 3 (PAD, MASK, UNK)
+    VANILLA_UNK_TOKEN_ID  # 語彙外 → UNK
+)
+
+# マスクトークン適用
+token_ids = torch.where(mask_matrix, VANILLA_MASK_TOKEN_ID, token_ids)
+
+# パディング位置を PAD に
+token_ids = torch.where(valid_mask_bool, token_ids, VANILLA_PAD_TOKEN_ID)
+
+# ラベル: マスク位置のみ正解トークン、他は IGNORE_INDEX
+token_labels = torch.where(mask_matrix, original_token_ids, IGNORE_INDEX)
+```
+
 ### Step 7: ラベル準備
 
 ```python
@@ -249,3 +298,6 @@ for batch in dataloader:
 | パディング位置は非マスク | パディング位置の予測は無意味 |
 | `mod_labels` で非マスク位置を `IGNORE_INDEX` | CrossEntropy で自動的に損失計算から除外 |
 | `mag_labels` は全位置保持 | Regression 損失は `mask_matrix` でフィルタリング |
+| Vectorized Token ID 生成 | Python ループを避けて高速化 |
+| log magnitude からの整数復元 | データセットに生整数がない場合の近似方法 |
+| `VOCAB_SIZE = 10003` | GPU メモリ 8GB 環境での実用的な上限 |

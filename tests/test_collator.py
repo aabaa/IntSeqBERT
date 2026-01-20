@@ -99,6 +99,7 @@ class TestOutputShapes:
         
         expected_keys = [
             "mag_inputs", "mod_inputs", "mag_labels", "mod_labels",
+            "token_ids", "token_labels",  # Vanilla Transformer support
             "attention_mask", "mask_matrix", "oeis_ids"
         ]
         for key in expected_keys:
@@ -341,6 +342,98 @@ class TestLabelPreparation:
         # Sequence 0: padding at positions 5-9
         padding_region = result["mod_labels"][0, 5:, :]
         assert (padding_region == config.IGNORE_INDEX).all()
+
+
+# ==========================================
+# 8. Token ID Processing Tests (Vanilla Transformer)
+# ==========================================
+
+class TestTokenIdProcessing:
+    """Tests for token_ids and token_labels generation for Vanilla Transformer."""
+    
+    def test_token_ids_shape(self):
+        """Test that token_ids has correct shape."""
+        collator = OEISCollator()
+        batch = create_mock_batch([10, 8, 12])
+        result = collator(batch)
+        
+        B, L = 3, 12  # L = max length
+        assert result["token_ids"].shape == (B, L)
+        assert result["token_labels"].shape == (B, L)
+    
+    def test_token_ids_dtype(self):
+        """Test that token_ids is LongTensor."""
+        collator = OEISCollator()
+        batch = create_mock_batch([10])
+        result = collator(batch)
+        
+        assert result["token_ids"].dtype == torch.long
+        assert result["token_labels"].dtype == torch.long
+    
+    def test_token_ids_valid_range(self):
+        """Test that token_ids are within valid vocabulary range."""
+        collator = OEISCollator()
+        batch = create_mock_batch([10, 10])
+        result = collator(batch)
+        
+        # All token IDs should be in [0, VANILLA_VOCAB_SIZE)
+        assert (result["token_ids"] >= 0).all()
+        assert (result["token_ids"] < config.VANILLA_VOCAB_SIZE).all()
+    
+    def test_masked_positions_have_mask_token(self):
+        """Test that masked positions have MASK token (ID=1)."""
+        collator = OEISCollator()
+        collator.mask_prob = 1.0  # Mask all
+        batch = create_mock_batch([10])
+        result = collator(batch)
+        
+        # All valid positions should have MASK token
+        valid_positions = result["attention_mask"][0, :10] == 1
+        token_ids_valid = result["token_ids"][0, :10]
+        assert (token_ids_valid == config.VANILLA_MASK_TOKEN_ID).all()
+    
+    def test_padding_positions_have_pad_token(self):
+        """Test that padding positions have PAD token (ID=0)."""
+        collator = OEISCollator()
+        batch = create_mock_batch([5, 10])
+        result = collator(batch)
+        
+        # Sequence 0: positions 5-9 are padding
+        padding_tokens = result["token_ids"][0, 5:]
+        assert (padding_tokens == config.VANILLA_PAD_TOKEN_ID).all()
+    
+    def test_unmasked_positions_have_valid_tokens(self):
+        """Test that unmasked positions have valid token IDs (not MASK or PAD)."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0  # No masking
+        batch = create_mock_batch([10])
+        result = collator(batch)
+        
+        # Valid positions should have token IDs >= 2 (not PAD=0, not MASK=1)
+        valid_tokens = result["token_ids"][0, :10]
+        assert (valid_tokens >= config.VANILLA_UNK_TOKEN_ID).all()  # >= 2
+    
+    def test_token_labels_masked_only(self):
+        """Test that token_labels has IGNORE_INDEX for non-masked positions."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0  # No masking
+        batch = create_mock_batch([10])
+        result = collator(batch)
+        
+        # No masked positions, so all labels should be IGNORE_INDEX
+        assert (result["token_labels"] == config.IGNORE_INDEX).all()
+    
+    def test_token_labels_preserve_for_masked(self):
+        """Test that masked positions have valid target token IDs in labels."""
+        collator = OEISCollator()
+        collator.mask_prob = 1.0  # Mask all
+        batch = create_mock_batch([10])
+        result = collator(batch)
+        
+        # Masked positions should have valid token IDs (not IGNORE_INDEX)
+        masked_labels = result["token_labels"][0, :10]
+        assert (masked_labels != config.IGNORE_INDEX).all()
+        assert (masked_labels >= config.VANILLA_UNK_TOKEN_ID).all()  # >= 2
 
 
 # ==========================================
