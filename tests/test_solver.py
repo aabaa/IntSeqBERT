@@ -26,6 +26,7 @@ from intseq_bert.solver import (
     compute_magnitude_score,
     compute_modulo_score,
     compute_total_score,
+    compute_total_scores_batch,
     # Top-K extraction
     get_top_remainders,
     # Mode functions
@@ -299,6 +300,86 @@ class TestTotalScore:
         mod = compute_modulo_score(n, uniform_log_probs, small_mod_range)
         
         assert total == pytest.approx(mag + mod, rel=1e-5)
+
+
+class TestComputeTotalScoresBatch:
+    """Tests for compute_total_scores_batch vectorized function."""
+    
+    def test_empty_candidates(self, small_mod_range, uniform_log_probs):
+        """Test returns empty tensor for empty candidate list."""
+        scores = compute_total_scores_batch(
+            [], mag_mu=2.0, sigma=1.0,
+            mod_log_probs=uniform_log_probs,
+            mod_range=small_mod_range
+        )
+        assert len(scores) == 0
+    
+    def test_single_candidate(self, small_mod_range, uniform_log_probs):
+        """Test matches scalar version for single candidate."""
+        n = 42
+        mag_mu, sigma = 2.5, 1.0
+        
+        scalar_score = compute_total_score(n, mag_mu, sigma, uniform_log_probs, small_mod_range)
+        batch_scores = compute_total_scores_batch([n], mag_mu, sigma, uniform_log_probs, small_mod_range)
+        
+        assert batch_scores[0].item() == pytest.approx(scalar_score, rel=1e-4)
+    
+    def test_multiple_candidates_matches_scalar(self, small_mod_range, peaked_log_probs):
+        """Test batch scoring matches scalar version for multiple candidates."""
+        candidates = [10, 23, 42, 100]
+        mag_mu, sigma = 2.0, 1.0
+        
+        # Compute scalar scores
+        scalar_scores = [
+            compute_total_score(n, mag_mu, sigma, peaked_log_probs, small_mod_range)
+            for n in candidates
+        ]
+       
+        # Compute batch scores
+        batch_scores = compute_total_scores_batch(
+            candidates, mag_mu, sigma, peaked_log_probs, small_mod_range
+        )
+        
+        # Compare
+        for i, (scalar, batch) in enumerate(zip(scalar_scores, batch_scores)):
+            assert batch.item() == pytest.approx(scalar, rel=1e-4), f"Mismatch at index {i}"
+    
+    def test_handles_large_candidates(self, small_mod_range, uniform_log_probs):
+        """Test handles large candidate values correctly."""
+        large_candidates = [10**6, 10**9, 10**12]
+        scores = compute_total_scores_batch(
+            large_candidates, mag_mu=10.0, sigma=2.0,
+            mod_log_probs=uniform_log_probs,
+            mod_range=small_mod_range
+        )
+        
+        assert len(scores) == 3
+        # All scores should be finite
+        assert all(torch.isfinite(s) for s in scores)
+    
+    def test_returns_torch_tensor(self, small_mod_range, uniform_log_probs):
+        """Test returns PyTorch tensor."""
+        scores = compute_total_scores_batch(
+            [10, 20, 30], mag_mu=2.0, sigma=1.0,
+            mod_log_probs=uniform_log_probs,
+            mod_range=small_mod_range
+        )
+        
+        assert isinstance(scores, torch.Tensor)
+        assert scores.shape == (3,)
+    
+    def test_handles_very_large_integers(self, small_mod_range, uniform_log_probs):
+        """Test handles integers beyond int64 range."""
+        # These are larger than 2^63-1
+        very_large_candidates = [10**20, 10**30, 10**40]
+        scores = compute_total_scores_batch(
+            very_large_candidates, mag_mu=30.0, sigma=5.0,
+            mod_log_probs=uniform_log_probs,
+            mod_range=small_mod_range
+        )
+        
+        assert len(scores) == 3
+        assert all(torch.isfinite(s) for s in scores)
 
 
 # ============================================================
