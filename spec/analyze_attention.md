@@ -34,7 +34,7 @@ from typing import Dict, List, Optional, Tuple
 
 ```python
 from intseq_bert import config
-from intseq_bert.analysis.analyze_mod_spectrum import ModelWrapper, create_model_wrapper
+from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 from intseq_bert.analysis.analyze_cases import load_single_sequence
 ```
 

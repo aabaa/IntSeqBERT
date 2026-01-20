@@ -46,7 +46,7 @@ from typing import Dict, List, Tuple, Optional
 ```python
 from intseq_bert import config
 from intseq_bert.solver import IntegerSolver
-from intseq_bert.models import IntSeqForPreTraining
+from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 from intseq_bert.features import process_sequence
 from intseq_bert.collator import OEISCollator
 ```
@@ -78,6 +78,7 @@ python -m intseq_bert.analysis.analyze_solver \
 | 引数 | 型 | 必須 | デフォルト | 説明 |
 |------|------|------|-----------|------|
 | `--checkpoint` | str | ✅ | - | モデルチェックポイントパス |
+| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`) |
 | `--split_type` | str | ✅ | - | 分割タイプ (例: `std`, `easy`) |
 | `--split_name` | str | | `test` | 分割名 (`train`, `val`, `test`) |
 | `--output_dir` | str | ✅ | - | 出力ディレクトリ |
@@ -384,19 +385,10 @@ def load_test_samples(jsonl_path: Path, split_ids: Set[str], max_samples: int):
 チェックポイントから `d_model`, `nhead`, `num_layers` を復元する。
 
 ```python
-def load_model_from_checkpoint(checkpoint_path: Path, device: str):
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    
-    # 設定復元 (train.py と同じロジック)
-    ckpt_config = checkpoint.get("config", {})
-    model = IntSeqForPreTraining(
-        d_model=ckpt_config.get("d_model", config.D_MODEL),
-        nhead=ckpt_config.get("nhead", config.NHEAD),
-        num_layers=ckpt_config.get("num_layers", config.NUM_LAYERS)
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(device).eval()
-    return model
+def load_model_from_checkpoint(model_type: str, checkpoint_path: Path, device: str):
+    """create_model_wrapper を使用してモデルを読み込み"""
+    from intseq_bert.analysis.common import create_model_wrapper
+    return create_model_wrapper(model_type, str(checkpoint_path), device)
 ```
 
 ### 7.3. パフォーマンス目安

@@ -110,16 +110,81 @@ class IntSeqWrapper(ModelWrapper):
         return [F.log_softmax(logits, dim=-1) for logits in split_logits]
 
 
+class VanillaWrapper(ModelWrapper):
+    """Wrapper for VanillaTransformerForPreTraining model."""
+    
+    def __init__(self, checkpoint_path: str, device: str):
+        import torch
+        from intseq_bert.vanilla_models import VanillaTransformerForPreTraining
+        
+        # Load checkpoint
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        # Extract model config from checkpoint or use defaults
+        if "config" in checkpoint:
+            model_config = checkpoint["config"]
+            self.model = VanillaTransformerForPreTraining(
+                d_model=model_config.get("d_model", config.D_MODEL),
+                nhead=model_config.get("nhead", config.NHEAD),
+                num_layers=model_config.get("num_layers", config.NUM_LAYERS),
+                dropout=model_config.get("dropout", config.DROPOUT),
+                vocab_size=model_config.get("vocab_size", config.VANILLA_VOCAB_SIZE),
+                pad_token_id=model_config.get("pad_token_id", config.VANILLA_PAD_TOKEN_ID)
+            )
+        else:
+            # Use default config
+            self.model = VanillaTransformerForPreTraining()
+        
+        # Load state dict
+        if "model_state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+        elif "state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["state_dict"])
+        else:
+            # Assume checkpoint is the state dict itself
+            self.model.load_state_dict(checkpoint)
+        
+        self.model.to(device).eval()
+        self.device = device
+    
+    def predict(self, batch: Dict) -> Dict:
+        with torch.no_grad():
+            outputs = self.model(
+                input_ids=batch["token_ids"].to(self.device),
+                src_key_padding_mask=(batch["attention_mask"] == 0).to(self.device)
+            )
+        return outputs["predictions"]
+    
+    def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
+        split_logits = split_mod_logits(mod_logits)
+        return [F.log_softmax(logits, dim=-1) for logits in split_logits]
+
+
 def create_model_wrapper(
     model_type: str,
     checkpoint_path: str,
     device: str
 ) -> ModelWrapper:
-    """Factory function to create appropriate model wrapper."""
+    """
+    Factory function to create appropriate model wrapper.
+    
+    Args:
+        model_type: 'intseq' or 'vanilla'
+        checkpoint_path: Path to checkpoint file
+        device: Device to load model on ('cuda', 'cpu', etc.)
+    
+    Returns:
+        ModelWrapper instance
+    """
     if model_type == "intseq":
         return IntSeqWrapper(checkpoint_path, device)
+    elif model_type == "vanilla":
+        return VanillaWrapper(checkpoint_path, device)
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        raise ValueError(
+            f"Unknown model_type: {model_type}. "
+            f"Supported types: 'intseq', 'vanilla'"
+        )
 
 
 # ==========================================

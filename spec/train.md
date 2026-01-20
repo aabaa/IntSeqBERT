@@ -2,13 +2,16 @@
 
 ## 1. 概要
 
-本モジュールは、IntSeqBERT モデルの事前学習（Pre-training）を実行するエントリーポイントである。
+本モジュールは、IntSeqBERT / Vanilla Transformer モデルの事前学習（Pre-training）を実行するエントリーポイントである。
 `preprocess.py` で生成されたデータセット分割と特徴量ファイルを読み込み、**Masked Sequence Modeling** タスクを実行する。
-学習プロセスでは、3つのストリーム（Magnitude, Sign, Modulo）の損失バランスを自動調整し、検証時には全ての指標を「パーセント（精度）」で統一して評価する。
+学習プロセスでは、3つのストリーム（Magnitude, Sign, Modulo）の損失を**固定重み**（`w_mag=1.0`, `w_sign=1.0`, `w_mod=2.0`）で結合し、検証時には全ての指標を「パーセント（精度）」で統一して評価する。
 
 ## 2. 依存関係
 
-* **モデル:** `src/intseq_bert/models.py` (`IntSeqForPreTraining`)
+* **モデル:**
+  - `src/intseq_bert/intseq_models.py` (`IntSeqForPreTraining`)
+  - `src/intseq_bert/vanilla_models.py` (`VanillaTransformerForPreTraining`)
+  - `src/intseq_bert/models.py` (再エクスポート用)
 * **データ:** `src/intseq_bert/loader.py` (`load_dataset`), `src/intseq_bert/collator.py` (`OEISCollator`)
 * **設定:** `src/intseq_bert/config.py`
 * **ライブラリ:** `torch`, `torch.optim`, `tqdm`, `logging`, `tensorboard` (または `wandb`)
@@ -22,6 +25,12 @@
 * `--split_type`: 分割タイプ (例: `std`, `easy`) (必須)
 * `--data_root`: データルートディレクトリ (default: `config.DATA_ROOT`)
 * `--output_dir`: ログ・チェックポイント保存先 (必須)
+
+### モデル選択
+
+* `--model_type`: モデル種別 (`intseq`, `vanilla`) (default: `intseq`)
+  - `intseq`: IntSeqBERT (Dual Stream + FiLM 融合)
+  - `vanilla`: Vanilla Transformer (標準トークン埋め込み)
 
 ### モデル構成 (Config上書き用)
 
@@ -46,7 +55,7 @@
 
 ## 4. Collator 出力からラベルへの変換
 
-`OEISCollator` の出力キーと `IntSeqForPreTraining` が期待するラベル形式は異なるため、学習ループ内で変換を行う。
+`OEISCollator` の出力キーとモデル（`IntSeqForPreTraining` / `VanillaTransformerForPreTraining`）が期待するラベル形式は異なるため、学習ループ内で変換を行う。
 
 ### Collator 出力
 

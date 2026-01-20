@@ -11,7 +11,7 @@ HuggingFace Transformers の設計思想を踏襲し、**埋め込み層 (`Embed
 - **FiLM (Feature-wise Linear Modulation)** によるデュアルストリーム統合
 - **Heteroscedastic Regression** による不確実性推定（Huber損失ベース）
 - **FP32強制演算** による数値安定性確保（極端なlog値対応）
-- **Automatic Weighted Loss** によるマルチタスク学習の安定化
+- **固定損失重み** によるマルチタスク学習の安定化（`w_mag=1.0`, `w_sign=1.0`, `w_mod=2.0`）
 
 ---
 

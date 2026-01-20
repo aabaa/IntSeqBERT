@@ -36,7 +36,7 @@ from torch.utils.data import DataLoader
 from intseq_bert import config
 from intseq_bert.loader import load_dataset, OEISDataset
 from intseq_bert.collator import OEISCollator
-from intseq_bert.models import IntSeqForPreTraining, VanillaTransformerForPreTraining
+from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 ```
 
 ---

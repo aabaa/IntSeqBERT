@@ -35,7 +35,7 @@ from typing import Dict, Optional, List, Tuple
 ```python
 from intseq_bert import config
 from intseq_bert.loader import load_dataset
-from intseq_bert.analysis.analyze_mod_spectrum import ModelWrapper, create_model_wrapper
+from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 ```
 
 ---

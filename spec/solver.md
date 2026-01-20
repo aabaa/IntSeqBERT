@@ -46,7 +46,8 @@ SOLVER_MAX_ANCHORS = 20                     # アンカーの最大数
 
 ### 関連モジュール
 
-- `models.py`: `IntSeqForPreTraining` の出力を入力として使用
+- `intseq_models.py` / `vanilla_models.py`: モデルの出力を入力として使用
+- `base_models.py`: `BaseForPreTraining` 共通インターフェース
 - `features.py`: 特徴量計算（参照用）
 
 ---
@@ -115,7 +116,7 @@ def solve(
 def from_model_output(
     predictions: Dict,
     position: int,
-    model: "IntSeqForPreTraining"
+    model: "BaseForPreTraining"  # IntSeqForPreTraining or VanillaTransformerForPreTraining
 ) -> Tuple[float, float, int, List[torch.Tensor]]:
     """
     モデルの predictions 辞書から solve() の入力形式に変換する。

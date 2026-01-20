@@ -555,12 +555,21 @@ def train(args):
     )
     
     # 3. Model Initialization
-    logger.info("Initializing model...")
-    model = models.IntSeqForPreTraining(
-        d_model=args.d_model,
-        nhead=args.nhead,
-        num_layers=args.num_layers
-    )
+    logger.info(f"Initializing model (type={args.model_type})...")
+    if args.model_type == "intseq":
+        model = models.IntSeqForPreTraining(
+            d_model=args.d_model,
+            nhead=args.nhead,
+            num_layers=args.num_layers
+        )
+    elif args.model_type == "vanilla":
+        model = models.VanillaTransformerForPreTraining(
+            d_model=args.d_model,
+            nhead=args.nhead,
+            num_layers=args.num_layers
+        )
+    else:
+        raise ValueError(f"Unknown model_type: {args.model_type}")
     
     start_epoch = 0
     if args.resume:
@@ -877,12 +886,23 @@ def test_only(args):
     
     # 2. Restore model config with fallback priority
     model_config = _load_model_config(Path(args.model_path), checkpoint, args)
+    model_type = getattr(args, "model_type", "intseq")
     
-    model = models.IntSeqForPreTraining(
-        d_model=model_config["d_model"],
-        nhead=model_config["nhead"],
-        num_layers=model_config["num_layers"]
-    )
+    if model_type == "intseq":
+        model = models.IntSeqForPreTraining(
+            d_model=model_config["d_model"],
+            nhead=model_config["nhead"],
+            num_layers=model_config["num_layers"]
+        )
+    elif model_type == "vanilla":
+        model = models.VanillaTransformerForPreTraining(
+            d_model=model_config["d_model"],
+            nhead=model_config["nhead"],
+            num_layers=model_config["num_layers"]
+        )
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+    
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
@@ -955,6 +975,9 @@ def main():
     parser.add_argument("--output_dir", required=True, help="Output directory for checkpoints")
     
     # Model Config
+    parser.add_argument("--model_type", type=str, default="intseq",
+                       choices=["intseq", "vanilla"],
+                       help="Model type: intseq (IntSeqBERT) or vanilla (Vanilla Transformer)")
     parser.add_argument("--d_model", type=int, default=config.D_MODEL)
     parser.add_argument("--nhead", type=int, default=config.NHEAD)
     parser.add_argument("--num_layers", type=int, default=config.NUM_LAYERS)

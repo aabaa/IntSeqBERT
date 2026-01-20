@@ -19,7 +19,7 @@ import torch.nn.functional as F
 from . import config
 
 if TYPE_CHECKING:
-    from .models import IntSeqForPreTraining
+    from .intseq_models import IntSeqForPreTraining
 
 
 # ============================================================
