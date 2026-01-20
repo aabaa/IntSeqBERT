@@ -11,10 +11,12 @@ Implements IntegerSolver class with hybrid algorithm:
 from __future__ import annotations
 
 import math
+import heapq
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 from . import config
 
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 
 def extended_gcd(a: int, b: int) -> Tuple[int, int, int]:
     """
-    Extended Euclidean Algorithm.
+    Extended Euclidean Algorithm (iterative version).
     
     Computes g, x, y such that ax + by = gcd(a, b).
     
@@ -44,10 +46,17 @@ def extended_gcd(a: int, b: int) -> Tuple[int, int, int]:
         >>> extended_gcd(15, 6)
         (3, 1, -2)  # 15*1 + 6*(-2) = 3
     """
-    if b == 0:
-        return a, 1, 0
-    g, x1, y1 = extended_gcd(b, a % b)
-    return g, y1, x1 - (a // b) * y1
+    old_r, r = a, b
+    old_s, s = 1, 0
+    old_t, t = 0, 1
+    
+    while r != 0:
+        quotient = old_r // r
+        old_r, r = r, old_r - quotient * r
+        old_s, s = s, old_s - quotient * s
+        old_t, t = t, old_t - quotient * t
+    
+    return old_r, old_s, old_t
 
 
 def solve_crt_pair(r1: int, m1: int, r2: int, m2: int) -> Tuple[int, int]:
@@ -246,6 +255,88 @@ def compute_total_score(
     return mag_score + mod_score
 
 
+def compute_total_scores_batch(
+    candidates: List[int],
+    mag_mu: float,
+    sigma: float,
+    mod_log_probs: List[torch.Tensor],
+    mod_range: List[int]
+) -> torch.Tensor:
+    """
+    Vectorized batch scoring for multiple candidates.
+    
+    Significantly faster than calling compute_total_score in a loop.
+    
+    Args:
+        candidates: List of candidate integers (positive)
+        mag_mu: Predicted magnitude mean
+        sigma: Magnitude standard deviation
+        mod_log_probs: List of log-probability tensors (on same device)
+        mod_range: List of moduli
+    
+    Returns:
+        Tensor of scores (same length as candidates)
+    """
+    if not candidates:
+        return torch.tensor([])
+    
+    n_candidates = len(candidates)
+    
+    # Handle very large integers that don't fit in int64
+    # Use Python's arbitrary precision arithmetic then convert
+    try:
+        candidates_arr = np.array(candidates, dtype=np.int64)
+    except (OverflowError, ValueError):
+        # Fall back to object dtype for arbitrarily large integers
+        candidates_arr = np.array(candidates, dtype=object)
+    
+    # 1. Magnitude scores (vectorized)
+    # Avoid log of zero/negative
+    valid_mask = candidates_arr > 0
+    log10_vals = np.zeros(n_candidates, dtype=np.float64)
+    
+    # Convert to float for log computation (handles both int64 and object dtype)
+    if candidates_arr.dtype == object:
+        # For arbitrarily large integers, convert to float64 (may lose precision but that's OK for scoring)
+        valid_candidates = [float(c) for i, c in enumerate(candidates) if valid_mask[i]]
+        if valid_candidates:
+            log10_vals[valid_mask] = np.log10(valid_candidates)
+    else:
+        log10_vals[valid_mask] = np.log10(candidates_arr[valid_mask].astype(np.float64))
+    
+    mag_targets = 1 + log10_vals  # Model's scale
+    
+    variance = sigma ** 2 + config.EPSILON
+    mag_scores = -((mag_targets - mag_mu) ** 2) / (2 * variance)
+    mag_scores[~valid_mask] = -1e10  # Penalize invalid candidates
+    
+    # 2. Pre-cache all log_prob tensors as numpy arrays (avoid repeated GPU->CPU transfer)
+    log_probs_np = [lp.detach().cpu().numpy() for lp in mod_log_probs]
+    
+    # 3. Modulo scores (vectorized per modulus)
+    mod_scores = np.zeros(n_candidates)
+    
+    for i, m in enumerate(mod_range):
+        # Compute remainders (works for both int64 and object dtype)
+        if candidates_arr.dtype == object:
+            remainders = np.array([int(c % m) for c in candidates], dtype=np.int64)
+        else:
+            remainders = candidates_arr % m
+        
+        log_prob_np = log_probs_np[i]
+        valid_remainders = remainders < len(log_prob_np)
+        
+        # Safe indexing with numpy advanced indexing
+        valid_idx = remainders[valid_remainders]
+        mod_scores[valid_remainders] += log_prob_np[valid_idx]
+        mod_scores[~valid_remainders] += -100.0  # Penalty for invalid
+    
+    # 4. Total scores
+    total_scores = mag_scores + mod_scores
+    
+    return torch.from_numpy(total_scores)
+
+
 # ============================================================
 # Top-K Remainder Extraction
 # ============================================================
@@ -301,19 +392,56 @@ def solve_dense(
     Returns:
         List of candidate dicts with keys: value, score, method
     """
-    candidates = []
+    width = n_max - n_min + 1
     
-    for n in range(n_min, n_max + 1):
-        score = compute_total_score(n, mag_mu, sigma, mod_log_probs, mod_range)
-        candidates.append({
-            "value": n,
-            "score": score,
-            "method": "dense"
-        })
+    # For very small ranges (< 1000), use simple loop
+    # For larger ranges, use vectorized batch scoring
+    VECTORIZE_THRESHOLD = 1000
     
-    # Sort by score descending
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    return candidates[:top_k]
+    if width <= VECTORIZE_THRESHOLD:
+        # Small range: use heap-based approach
+        candidates = []
+        for n in range(n_min, n_max + 1):
+            score = compute_total_score(n, mag_mu, sigma, mod_log_probs, mod_range)
+            
+            if len(candidates) < top_k:
+                heapq.heappush(candidates, (score, n))
+            else:
+                if score > candidates[0][0]:
+                    heapq.heapreplace(candidates, (score, n))
+        
+        results = []
+        for score, n in sorted(candidates, key=lambda x: x[0], reverse=True):
+            results.append({
+                "value": n,
+                "score": score,
+                "method": "dense"
+            })
+        return results
+    
+    else:
+        # Large range: use vectorized batch scoring
+        candidate_list = list(range(n_min, n_max + 1))
+        scores = compute_total_scores_batch(
+            candidate_list, mag_mu, sigma, mod_log_probs, mod_range
+        )
+        
+        # Get top-k using torch.topk
+        if len(candidate_list) <= top_k:
+            top_indices = list(range(len(candidate_list)))
+        else:
+            top_indices = scores.topk(top_k).indices.tolist()
+        
+        results = []
+        for idx in top_indices:
+            results.append({
+                "value": candidate_list[idx],
+                "score": scores[idx].item(),
+                "method": "dense"
+            })
+        
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results
 
 
 # ============================================================
@@ -421,9 +549,12 @@ def beam_search_crt(
             # All combinations failed, keep previous beams
             continue
         
-        # Keep top beam_width by cumulative probability
-        new_beams.sort(key=lambda x: x[2], reverse=True)
-        beams = new_beams[:beam_width]
+        # Keep top beam_width by cumulative probability (optimized with heapq)
+        if len(new_beams) <= beam_width:
+            beams = new_beams
+        else:
+            # Use heapq.nlargest for better performance than full sort
+            beams = heapq.nlargest(beam_width, new_beams, key=lambda x: x[2])
     
     return beams
 
@@ -431,7 +562,9 @@ def beam_search_crt(
 def enumerate_candidates_from_beams(
     beams: List[Tuple[int, int, float]],
     n_min: int,
-    n_max: int
+    n_max: int,
+    max_count: int = None,
+    skip_threshold: int = None
 ) -> set:
     """
     Enumerate all integers in range that match beam CRT solutions.
@@ -440,10 +573,19 @@ def enumerate_candidates_from_beams(
         beams: List of (x, M, log_prob) from beam search
         n_min: Minimum of search range
         n_max: Maximum of search range
+        max_count: Safety limit on number of candidates to return
+                   (default: config.SOLVER_MAX_ENUM_CANDIDATES)
+        skip_threshold: Skip beams that would generate more than this many
+                        candidates (default: config.SOLVER_BEAM_SKIP_THRESHOLD)
     
     Returns:
         Set of candidate integers
     """
+    if max_count is None:
+        max_count = config.SOLVER_MAX_ENUM_CANDIDATES
+    if skip_threshold is None:
+        skip_threshold = config.SOLVER_BEAM_SKIP_THRESHOLD
+    
     candidates = set()
     
     for x, M, _ in beams:
@@ -458,10 +600,18 @@ def enumerate_candidates_from_beams(
         
         k_end = (n_max - x) // M
         
+        # Skip this beam if it would generate too many candidates
+        num_candidates_for_beam = k_end - k_start + 1
+        if num_candidates_for_beam > skip_threshold:
+            # This beam has too low LCM, skip it to avoid CPU thrashing
+            continue
+        
         for k in range(k_start, k_end + 1):
             n = x + k * M
             if n_min <= n <= n_max:
                 candidates.add(n)
+                if len(candidates) >= max_count:
+                    return candidates
     
     return candidates
 
@@ -514,25 +664,38 @@ def solve_sieve(
     # 2. Beam search CRT
     beams = beam_search_crt(anchors, mod_log_probs, mod_range, beam_width)
     
-    # 3. Enumerate candidates
+    # 3. Enumerate candidates (using config defaults)
     candidate_set = enumerate_candidates_from_beams(beams, n_min, n_max)
     
     if not candidate_set:
         # No valid candidates found, try single best per anchor
         return []
     
-    # 4. Score all candidates with full moduli
+    # 4. Score all candidates with vectorized batch scoring
+    candidate_list = list(candidate_set)
+    scores = compute_total_scores_batch(
+        candidate_list, mag_mu, sigma, mod_log_probs, mod_range
+    )
+    
+    # 5. Get top-k using argsort (faster than heap for vectorized data)
+    if len(candidate_list) <= top_k:
+        # Return all if fewer than top_k
+        top_indices = list(range(len(candidate_list)))
+    else:
+        # Get indices of top-k scores
+        top_indices = scores.topk(top_k).indices.tolist()
+    
     candidates = []
-    for n in candidate_set:
-        score = compute_total_score(n, mag_mu, sigma, mod_log_probs, mod_range)
+    for idx in top_indices:
         candidates.append({
-            "value": n,
-            "score": score,
+            "value": candidate_list[idx],
+            "score": scores[idx].item(),
             "method": "sieve"
         })
     
+    # Sort by score descending
     candidates.sort(key=lambda x: x["score"], reverse=True)
-    return candidates[:top_k]
+    return candidates
 
 
 # ============================================================
@@ -618,8 +781,8 @@ def solve_sparse_crt(
     # 2. Beam search CRT
     beams = beam_search_crt(basis, mod_log_probs, mod_range, beam_width)
     
-    # 3. Adjust candidates to be within range
-    candidates = []
+    # 3. Adjust candidates to be within range and use batch scoring
+    candidate_list = []
     seen = set()
     
     for x, M, _ in beams:
@@ -637,12 +800,24 @@ def solve_sparse_crt(
         
         if n_min <= n <= n_max and n not in seen:
             seen.add(n)
-            score = compute_total_score(n, mag_mu, sigma, mod_log_probs, mod_range)
-            candidates.append({
-                "value": n,
-                "score": score,
-                "method": "crt"
-            })
+            candidate_list.append(n)
+    
+    if not candidate_list:
+        return []
+    
+    # Batch scoring for all candidates
+    scores = compute_total_scores_batch(
+        candidate_list, mag_mu, sigma, mod_log_probs, mod_range
+    )
+    
+    # Build result with scores
+    candidates = []
+    for i, n in enumerate(candidate_list):
+        candidates.append({
+            "value": n,
+            "score": scores[i].item(),
+            "method": "crt"
+        })
     
     candidates.sort(key=lambda x: x["score"], reverse=True)
     return candidates[:top_k]

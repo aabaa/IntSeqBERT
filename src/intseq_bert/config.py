@@ -220,6 +220,10 @@ SOLVER_MAX_ANCHORS = 20         # Maximum number of anchor moduli
 SOLVER_BEAM_WIDTH = 10          # Beam width for CRT candidate generation
 SOLVER_TOP_K_DEFAULT = 5        # Default number of candidates to return
 
+# Candidate enumeration safety limits (OOM prevention)
+SOLVER_MAX_ENUM_CANDIDATES = 200_000  # Hard limit on enumerated candidates per solve
+SOLVER_BEAM_SKIP_THRESHOLD = 10_000_000  # Skip beam if it would generate > this many candidates
+
 # ==========================================
 # 11. Vanilla Transformer Constants
 # ==========================================
