@@ -27,7 +27,7 @@ from intseq_bert import config
 from intseq_bert.features import process_sequence
 from intseq_bert.solver import IntegerSolver
 from intseq_bert.collator import OEISCollator
-from intseq_bert.analysis.common import IntSeqWrapper
+from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -114,21 +114,22 @@ def load_test_samples(
 
 
 def load_model_from_checkpoint(
+    model_type: str,
     checkpoint_path: Path,
     device: str
-) -> Tuple[Any, IntSeqWrapper]:
+) -> ModelWrapper:
     """
-    Load model from checkpoint using IntSeqWrapper.
+    Load model from checkpoint using create_model_wrapper.
     
     Args:
+        model_type: Model type ('intseq' or 'vanilla')
         checkpoint_path: Path to checkpoint file
         device: Device to load model on
     
     Returns:
-        Tuple of (raw_model, wrapper)
+        ModelWrapper instance
     """
-    wrapper = IntSeqWrapper(str(checkpoint_path), device)
-    return wrapper.model, wrapper
+    return create_model_wrapper(model_type, str(checkpoint_path), device)
 
 
 # ============================================================
@@ -243,7 +244,7 @@ def prepare_single_batch(
 
 
 def run_inference_single(
-    model_wrapper: IntSeqWrapper,
+    model_wrapper: ModelWrapper,
     batch: Dict[str, torch.Tensor],
     solver: IntegerSolver,
     top_k: int
@@ -320,7 +321,7 @@ def get_sign_idx(value: int) -> int:
 
 def evaluate_samples(
     samples: List[Dict],
-    model_wrapper: IntSeqWrapper,
+    model_wrapper: ModelWrapper,
     solver: IntegerSolver,
     collator: OEISCollator,
     device: str,
@@ -682,6 +683,11 @@ def parse_args() -> argparse.Namespace:
         "--device", type=str, default="auto",
         help="Device (cuda, cpu, auto)"
     )
+    parser.add_argument(
+        "--model_type", type=str, default="intseq",
+        choices=["intseq", "vanilla"],
+        help="Model type: intseq (IntSeqBERT) or vanilla (Vanilla Transformer)"
+    )
     
     return parser.parse_args()
 
@@ -728,7 +734,8 @@ def main():
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     
-    model, model_wrapper = load_model_from_checkpoint(checkpoint_path, device)
+    model_wrapper = load_model_from_checkpoint(args.model_type, checkpoint_path, device)
+    logger.info(f"Loaded model (type={args.model_type})")
     
     # Create solver
     solver = IntegerSolver()
