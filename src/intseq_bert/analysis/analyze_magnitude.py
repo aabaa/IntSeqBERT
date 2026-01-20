@@ -643,7 +643,7 @@ def analyze_log_linearity(sequence: List[int]) -> bool:
     
     r_squared = 1.0 - (ss_res / ss_tot)
     
-    return r_squared > config.LOG_LINEARITY_R2_THRESHOLD
+    return bool(r_squared > config.LOG_LINEARITY_R2_THRESHOLD)
 
 
 def compute_growth_type_metrics(
