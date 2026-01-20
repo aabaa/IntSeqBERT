@@ -93,12 +93,14 @@ def load_single_sequence(
             padding = torch.zeros(mag_tensor.size(0), 1)
             mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
             
-        return {
+        result = {
             "mag_inputs": mag_tensor.unsqueeze(0),
             "mod_inputs": data["mod_features"].unsqueeze(0),
             "attention_mask": torch.ones(1, data["mag_features"].size(0)),
             "oeis_id": oeis_id
         }
+        _add_token_ids(result)
+        return result
     
     # 2. Try JSONL fallback
     if jsonl_path and jsonl_path.exists():
@@ -153,12 +155,14 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
         padding = torch.zeros(mag_tensor.size(0), 1)
         mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
         
-    return {
+    result = {
         "mag_inputs": mag_tensor.unsqueeze(0),
         "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
         "attention_mask": torch.ones(1, len(sequence)),
         "oeis_id": record["oeis_id"]
     }
+    _add_token_ids(result)
+    return result
 
 
 def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str, torch.Tensor]:
@@ -174,12 +178,44 @@ def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str
         padding = torch.zeros(mag_tensor.size(0), 1)
         mag_tensor = torch.cat([mag_tensor, padding], dim=-1)
         
-    return {
+    result = {
         "mag_inputs": mag_tensor.unsqueeze(0),
         "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
         "attention_mask": torch.ones(1, len(sequence)),
         "oeis_id": oeis_id
     }
+    _add_token_ids(result)
+    return result
+
+
+def _add_token_ids(batch: Dict[str, torch.Tensor]) -> None:
+    """
+    Generate token_ids for Vanilla compatibility.
+    Reconstructs approximate integers from magnitude features and maps to token IDs.
+    """
+    mag_tensor = batch["mag_inputs"][0]  # (L, 5)
+    log_vals = mag_tensor[:, 0]
+    
+    # Reconstruct approximate absolute values
+    # Note: Collator uses 10^log - 1. We reproduce this.
+    approx_abs = torch.pow(10.0, log_vals) - 1
+    approx_abs = torch.clamp(approx_abs, min=0).long()
+    
+    SPECIAL_TOKENS_OFFSET = 3
+    # Use fallback if config values missing, though they should be present
+    vocab_size = getattr(config, "VANILLA_VOCAB_SIZE", 10003)
+    unk_token_id = getattr(config, "VANILLA_UNK_TOKEN_ID", 2)
+    
+    max_int = vocab_size - SPECIAL_TOKENS_OFFSET - 1
+    
+    in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
+    token_ids = torch.where(
+        in_vocab_mask,
+        approx_abs + SPECIAL_TOKENS_OFFSET,
+        torch.full_like(approx_abs, unk_token_id)
+    )
+    
+    batch["token_ids"] = token_ids.unsqueeze(0)  # (1, L)
 
 
 # ==========================================

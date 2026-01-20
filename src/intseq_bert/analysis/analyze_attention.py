@@ -70,6 +70,8 @@ class AttentionExtractor:
         """Get encoder layers based on model type."""
         if hasattr(self.model, 'bert'):
             return self.model.bert.encoder.layers
+        elif hasattr(self.model, 'backbone') and hasattr(self.model.backbone, 'encoder'):
+            return self.model.backbone.encoder.layers
         elif hasattr(self.model, 'encoder'):
             return self.model.encoder.encoder.layers
         else:
@@ -402,6 +404,8 @@ def _patch_attention_layers(model: torch.nn.Module):
     def _get_layers(model):
         if hasattr(model, 'bert'):
             return model.bert.encoder.layers
+        elif hasattr(model, 'backbone') and hasattr(model.backbone, 'encoder'):
+             return model.backbone.encoder.layers
         elif hasattr(model, 'encoder'):
              # Check if encoder is directly the TransformerEncoder
              if hasattr(model.encoder, 'layers'):
