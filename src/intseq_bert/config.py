@@ -164,6 +164,10 @@ DEFAULT_EPOCHS = 20
 MIN_RELIABLE_SAMPLES = 30  # For scale-wise bucket analysis
 MIN_TAG_SAMPLES = 10       # For tag-stratified analysis
 
+# Log-linearity analysis (Growth Type)
+# R² threshold to classify a sequence as "log-linear" (exponential growth)
+LOG_LINEARITY_R2_THRESHOLD = 0.95
+
 # Bootstrap CI parameters
 BOOTSTRAP_SAMPLES_DEFAULT = 1000
 CI_LEVEL_DEFAULT = 0.95

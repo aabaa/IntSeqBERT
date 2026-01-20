@@ -250,6 +250,34 @@ def bootstrap_ci(data, metric_fn, n_samples=1000, ci=0.95):
     return lower, upper
 ```
 
+### 5.7. Growth Type Analysis (成長タイプ別分析)
+
+数列が「指数関数的（Log-Linear）」か「それ以外」かで精度に差があるかを分析する機能。
+
+#### `analyze_log_linearity(sequence: List[int]) -> bool`
+
+入力数列が「指数関数的（対数スケールで線形）」に成長しているかを判定するヘルパー関数。
+
+**ロジック:**
+1. 系列の絶対値を取り、0 を除外してから log10 をとる。
+2. インデックス [0, 1, ..., L-1] と対数値の間で線形回帰を行う。
+3. 決定係数 r² > 0.95 (閾値は `config.LOG_LINEARITY_R2_THRESHOLD` で定数化) なら `True` (Log-Linear) を返す。
+
+```python
+# config.py
+LOG_LINEARITY_R2_THRESHOLD = 0.95
+```
+
+#### `compute_growth_type_metrics()`
+
+データセットを走査し、`is_log_linear` でグループ化した MSE/MAE を算出。
+
+**出力カラム:** `growth_type`, `count`, `mse`, `mae`, `mse_ci_lower`, `mse_ci_upper`, `is_reliable`
+
+#### `plot_growth_type_comparison()`
+
+Log-Linear vs Non-Log-Linear の棒グラフ比較。
+
 ---
 
 ## 6. 出力ファイル構成
@@ -263,12 +291,14 @@ results/analysis/mag/
 ├── error_distribution.csv     # 誤差分布の統計量
 ├── worst_k_samples.csv        # 最悪 K サンプル詳細
 ├── consistency_report.csv     # Sign-Magnitude 整合性レポート
+├── growth_type_metrics.csv    # 成長タイプ別 MSE/MAE
 └── figures/
     ├── error_vs_scale.png     # 横軸: log(y), 縦軸: Error
     ├── prediction_scatter.png # 横軸: GT, 縦軸: Pred (対角線付き)
     ├── calibration_plot.png   # 不確実性の信頼性
     ├── error_histogram.png    # 誤差分布ヒストグラム
-    └── error_qq_plot.png      # QQプロット
+    ├── error_qq_plot.png      # QQプロット
+    └── growth_type_comparison.png  # Log-Linear vs Non-Log-Linear 比較
 ```
 
 ---
@@ -312,3 +342,19 @@ python -m intseq_bert.analysis.analyze_magnitude \
 ### 8.3. 結果の比較
 
 両方の `overall_metrics.csv` を読み込み、指標の差分と信頼区間の重複を確認することで、統計的に有意な差があるかを判断できる。
+
+---
+
+## 9. 実装上の注意点
+
+### 9.1. Magnitude の定義
+
+モデル出力 `mag_mu` は `1 + log10(|x|)` として学習されている。評価時は **1を引いて純粋な log10(|x|) に戻してから** 比較・可視化を行う。
+
+### 9.2. 0 の扱い
+
+log10(0) は未定義（-inf）だが、便宜上 0.0 または特別な値（例: -1.0）として扱い、可視化時に除外するか明示する。
+
+### 9.3. プロットスタイル
+
+スタイルには `seaborn` を使用し、論文掲載に耐えうる視認性を確保する。

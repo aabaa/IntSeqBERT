@@ -584,6 +584,223 @@ def compute_tag_stratified_metrics(
 
 
 # ==========================================
+# Growth Type Analysis
+# ==========================================
+
+def analyze_log_linearity(sequence: List[int]) -> bool:
+    """
+    Determine if a sequence exhibits exponential (log-linear) growth.
+    
+    A sequence is considered log-linear if the log10 of its absolute values
+    shows a high linear correlation with the position indices.
+    
+    Args:
+        sequence: Integer sequence values
+    
+    Returns:
+        True if the sequence appears to grow exponentially (R² > threshold)
+    """
+    # Filter out zeros and take absolute values
+    abs_values = []
+    indices = []
+    for i, val in enumerate(sequence):
+        if val != 0:
+            abs_values.append(abs(val))
+            indices.append(i)
+    
+    # Need at least 3 points to determine trend
+    if len(abs_values) < 3:
+        return False
+    
+    # Take log10 of absolute values
+    log_values = np.log10(abs_values)
+    indices_arr = np.array(indices, dtype=np.float64)
+    
+    # Linear regression: log_value = a * index + b
+    # Calculate R² (coefficient of determination)
+    n = len(log_values)
+    mean_x = np.mean(indices_arr)
+    mean_y = np.mean(log_values)
+    
+    # Avoid division by zero for constant sequences
+    ss_tot = np.sum((log_values - mean_y) ** 2)
+    if ss_tot < config.EPSILON:
+        return False
+    
+    # Calculate slope and R²
+    numerator = np.sum((indices_arr - mean_x) * (log_values - mean_y))
+    denominator_x = np.sum((indices_arr - mean_x) ** 2)
+    
+    if denominator_x < config.EPSILON:
+        return False
+    
+    slope = numerator / denominator_x
+    intercept = mean_y - slope * mean_x
+    
+    # Predicted values
+    y_pred = slope * indices_arr + intercept
+    ss_res = np.sum((log_values - y_pred) ** 2)
+    
+    r_squared = 1.0 - (ss_res / ss_tot)
+    
+    return r_squared > config.LOG_LINEARITY_R2_THRESHOLD
+
+
+def compute_growth_type_metrics(
+    gt: torch.Tensor,
+    pred: torch.Tensor,
+    mask: torch.Tensor,
+    sequences: List[List[int]],
+    n_bootstrap: int = config.BOOTSTRAP_SAMPLES_DEFAULT
+) -> pd.DataFrame:
+    """
+    Compute metrics stratified by growth type (log-linear vs non-log-linear).
+    
+    Args:
+        gt: Ground truth magnitude values (N, L)
+        pred: Predicted magnitude values (N, L)
+        mask: Validity mask (N, L)
+        sequences: Original integer sequences for growth type determination
+        n_bootstrap: Number of bootstrap samples for CI
+    
+    Returns:
+        DataFrame with columns: [growth_type, count, mse, mae, mse_ci_lower, mse_ci_upper, is_reliable]
+    """
+    # Classify each sequence by growth type
+    log_linear_indices = []
+    non_log_linear_indices = []
+    
+    for i, seq in enumerate(sequences):
+        if analyze_log_linearity(seq):
+            log_linear_indices.append(i)
+        else:
+            non_log_linear_indices.append(i)
+    
+    results = []
+    
+    for growth_type, indices in [("Log-Linear", log_linear_indices), 
+                                   ("Non-Log-Linear", non_log_linear_indices)]:
+        if len(indices) == 0:
+            continue
+        
+        indices_t = torch.tensor(indices, dtype=torch.long)
+        group_gt = gt[indices_t]
+        group_pred = pred[indices_t]
+        group_mask = mask[indices_t]
+        
+        # Flatten and apply mask
+        gt_flat = group_gt[group_mask.bool()]
+        pred_flat = group_pred[group_mask.bool()]
+        
+        if len(gt_flat) == 0:
+            continue
+        
+        mse = compute_mse(gt_flat, pred_flat)
+        mae = compute_mae(gt_flat, pred_flat)
+        
+        # Bootstrap CI for MSE
+        ci_lower, ci_upper = bootstrap_ci(
+            gt_flat.numpy(),
+            pred_flat.numpy(),
+            lambda g, p: ((g - p) ** 2).mean(),
+            n_samples=n_bootstrap
+        )
+        
+        is_reliable = len(indices) >= MIN_RELIABLE_SAMPLES
+        if not is_reliable:
+            logger.warning(f"Warning: Growth type '{growth_type}' has only N={len(indices)} sequences (unreliable)")
+        
+        results.append({
+            "growth_type": growth_type,
+            "count": len(indices),
+            "mse": mse,
+            "mae": mae,
+            "mse_ci_lower": ci_lower,
+            "mse_ci_upper": ci_upper,
+            "is_reliable": is_reliable
+        })
+    
+    return pd.DataFrame(results)
+
+
+def plot_growth_type_comparison(
+    growth_df: pd.DataFrame,
+    output_path: Path
+) -> None:
+    """
+    Plot comparison of metrics between Log-Linear and Non-Log-Linear sequences.
+    
+    Args:
+        growth_df: DataFrame from compute_growth_type_metrics
+        output_path: Path to save the figure
+    """
+    if not HAS_PLOTTING:
+        logger.warning("Plotting not available (matplotlib/seaborn not installed)")
+        return
+    
+    if len(growth_df) == 0:
+        logger.warning("No growth type data to plot")
+        return
+    
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    
+    growth_types = growth_df["growth_type"].tolist()
+    x = range(len(growth_types))
+    
+    # Plot MSE comparison
+    ax1 = axes[0]
+    mse_values = growth_df["mse"].tolist()
+    ci_lower = growth_df["mse_ci_lower"].tolist()
+    ci_upper = growth_df["mse_ci_upper"].tolist()
+    is_reliable = growth_df["is_reliable"].tolist()
+    
+    colors = ['#2ecc71' if r else '#e74c3c' for r in is_reliable]
+    bars = ax1.bar(x, mse_values, color=colors, edgecolor='black', linewidth=1)
+    
+    # Error bars for CI
+    for i, (xi, yi, lower, upper) in enumerate(zip(x, mse_values, ci_lower, ci_upper)):
+        ax1.errorbar(xi, yi, yerr=[[yi - lower], [upper - yi]], fmt='none', color='black', capsize=5)
+    
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(growth_types, rotation=0)
+    ax1.set_ylabel('MSE')
+    ax1.set_title('MSE by Growth Type')
+    
+    # Add count annotations
+    for i, (xi, yi, count) in enumerate(zip(x, mse_values, growth_df["count"].tolist())):
+        ax1.annotate(f'N={count}', (xi, yi), textcoords="offset points",
+                    xytext=(0, 5), ha='center', fontsize=10)
+    
+    # Plot MAE comparison
+    ax2 = axes[1]
+    mae_values = growth_df["mae"].tolist()
+    bars = ax2.bar(x, mae_values, color=colors, edgecolor='black', linewidth=1)
+    
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(growth_types, rotation=0)
+    ax2.set_ylabel('MAE')
+    ax2.set_title('MAE by Growth Type')
+    
+    # Add count annotations
+    for i, (xi, yi, count) in enumerate(zip(x, mae_values, growth_df["count"].tolist())):
+        ax2.annotate(f'N={count}', (xi, yi), textcoords="offset points",
+                    xytext=(0, 5), ha='center', fontsize=10)
+    
+    # Add legend for reliability
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#2ecc71', edgecolor='black', label='Reliable (N≥30)'),
+        Patch(facecolor='#e74c3c', edgecolor='black', label='Unreliable (N<30)')
+    ]
+    fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98))
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    logger.info(f"Saved: {output_path}")
+
+
+# ==========================================
 # Plotting Functions
 # ==========================================
 
@@ -1069,7 +1286,32 @@ def main(args=None):
         tag_df.to_csv(output_dir / "tag_wise_metrics.csv", index=False)
         logger.info(f"Saved: {output_dir / 'tag_wise_metrics.csv'}")
     
-    # 7. Consistency report (placeholder)
+    # 7. Growth Type Analysis
+    logger.info("Computing growth type metrics...")
+    # Load original sequences from JSONL
+    id_to_sequence = {}
+    if Path(args.jsonl_path).exists():
+        with open(args.jsonl_path, "r") as f:
+            for line in f:
+                record = json.loads(line)
+                id_to_sequence[record["oeis_id"]] = record.get("terms", [])
+    
+    # Build sequences list aligned with oeis_ids
+    sequences = [id_to_sequence.get(oid, []) for oid in oeis_ids]
+    
+    # Filter to only include sequences with sufficient data
+    valid_seq_mask = [len(seq) >= 3 for seq in sequences]
+    if sum(valid_seq_mask) > 0:
+        growth_df = compute_growth_type_metrics(
+            gt_mag, pred_mag, mask, sequences, n_bootstrap=args.bootstrap_samples
+        )
+        growth_df.to_csv(output_dir / "growth_type_metrics.csv", index=False)
+        logger.info(f"Saved: {output_dir / 'growth_type_metrics.csv'}")
+    else:
+        logger.warning("No valid sequences found for growth type analysis")
+        growth_df = pd.DataFrame()
+    
+    # 8. Consistency report (placeholder)
     consistency_data = {"sign_mag_consistency": "N/A - requires sign predictions"}
     consistency_df = pd.DataFrame([consistency_data])
     consistency_df.to_csv(output_dir / "consistency_report.csv", index=False)
@@ -1088,11 +1330,15 @@ def main(args=None):
     if pred_sigma is not None and 'cal_df' in locals():
         plot_calibration(cal_df, figures_dir / "calibration_plot.png")
     
-    # 8.4 Error histogram
+    # 9.4 Error histogram
     plot_error_histogram(errors, figures_dir / "error_histogram.png")
     
-    # 8.5 Error QQ plot
+    # 9.5 Error QQ plot
     plot_error_qq(errors, figures_dir / "error_qq_plot.png")
+    
+    # 9.6 Growth type comparison plot
+    if len(growth_df) > 0:
+        plot_growth_type_comparison(growth_df, figures_dir / "growth_type_comparison.png")
     
     # Save config
     config_data = {

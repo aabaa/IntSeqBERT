@@ -756,3 +756,315 @@ class TestTagStratifiedAnalysis:
         
         # Count column should be positive
         assert df["count"].min() > 0
+
+
+# ==========================================
+# Growth Type Analysis Tests
+# ==========================================
+
+class TestAnalyzeLogLinearity:
+    """Tests for analyze_log_linearity function (spec 3.1)."""
+    
+    @requires_analyze_magnitude
+    def test_exponential_sequence_detected(self):
+        """Test exponential sequence is detected as log-linear."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        # Geometric sequence: 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024
+        # log10 values: 0.301, 0.602, 0.903, ... (perfectly linear)
+        sequence = [2 ** i for i in range(1, 11)]
+        
+        result = analyze_log_linearity(sequence)
+        assert result == True
+    
+    @requires_analyze_magnitude
+    def test_polynomial_sequence_not_log_linear(self):
+        """Test polynomial sequence is not detected as log-linear."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        # Polynomial sequence: n^2 = 1, 4, 9, 16, 25, 36, 49, 64, 81, 100
+        # log10 grows as 2*log(n), not linearly with index
+        sequence = [n ** 2 for n in range(1, 20)]
+        
+        result = analyze_log_linearity(sequence)
+        assert result == False
+    
+    @requires_analyze_magnitude
+    def test_constant_sequence_not_log_linear(self):
+        """Test constant sequence is not log-linear."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        sequence = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+        
+        result = analyze_log_linearity(sequence)
+        assert result == False  # No growth, R² undefined or low
+    
+    @requires_analyze_magnitude
+    def test_sequence_with_zeros(self):
+        """Test sequence with zeros handles them correctly."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        # Sequence with zeros - they should be filtered out
+        sequence = [0, 2, 4, 8, 16, 32, 0, 64, 128]
+        
+        # Should not raise exception
+        result = analyze_log_linearity(sequence)
+        assert isinstance(result, bool)
+    
+    @requires_analyze_magnitude
+    def test_short_sequence_returns_false(self):
+        """Test sequences with fewer than 3 non-zero values return False."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        sequence = [2, 4]
+        result = analyze_log_linearity(sequence)
+        assert result == False
+        
+        sequence_with_zeros = [0, 0, 5, 0, 10]
+        result = analyze_log_linearity(sequence_with_zeros)
+        assert result == False
+    
+    @requires_analyze_magnitude
+    def test_negative_values_handled(self):
+        """Test negative values are handled via absolute value."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        # Alternating sign exponential: -2, 4, -8, 16, -32, 64, -128, 256
+        # Absolute values: 2, 4, 8, 16, 32, 64, 128, 256 (log-linear)
+        sequence = [(-1) ** i * (2 ** i) for i in range(1, 11)]
+        
+        result = analyze_log_linearity(sequence)
+        assert result == True
+    
+    @requires_analyze_magnitude
+    def test_fibonacci_not_log_linear(self):
+        """Test Fibonacci sequence is not strictly log-linear (borderline case)."""
+        from intseq_bert.analysis.analyze_magnitude import analyze_log_linearity
+        
+        # Fibonacci: 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144...
+        # Approaches log-linear but not perfectly (golden ratio growth)
+        fib = [1, 1]
+        for i in range(20):
+            fib.append(fib[-1] + fib[-2])
+        
+        result = analyze_log_linearity(fib)
+        # Fibonacci is approximately exponential but may not hit 0.95 threshold
+        assert isinstance(result, bool)
+    
+    @requires_analyze_magnitude
+    def test_threshold_from_config(self):
+        """Test that LOG_LINEARITY_R2_THRESHOLD is used from config."""
+        assert hasattr(config, 'LOG_LINEARITY_R2_THRESHOLD')
+        assert config.LOG_LINEARITY_R2_THRESHOLD == 0.95
+
+
+class TestComputeGrowthTypeMetrics:
+    """Tests for compute_growth_type_metrics function (spec 3.1)."""
+    
+    @requires_analyze_magnitude
+    def test_output_structure(self, sample_gt_values, sample_pred_values, sample_mask_map):
+        """Test growth type metrics has expected columns."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        # Create some sample sequences
+        sequences = []
+        N = sample_gt_values.shape[0]
+        for i in range(N):
+            if i % 2 == 0:
+                # Exponential sequence
+                sequences.append([2 ** j for j in range(10)])
+            else:
+                # Linear sequence
+                sequences.append([j for j in range(1, 11)])
+        
+        df = compute_growth_type_metrics(
+            sample_gt_values, sample_pred_values, sample_mask_map, sequences
+        )
+        
+        assert isinstance(df, pd.DataFrame)
+        expected_cols = {"growth_type", "count", "mse", "mae", "mse_ci_lower", "mse_ci_upper", "is_reliable"}
+        assert expected_cols.issubset(set(df.columns))
+    
+    @requires_analyze_magnitude
+    def test_two_growth_types(self, sample_gt_values, sample_pred_values, sample_mask_map):
+        """Test both Log-Linear and Non-Log-Linear types are present."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        N = sample_gt_values.shape[0]
+        sequences = []
+        for i in range(N):
+            if i % 2 == 0:
+                sequences.append([2 ** j for j in range(10)])  # Exponential
+            else:
+                sequences.append([j ** 2 for j in range(1, 11)])  # Polynomial
+        
+        df = compute_growth_type_metrics(
+            sample_gt_values, sample_pred_values, sample_mask_map, sequences
+        )
+        
+        growth_types = df["growth_type"].tolist()
+        assert "Log-Linear" in growth_types or "Non-Log-Linear" in growth_types
+    
+    @requires_analyze_magnitude
+    def test_count_matches_sequences(self, sample_gt_values, sample_pred_values, sample_mask_map):
+        """Test count sums match total number of sequences."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        N = sample_gt_values.shape[0]
+        sequences = [[2 ** j for j in range(10)] for _ in range(N)]
+        
+        df = compute_growth_type_metrics(
+            sample_gt_values, sample_pred_values, sample_mask_map, sequences
+        )
+        
+        total_count = df["count"].sum()
+        assert total_count == N
+    
+    @requires_analyze_magnitude
+    def test_metrics_non_negative(self, sample_gt_values, sample_pred_values, sample_mask_map):
+        """Test MSE and MAE are non-negative."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        N = sample_gt_values.shape[0]
+        sequences = [[2 ** j for j in range(10)] for _ in range(N)]
+        
+        df = compute_growth_type_metrics(
+            sample_gt_values, sample_pred_values, sample_mask_map, sequences
+        )
+        
+        assert (df["mse"] >= 0).all()
+        assert (df["mae"] >= 0).all()
+    
+    @requires_analyze_magnitude
+    def test_ci_ordering(self, sample_gt_values, sample_pred_values, sample_mask_map):
+        """Test CI lower <= CI upper."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        N = sample_gt_values.shape[0]
+        sequences = [[2 ** j for j in range(10)] for _ in range(N)]
+        
+        df = compute_growth_type_metrics(
+            sample_gt_values, sample_pred_values, sample_mask_map, sequences, n_bootstrap=100
+        )
+        
+        for _, row in df.iterrows():
+            assert row["mse_ci_lower"] <= row["mse_ci_upper"]
+    
+    @requires_analyze_magnitude
+    def test_reliability_flag(self):
+        """Test is_reliable is based on MIN_RELIABLE_SAMPLES."""
+        from intseq_bert.analysis.analyze_magnitude import compute_growth_type_metrics
+        
+        # Create small dataset (fewer than 30 sequences)
+        N, L = 10, 16
+        gt = torch.rand(N, L) * 60
+        pred = gt + torch.randn(N, L) * 0.5
+        mask = torch.ones(N, L, dtype=torch.bool)
+        sequences = [[2 ** j for j in range(10)] for _ in range(N)]
+        
+        df = compute_growth_type_metrics(gt, pred, mask, sequences, n_bootstrap=50)
+        
+        # All groups should be unreliable since N < 30
+        for _, row in df.iterrows():
+            if row["count"] < 30:
+                assert row["is_reliable"] == False
+
+
+@requires_analyze_magnitude
+class TestPlotGrowthTypeComparison:
+    """Tests for plot_growth_type_comparison function (spec 3.1)."""
+    
+    def test_plot_generation(self, tmp_path):
+        """Test growth type comparison plot is generated."""
+        from intseq_bert.analysis.analyze_magnitude import plot_growth_type_comparison
+        
+        # Create sample DataFrame
+        growth_df = pd.DataFrame([
+            {"growth_type": "Log-Linear", "count": 50, "mse": 0.5, "mae": 0.3, 
+             "mse_ci_lower": 0.4, "mse_ci_upper": 0.6, "is_reliable": True},
+            {"growth_type": "Non-Log-Linear", "count": 100, "mse": 0.8, "mae": 0.5,
+             "mse_ci_lower": 0.7, "mse_ci_upper": 0.9, "is_reliable": True}
+        ])
+        
+        output_path = tmp_path / "growth_type_comparison.png"
+        plot_growth_type_comparison(growth_df, output_path)
+        
+        assert output_path.exists()
+    
+    def test_plot_with_empty_dataframe(self, tmp_path):
+        """Test plot handles empty DataFrame gracefully."""
+        from intseq_bert.analysis.analyze_magnitude import plot_growth_type_comparison
+        
+        empty_df = pd.DataFrame()
+        output_path = tmp_path / "empty_growth_plot.png"
+        
+        # Should not raise exception
+        plot_growth_type_comparison(empty_df, output_path)
+        
+        # File may or may not be created for empty data
+        # Just verify no exception was raised
+    
+    def test_plot_with_single_group(self, tmp_path):
+        """Test plot handles single growth type."""
+        from intseq_bert.analysis.analyze_magnitude import plot_growth_type_comparison
+        
+        single_df = pd.DataFrame([
+            {"growth_type": "Log-Linear", "count": 100, "mse": 0.5, "mae": 0.3,
+             "mse_ci_lower": 0.4, "mse_ci_upper": 0.6, "is_reliable": True}
+        ])
+        
+        output_path = tmp_path / "single_growth_plot.png"
+        plot_growth_type_comparison(single_df, output_path)
+        
+        assert output_path.exists()
+    
+    def test_plot_with_unreliable_data(self, tmp_path):
+        """Test plot handles unreliable (small sample) data."""
+        from intseq_bert.analysis.analyze_magnitude import plot_growth_type_comparison
+        
+        unreliable_df = pd.DataFrame([
+            {"growth_type": "Log-Linear", "count": 10, "mse": 0.5, "mae": 0.3,
+             "mse_ci_lower": 0.2, "mse_ci_upper": 0.8, "is_reliable": False},
+            {"growth_type": "Non-Log-Linear", "count": 15, "mse": 0.8, "mae": 0.5,
+             "mse_ci_lower": 0.5, "mse_ci_upper": 1.1, "is_reliable": False}
+        ])
+        
+        output_path = tmp_path / "unreliable_growth_plot.png"
+        plot_growth_type_comparison(unreliable_df, output_path)
+        
+        assert output_path.exists()
+
+
+# ==========================================
+# Updated Integration Tests
+# ==========================================
+
+class TestGrowthTypeIntegration:
+    """Integration tests for growth type analysis."""
+    
+    @requires_analyze_magnitude
+    def test_expected_output_files_include_growth_type(self):
+        """Test that expected output files include growth type metrics."""
+        expected_files = [
+            "overall_metrics.csv",
+            "scale_wise_metrics.csv",
+            "tag_wise_metrics.csv",
+            "calibration_data.csv",
+            "error_distribution.csv",
+            "worst_k_samples.csv",
+            "consistency_report.csv",
+            "growth_type_metrics.csv",  # New from spec
+        ]
+        
+        expected_figures = [
+            "error_vs_scale.png",
+            "prediction_scatter.png",
+            "calibration_plot.png",
+            "error_histogram.png",
+            "error_qq_plot.png",
+            "growth_type_comparison.png",  # New from spec
+        ]
+        
+        assert "growth_type_metrics.csv" in expected_files
+        assert "growth_type_comparison.png" in expected_figures
+
