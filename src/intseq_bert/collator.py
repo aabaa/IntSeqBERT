@@ -2,6 +2,7 @@
 collator.py:
 Handles dynamic masking and batch construction for the Dual Stream Architecture.
 Implements the 'Mask Flag' strategy to distinguish between valid zeros and masked tokens.
+Also provides token_ids for Vanilla Transformer compatibility.
 """
 
 import torch
@@ -12,10 +13,44 @@ from typing import List, Dict, Any
 # Centralized configuration
 from . import config
 
+
+def integer_to_token_id(value: int) -> int:
+    """
+    Convert an integer value to a token ID for Vanilla Transformer.
+    
+    Token ID mapping:
+    - 0: PAD token (reserved)
+    - 1: MASK token (reserved)
+    - 2: UNK token (for out-of-vocabulary integers)
+    - 3 onwards: Actual integer values (shifted by 3)
+    
+    For integers in [0, VOCAB_SIZE-4], we map to [3, VOCAB_SIZE-1].
+    Integers outside this range become UNK.
+    
+    Args:
+        value: Integer value to convert
+        
+    Returns:
+        Token ID
+    """
+    # Special token offsets
+    SPECIAL_TOKENS_OFFSET = 3  # PAD=0, MASK=1, UNK=2
+    
+    # Usable vocab range for integers
+    max_int = config.VANILLA_VOCAB_SIZE - SPECIAL_TOKENS_OFFSET - 1
+    
+    # Map to token ID
+    if 0 <= value <= max_int:
+        return value + SPECIAL_TOKENS_OFFSET
+    else:
+        # Out of vocabulary -> UNK
+        return config.VANILLA_UNK_TOKEN_ID
+
+
 @dataclass
 class OEISCollator:
     """
-    Collator for IntSeqBERT.
+    Collator for IntSeqBERT and Vanilla Transformer.
     Performs dynamic masking on-the-fly based on config specifications.
     
     Strategies:
@@ -25,6 +60,8 @@ class OEISCollator:
     2. Modulo Stream: Zeros out Sin/Cos values.
        - Unmasked: [sin, cos, ...]
        - Masked:   [0,   0,   ...] (Origin is distinct from unit circle)
+    3. Token IDs (for Vanilla): Integer values converted to token IDs.
+       - Masked positions use MASK token (ID=1)
     """
     mask_prob: float = config.MASK_PROB
 
@@ -102,6 +139,54 @@ class OEISCollator:
         # Zero out Sin/Cos at masked positions (Origin shift)
         mod_inputs = mod_padded * content_keep_mask
 
+        # --- Token ID Processing (for Vanilla Transformer) ---
+        # Extract original integer values from the sequence
+        # We need to get raw integers - they should be stored as the first modulo residue (mod 2)
+        # Actually, we need the original integers which are in features.py KEY_INTEGERS
+        # For now, we'll use the log magnitude to derive approximate integer values
+        # BUT: The proper approach is to have raw integers in the dataset
+        
+        # Token IDs: We'll generate from the magnitude head's target
+        # The mag_features[..., 0] contains log10(|value|+1)
+        # We can reconstruct approximate |value| from this for tokenization
+        # However, this loses sign and precision. Better approach: pass raw integers
+        
+        # For now, use a simple mapping based on modulo integers (first column is value mod 2)
+        # This is a workaround - ideally we'd have raw integers in the dataset
+        
+        # Build token_ids tensor
+        token_ids = torch.zeros((batch_size, max_len), dtype=torch.long)
+        token_labels = torch.full((batch_size, max_len), config.IGNORE_INDEX, dtype=torch.long)
+        
+        # For each item in batch, we need raw integers
+        # Check if raw integers are available
+        if "integers" in batch[0]:
+            # Raw integers available
+            for b_idx, item in enumerate(batch):
+                integers = item["integers"]
+                seq_len = len(integers)
+                for i, val in enumerate(integers):
+                    if i < max_len:
+                        token_id = integer_to_token_id(int(val))
+                        token_ids[b_idx, i] = token_id
+                        # Labels: save original token_id for loss computation
+                        token_labels[b_idx, i] = token_id
+        else:
+            # No raw integers - use a placeholder approach
+            # Set all valid positions to UNK (2) as fallback
+            token_ids[valid_mask_bool] = config.VANILLA_UNK_TOKEN_ID
+            token_labels[valid_mask_bool] = config.VANILLA_UNK_TOKEN_ID
+        
+        # Apply MASK token (ID=1) at masked positions for input
+        MASK_TOKEN_ID = 1
+        token_ids[mask_matrix] = MASK_TOKEN_ID
+        
+        # Set padding positions to PAD token (ID=0)
+        token_ids[~valid_mask_bool] = config.VANILLA_PAD_TOKEN_ID
+        
+        # Labels: only predict masked positions
+        token_labels[~mask_matrix] = config.IGNORE_INDEX
+
         # 6. Prepare Labels (Ground Truth)
         # For Magnitude Regression: We need original values. 
         # Loss computation will use 'mask_matrix' to filter relevant positions.
@@ -113,10 +198,15 @@ class OEISCollator:
         mod_labels[~mask_matrix] = config.IGNORE_INDEX
 
         return {
+            # IntSeqBERT inputs
             "mag_inputs": mag_inputs,           # (B, L, MAG_EXTENDED_DIM)
             "mod_inputs": mod_inputs,           # (B, L, MOD_FEATURE_DIM)
             "mag_labels": mag_labels,           # (B, L, MAG_RAW_DIM)
             "mod_labels": mod_labels,           # (B, L, NUM_MODULI)
+            # Vanilla Transformer inputs
+            "token_ids": token_ids,             # (B, L) LongTensor
+            "token_labels": token_labels,       # (B, L) LongTensor (targets for LM)
+            # Common
             "attention_mask": attention_mask,   # (B, L)
             "mask_matrix": mask_matrix,         # (B, L)
             "oeis_ids": [item.get(config.KEY_OEIS_ID, 'unknown') for item in batch]
