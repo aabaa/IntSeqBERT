@@ -1,6 +1,7 @@
 # Ignore all data files
 data/
 checkpoints/
+nohup.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
