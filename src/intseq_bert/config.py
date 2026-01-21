@@ -235,3 +235,4 @@ VANILLA_VOCAB_SIZE = 10_003    # Token vocabulary size (covers 0-9,999 + special
 VANILLA_PAD_TOKEN_ID = 0        # Padding token ID
 VANILLA_UNK_TOKEN_ID = 2        # Unknown token ID
 VANILLA_MASK_TOKEN_ID = 1       # Mask token ID
+VANILLA_SPECIAL_TOKENS_OFFSET = 3  # Number of special tokens (PAD, MASK, UNK); integers start at this ID

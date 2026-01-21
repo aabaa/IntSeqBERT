@@ -37,8 +37,9 @@ from intseq_bert.solver import (
     solve_sieve,
     select_basis,
     solve_sparse_crt,
-    # Main class
+    # Main classes
     IntegerSolver,
+    VanillaSolver,
 )
 
 
@@ -912,3 +913,138 @@ class TestEdgeCases:
         beams = beam_search_crt([0, 1], log_probs, mod_range, beam_width=1)
         # Should return something (maybe previous beams or handle gracefully)
         assert isinstance(beams, list)
+
+
+# ============================================================
+# Test: VanillaSolver
+# ============================================================
+
+
+class TestVanillaSolverInit:
+    """Tests for VanillaSolver initialization."""
+    
+    def test_default_initialization(self):
+        """Test VanillaSolver initializes with config defaults."""
+        from intseq_bert import config
+        
+        solver = VanillaSolver()
+        assert solver.vocab_size == config.VANILLA_VOCAB_SIZE
+        assert solver.special_offset == config.VANILLA_SPECIAL_TOKENS_OFFSET
+        assert solver.max_predictable == config.VANILLA_VOCAB_SIZE - config.VANILLA_SPECIAL_TOKENS_OFFSET - 1
+    
+    def test_custom_initialization(self):
+        """Test VanillaSolver with custom parameters."""
+        solver = VanillaSolver(vocab_size=1000, special_offset=5)
+        assert solver.vocab_size == 1000
+        assert solver.special_offset == 5
+        assert solver.max_predictable == 994
+
+
+class TestVanillaSolverTokenMapping:
+    """Tests for token ID to integer mapping."""
+    
+    def test_special_tokens_return_none(self):
+        """Test that special tokens (PAD, MASK, UNK) return None."""
+        solver = VanillaSolver()
+        
+        # IDs < special_offset are special tokens
+        assert solver._token_id_to_integer(0) is None  # PAD
+        assert solver._token_id_to_integer(1) is None  # MASK
+        assert solver._token_id_to_integer(2) is None  # UNK
+    
+    def test_integer_tokens_map_correctly(self):
+        """Test that integer tokens map to correct values."""
+        solver = VanillaSolver(special_offset=3)
+        
+        # token_id = integer + offset
+        assert solver._token_id_to_integer(3) == 0
+        assert solver._token_id_to_integer(4) == 1
+        assert solver._token_id_to_integer(103) == 100
+        assert solver._token_id_to_integer(10002) == 9999
+    
+    def test_is_special_token(self):
+        """Test special token detection."""
+        solver = VanillaSolver(special_offset=3)
+        
+        assert solver._is_special_token(0) is True
+        assert solver._is_special_token(1) is True
+        assert solver._is_special_token(2) is True
+        assert solver._is_special_token(3) is False
+        assert solver._is_special_token(100) is False
+
+
+class TestVanillaSolverSolve:
+    """Tests for VanillaSolver.solve() method."""
+    
+    def test_returns_top_k_candidates(self):
+        """Test solve returns correct number of candidates."""
+        solver = VanillaSolver()
+        
+        # Create mock logits with clear winner
+        logits = torch.zeros(solver.vocab_size)
+        logits[50] = 10.0  # token_id=50 -> integer=47
+        
+        candidates = solver.solve(logits, top_k=5)
+        
+        assert len(candidates) == 5
+    
+    def test_candidates_sorted_by_score(self):
+        """Test candidates are sorted by score descending."""
+        solver = VanillaSolver()
+        
+        logits = torch.randn(solver.vocab_size)
+        candidates = solver.solve(logits, top_k=10)
+        
+        scores = [c["score"] for c in candidates]
+        assert scores == sorted(scores, reverse=True)
+    
+    def test_correct_value_mapping(self):
+        """Test integer values are mapped correctly."""
+        solver = VanillaSolver(special_offset=3)
+        
+        # Create logits with peak at token_id=103 -> integer=100
+        logits = torch.zeros(solver.vocab_size)
+        logits[103] = 100.0  # Very high logit
+        
+        candidates = solver.solve(logits, top_k=1)
+        
+        assert candidates[0]["value"] == 100
+        assert candidates[0]["is_unk"] is False
+        assert candidates[0]["method"] == "vanilla_lm"
+    
+    def test_special_token_marked_as_unk(self):
+        """Test that special tokens are marked as UNK."""
+        solver = VanillaSolver(special_offset=3)
+        
+        # Create logits with peak at UNK token (id=2)
+        logits = torch.zeros(solver.vocab_size)
+        logits[2] = 100.0  # UNK has highest logit
+        
+        candidates = solver.solve(logits, top_k=1)
+        
+        assert candidates[0]["value"] is None
+        assert candidates[0]["is_unk"] is True
+    
+    def test_output_format(self):
+        """Test output dictionary contains required keys."""
+        solver = VanillaSolver()
+        
+        logits = torch.randn(solver.vocab_size)
+        candidates = solver.solve(logits, top_k=3)
+        
+        required_keys = {"value", "score", "method", "is_unk"}
+        for c in candidates:
+            assert set(c.keys()) == required_keys
+            assert isinstance(c["score"], float)
+            assert c["method"] == "vanilla_lm"
+            assert isinstance(c["is_unk"], bool)
+    
+    def test_top_k_larger_than_vocab(self):
+        """Test graceful handling when top_k > vocab_size."""
+        solver = VanillaSolver(vocab_size=100, special_offset=3)
+        
+        logits = torch.randn(100)
+        candidates = solver.solve(logits, top_k=200)  # Larger than vocab
+        
+        assert len(candidates) == 100  # Should cap at vocab size
+

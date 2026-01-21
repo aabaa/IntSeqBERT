@@ -1014,3 +1014,155 @@ class IntegerSolver:
             mod_log_probs.append(log_probs)
         
         return mag_mu, mag_log_var, sign_idx, mod_log_probs
+
+
+# ============================================================
+# VanillaSolver: Token-based Integer Reconstruction
+# ============================================================
+
+
+class VanillaSolver:
+    """
+    Integer solver for Vanilla Transformer using only lm_head predictions.
+    
+    Unlike IntegerSolver, this solver does NOT use diagnostic heads (Magnitude/Modulo).
+    It relies solely on token probability predictions from the language model head,
+    providing a fair evaluation baseline for comparing Vanilla vs IntSeqBERT.
+    
+    Key characteristics:
+    - Cannot predict out-of-vocabulary integers (returns UNK)
+    - Maximum predictable value is VOCAB_SIZE - SPECIAL_TOKENS_OFFSET - 1
+    - Returns top-k candidates with their log-probabilities
+    
+    Attributes:
+        vocab_size: Total vocabulary size (default from config)
+        special_offset: Number of special tokens (PAD, MASK, UNK)
+        max_predictable: Maximum integer value that can be predicted
+    """
+    
+    def __init__(
+        self,
+        vocab_size: int = config.VANILLA_VOCAB_SIZE,
+        special_offset: int = config.VANILLA_SPECIAL_TOKENS_OFFSET
+    ):
+        """
+        Initialize VanillaSolver.
+        
+        Args:
+            vocab_size: Total vocabulary size (default: 10003)
+            special_offset: Number of special tokens before integer IDs (default: 3)
+        """
+        self.vocab_size = vocab_size
+        self.special_offset = special_offset
+        self.max_predictable = vocab_size - special_offset - 1
+        
+        # Special token IDs
+        self.pad_token_id = config.VANILLA_PAD_TOKEN_ID
+        self.mask_token_id = config.VANILLA_MASK_TOKEN_ID
+        self.unk_token_id = config.VANILLA_UNK_TOKEN_ID
+    
+    def _token_id_to_integer(self, token_id: int) -> int | None:
+        """
+        Convert token ID to integer value.
+        
+        Args:
+            token_id: Token ID from model output
+            
+        Returns:
+            Integer value if token represents a number, None for special tokens
+        """
+        if token_id < self.special_offset:
+            # Special token (PAD, MASK, UNK)
+            return None
+        
+        integer_value = token_id - self.special_offset
+        return integer_value
+    
+    def _is_special_token(self, token_id: int) -> bool:
+        """Check if token ID is a special token."""
+        return token_id < self.special_offset
+    
+    def solve(
+        self,
+        logits: torch.Tensor,
+        top_k: int = 5
+    ) -> List[Dict]:
+        """
+        Reconstruct integer candidates from token logits.
+        
+        This method uses ONLY the lm_head output (logits) to predict integers.
+        It does NOT use any diagnostic head information (Magnitude/Modulo).
+        
+        Args:
+            logits: Token logits from lm_head, shape (vocab_size,)
+            top_k: Number of top candidates to return (default: 5)
+        
+        Returns:
+            List of candidate dictionaries (sorted by score descending):
+                - value: Predicted integer (or None if UNK)
+                - score: Log-probability of the prediction
+                - method: Always "vanilla_lm"
+                - is_unk: True if prediction is UNK/special token
+        
+        Example:
+            >>> solver = VanillaSolver()
+            >>> logits = model_output["token_logits"][0, pos]  # (vocab_size,)
+            >>> candidates = solver.solve(logits, top_k=5)
+            >>> print(candidates[0])
+            {'value': 42, 'score': -0.5, 'method': 'vanilla_lm', 'is_unk': False}
+        """
+        # 1. Convert logits to log-probabilities
+        log_probs = F.log_softmax(logits, dim=-1)
+        
+        # 2. Get top-k token IDs and their log-probabilities
+        k = min(top_k, self.vocab_size)
+        top_log_probs, top_indices = torch.topk(log_probs, k)
+        
+        # 3. Build candidate list
+        candidates = []
+        for i in range(k):
+            token_id = top_indices[i].item()
+            log_prob = top_log_probs[i].item()
+            
+            # Map token ID to integer value
+            integer_value = self._token_id_to_integer(token_id)
+            is_unk = self._is_special_token(token_id)
+            
+            candidates.append({
+                "value": integer_value,
+                "score": log_prob,
+                "method": "vanilla_lm",
+                "is_unk": is_unk
+            })
+        
+        return candidates
+    
+    @staticmethod
+    def from_model_output(
+        predictions: Dict,
+        position: int,
+        batch_idx: int = 0
+    ) -> torch.Tensor:
+        """
+        Extract token logits from model predictions for solve().
+        
+        Args:
+            predictions: model.forward()["predictions"] dict
+            position: Sequence position index (0-based)
+            batch_idx: Batch index (default: 0)
+        
+        Returns:
+            Token logits tensor of shape (vocab_size,) ready for solve()
+        
+        Example:
+            >>> outputs = model(token_ids, attention_mask)
+            >>> logits = VanillaSolver.from_model_output(
+            ...     outputs["predictions"], pos=5
+            ... )
+            >>> solver = VanillaSolver()
+            >>> candidates = solver.solve(logits)
+        """
+        # Extract token logits at the specified position
+        token_logits = predictions["logits"][batch_idx, position]
+        return token_logits
+
