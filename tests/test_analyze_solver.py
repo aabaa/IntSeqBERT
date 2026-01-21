@@ -32,6 +32,7 @@ from intseq_bert.analysis.analyze_solver import (
     compute_match_rank,
     get_sign_idx,
     prepare_single_batch,
+    run_inference_single,
     # Metrics
     compute_overall_metrics,
     compute_magnitude_breakdown,
@@ -650,3 +651,131 @@ class TestIntegration:
         # Save outputs
         save_results_csv(results, temp_dir / "results.csv")
         assert (temp_dir / "results.csv").exists()
+
+
+# ============================================================
+# Test: Vanilla Transformer Support
+# ============================================================
+
+
+class TestVanillaTransformerSupport:
+    """Tests for Vanilla Transformer model support."""
+    
+    def test_prepare_single_batch_masks_token_ids(self):
+        """Test that token_ids are masked at final position."""
+        from intseq_bert.collator import OEISCollator
+        
+        input_seq = [1, 2, 3]
+        collator = OEISCollator(mask_prob=0.0)
+        
+        # Prepare batch - token_ids masking happens for all model types
+        batch = prepare_single_batch(input_seq, collator, "cpu")
+        
+        # token_ids should exist and have correct shape
+        assert "token_ids" in batch
+        assert batch["token_ids"].shape == (1, 4)  # [1, 2, 3, 0] -> 4 tokens
+        
+        # Last position should be MASK token (ID=1)
+        assert batch["token_ids"][0, -1].item() == config.VANILLA_MASK_TOKEN_ID
+    
+    def test_prepare_single_batch_context_positions_not_masked(self):
+        """Test that context positions (non-last) are not masked in token_ids."""
+        from intseq_bert.collator import OEISCollator
+        
+        input_seq = [10, 20, 30]  # These should map to valid token IDs
+        collator = OEISCollator(mask_prob=0.0)
+        
+        batch = prepare_single_batch(input_seq, collator, "cpu")
+        
+        # Context positions should NOT be MASK token
+        for i in range(3):  # First 3 positions are context
+            assert batch["token_ids"][0, i].item() != config.VANILLA_MASK_TOKEN_ID
+    
+    def test_mode_breakdown_includes_vanilla_lm(self):
+        """Test that vanilla_lm mode is included in mode breakdown."""
+        results = [
+            {"oeis_id": "A001", "target": 10, "match_rank": 1, "solver_mode": "vanilla_lm",
+             "magnitude_bucket": "Small", "sign_pred": 0, "sign_true": 0},
+            {"oeis_id": "A002", "target": 20, "match_rank": -1, "solver_mode": "vanilla_lm",
+             "magnitude_bucket": "Small", "sign_pred": 0, "sign_true": 0},
+        ]
+        
+        df = compute_mode_breakdown(results, top_k=5)
+        
+        modes = df["mode"].tolist()
+        assert "vanilla_lm" in modes
+        
+        vanilla_row = df[df["mode"] == "vanilla_lm"].iloc[0]
+        assert vanilla_row["count"] == 2
+        assert vanilla_row["usage_rate"] == 100.0
+        assert vanilla_row["top1_acc"] == 50.0  # 1 out of 2
+    
+    def test_save_summary_json_handles_empty_mode_df(self, temp_dir):
+        """Test that save_summary_json handles empty DataFrames."""
+        overall = {"total_samples": 0, "top1_acc": 0.0}
+        magnitude_df = pd.DataFrame()
+        mode_df = pd.DataFrame()
+        
+        output_path = temp_dir / "summary.json"
+        save_summary_json(overall, magnitude_df, mode_df, 1.0, output_path)
+        
+        assert output_path.exists()
+        with open(output_path) as f:
+            data = json.load(f)
+        
+        assert data["by_magnitude"] == {}
+        assert data["by_mode"] == {}
+
+
+class TestVanillaUNKHandling:
+    """Tests for UNK (out-of-vocabulary) handling in Vanilla model."""
+    
+    def test_results_with_unk_predictions(self):
+        """Test that UNK predictions are handled correctly in results."""
+        # Simulate results where vanilla solver returned UNK
+        results = [
+            {"oeis_id": "A001", "target": 10, "match_rank": 1, "solver_mode": "vanilla_lm",
+             "magnitude_bucket": "Small", "sign_pred": 0, "sign_true": 0, "is_unk": False},
+            {"oeis_id": "A002", "target": 10**50, "match_rank": -1, "solver_mode": "vanilla_lm",
+             "magnitude_bucket": "Huge", "sign_pred": -1, "sign_true": 0, "is_unk": True},
+        ]
+        
+        # UNK predictions should have sign_pred = -1
+        assert results[1]["sign_pred"] == -1
+        assert results[1]["is_unk"] == True
+        
+        # Metrics should still compute correctly
+        overall = compute_overall_metrics(results, top_k=5)
+        assert overall["total_samples"] == 2
+        assert overall["top1_acc"] == 50.0  # 1 out of 2
+
+
+class TestMixedModelTypeResults:
+    """Tests for mixed model type scenarios."""
+    
+    def test_results_from_different_models(self):
+        """Test computing metrics from IntSeq and Vanilla model results."""
+        # IntSeq results
+        intseq_results = [
+            {"oeis_id": "A001", "target": 10, "match_rank": 1, "solver_mode": "dense",
+             "magnitude_bucket": "Small", "sign_pred": 0, "sign_true": 0},
+        ]
+        
+        # Vanilla results
+        vanilla_results = [
+            {"oeis_id": "A002", "target": 20, "match_rank": 1, "solver_mode": "vanilla_lm",
+             "magnitude_bucket": "Small", "sign_pred": 0, "sign_true": 0},
+        ]
+        
+        # Combine
+        all_results = intseq_results + vanilla_results
+        
+        overall = compute_overall_metrics(all_results, top_k=5)
+        assert overall["total_samples"] == 2
+        assert overall["top1_acc"] == 100.0
+        
+        mode_df = compute_mode_breakdown(all_results, top_k=5)
+        modes = mode_df["mode"].tolist()
+        assert "dense" in modes
+        assert "vanilla_lm" in modes
+

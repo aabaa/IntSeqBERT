@@ -45,7 +45,7 @@ from typing import Dict, List, Tuple, Optional
 
 ```python
 from intseq_bert import config
-from intseq_bert.solver import IntegerSolver
+from intseq_bert.solver import IntegerSolver, VanillaSolver
 from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 from intseq_bert.features import process_sequence
 from intseq_bert.collator import OEISCollator
@@ -58,6 +58,8 @@ from intseq_bert.collator import OEISCollator
 | `MOD_RANGE` | `list(range(2, 102))` | 法のリスト |
 | `MAGNITUDE_BUCKETS` | リスト | 桁数別分類の閾値 |
 | `SOLVER_TOP_K_DEFAULT` | 5 | デフォルトの候補数 |
+| `VANILLA_MASK_TOKEN_ID` | 1 | Vanilla Transformer の MASK トークン ID |
+| `VANILLA_SPECIAL_TOKENS_OFFSET` | 3 | トークンとInteger間のオフセット |
 
 ---
 
@@ -230,10 +232,29 @@ for sample in tqdm(samples):
 | `dense` | Mode A: 全探索 |
 | `sieve` | Mode AB: アンカー・シーブ |
 | `crt` | Mode B: Sparse CRT |
+| `vanilla_lm` | Vanilla Transformer (LM ヘッドのみ) |
 | `zero` | ゼロ即時返却 |
 | `none` | 解なし |
 
 各モードについて使用率と正解率を算出。
+
+### 5.4. Vanilla Transformer サポート
+
+`model_type=vanilla` の場合、以下の特別な処理が行われる：
+
+1. **Solver の切り替え**: `IntegerSolver` の代わりに `VanillaSolver` を使用
+2. **トークンID マスキング**: `token_ids` の最終位置を `VANILLA_MASK_TOKEN_ID` に設定
+3. **推論ロジック**: `lm_head` の logits から直接トークンIDを予測し、整数に変換
+4. **UNK 処理**: 語彙外トークン (UNK) が予測された場合、`is_unk=True` をマーク
+
+```python
+# Vanilla Transformer の推論フロー
+if model_type == "vanilla":
+    solver = VanillaSolver()
+    logits = VanillaSolver.from_model_output(output)  # (L, vocab_size)
+    candidates = solver.solve(logits, top_k)
+    # candidates: [{"value": int | None, "score": float, "is_unk": bool}, ...]
+```
 
 ---
 

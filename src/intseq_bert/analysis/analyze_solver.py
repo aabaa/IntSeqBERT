@@ -25,9 +25,12 @@ from tqdm import tqdm
 
 from intseq_bert import config
 from intseq_bert.features import process_sequence
-from intseq_bert.solver import IntegerSolver
+from intseq_bert.solver import IntegerSolver, VanillaSolver
 from intseq_bert.collator import OEISCollator
 from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
+
+# Type alias for solver
+Solver = IntegerSolver | VanillaSolver
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +207,7 @@ def prepare_single_batch(
     Masking Strategy (matches collator.py):
     1. Magnitude Stream: Set is_masked flag (channel -1) to 1.0, content channels to 0.0
     2. Modulo Stream: Zero out Sin/Cos values (origin shift)
+    3. Token IDs: Set to MASK token for Vanilla models
     
     Args:
         input_seq: Input sequence (list of integers)
@@ -240,14 +244,20 @@ def prepare_single_batch(
     # Zero out Sin/Cos values at masked position (origin = masked)
     batch["mod_inputs"][:, -1, :] = 0.0
     
+    # Token IDs: (B, L) - for Vanilla models
+    # Set last position to MASK token to prevent copying the dummy value
+    if "token_ids" in batch:
+        batch["token_ids"][:, -1] = config.VANILLA_MASK_TOKEN_ID
+    
     return batch
 
 
 def run_inference_single(
     model_wrapper: ModelWrapper,
     batch: Dict[str, torch.Tensor],
-    solver: IntegerSolver,
-    top_k: int
+    solver: Solver,
+    top_k: int,
+    model_type: str
 ) -> Tuple[List[Dict], int]:
     """
     Run inference for a single sample and solve.
@@ -255,8 +265,9 @@ def run_inference_single(
     Args:
         model_wrapper: Model wrapper
         batch: Prepared batch dict
-        solver: IntegerSolver instance
+        solver: IntegerSolver or VanillaSolver instance
         top_k: Number of candidates to return
+        model_type: Model type ('intseq', 'vanilla', or 'ablation')
     
     Returns:
         Tuple of (candidates_list, last_position_index)
@@ -268,13 +279,17 @@ def run_inference_single(
     seq_len = batch["attention_mask"].sum(dim=1).item()
     last_pos = int(seq_len) - 1
     
-    # Convert to solver format
-    args = IntegerSolver.from_model_output(
-        predictions, position=last_pos, model=model_wrapper.model
-    )
-    
-    # Solve
-    candidates = solver.solve(*args, top_k=top_k)
+    # Branch based on model type
+    if model_type == "vanilla":
+        # VanillaSolver: use only lm_head logits
+        logits = VanillaSolver.from_model_output(predictions, position=last_pos)
+        candidates = solver.solve(logits, top_k=top_k)
+    else:
+        # IntegerSolver: use diagnostic heads (mag/mod)
+        args = IntegerSolver.from_model_output(
+            predictions, position=last_pos, model=model_wrapper.model
+        )
+        candidates = solver.solve(*args, top_k=top_k)
     
     return candidates, last_pos
 
@@ -322,10 +337,11 @@ def get_sign_idx(value: int) -> int:
 def evaluate_samples(
     samples: List[Dict],
     model_wrapper: ModelWrapper,
-    solver: IntegerSolver,
+    solver: Solver,
     collator: OEISCollator,
     device: str,
     top_k: int,
+    model_type: str,
     show_progress: bool = True
 ) -> List[Dict]:
     """
@@ -334,10 +350,11 @@ def evaluate_samples(
     Args:
         samples: List of sample dicts
         model_wrapper: Model wrapper
-        solver: IntegerSolver instance
+        solver: IntegerSolver or VanillaSolver instance
         collator: Collator for batch preparation
         device: Device string
         top_k: Number of candidates
+        model_type: Model type ('intseq', 'vanilla', or 'ablation')
         show_progress: Whether to show progress bar
     
     Returns:
@@ -353,7 +370,7 @@ def evaluate_samples(
             
             # Run inference
             candidates, last_pos = run_inference_single(
-                model_wrapper, batch, solver, top_k
+                model_wrapper, batch, solver, top_k, model_type
             )
             
             # Compute match rank
@@ -365,13 +382,22 @@ def evaluate_samples(
                 score_top1 = candidates[0]["score"]
                 pred_top1 = candidates[0]["value"]
                 
-                # Get sign prediction from first candidate
-                sign_pred = get_sign_idx(pred_top1)
+                # Handle UNK predictions from VanillaSolver
+                # VanillaSolver returns is_unk=True and value=None for special tokens
+                is_unk = candidates[0].get("is_unk", False)
+                
+                if is_unk or pred_top1 is None:
+                    # UNK prediction: cannot determine sign
+                    sign_pred = -1
+                else:
+                    # Get sign prediction from first candidate
+                    sign_pred = get_sign_idx(pred_top1)
             else:
                 solver_mode = "none"
                 score_top1 = None
                 pred_top1 = None
                 sign_pred = -1
+                is_unk = False
             
             # True sign
             sign_true = get_sign_idx(sample["target"])
@@ -387,7 +413,8 @@ def evaluate_samples(
                 "score_top1": score_top1,
                 "sign_pred": sign_pred,
                 "sign_true": sign_true,
-                "magnitude_bucket": get_magnitude_bucket(sample["target"])
+                "magnitude_bucket": get_magnitude_bucket(sample["target"]),
+                "is_unk": is_unk if model_type == "vanilla" else False
             })
             
         except Exception as e:
@@ -403,7 +430,8 @@ def evaluate_samples(
                 "score_top1": None,
                 "sign_pred": -1,
                 "sign_true": get_sign_idx(sample["target"]),
-                "magnitude_bucket": get_magnitude_bucket(sample["target"])
+                "magnitude_bucket": get_magnitude_bucket(sample["target"]),
+                "is_unk": False
             })
     
     return results
@@ -530,7 +558,7 @@ def compute_mode_breakdown(results: List[Dict], top_k: int) -> pd.DataFrame:
             modes[mode]["topk"] += 1
     
     rows = []
-    mode_order = ["dense", "sieve", "crt", "zero", "none", "error"]
+    mode_order = ["dense", "sieve", "crt", "vanilla_lm", "zero", "none", "error"]
     
     for mode in mode_order:
         if mode in modes:
@@ -589,10 +617,21 @@ def save_summary_json(
         execution_time: Total execution time in seconds
         output_path: Output file path
     """
+    # Handle empty DataFrames gracefully
+    if not magnitude_df.empty and "bucket" in magnitude_df.columns:
+        by_magnitude = magnitude_df.set_index("bucket").to_dict(orient="index")
+    else:
+        by_magnitude = {}
+    
+    if not mode_df.empty and "mode" in mode_df.columns:
+        by_mode = mode_df.set_index("mode").to_dict(orient="index")
+    else:
+        by_mode = {}
+    
     summary = {
         "overall": overall,
-        "by_magnitude": magnitude_df.set_index("bucket").to_dict(orient="index"),
-        "by_mode": mode_df.set_index("mode").to_dict(orient="index"),
+        "by_magnitude": by_magnitude,
+        "by_mode": by_mode,
         "execution": {
             "total_time_sec": round(execution_time, 2),
             "avg_time_per_sample_sec": round(
@@ -737,8 +776,13 @@ def main():
     model_wrapper = load_model_from_checkpoint(args.model_type, checkpoint_path, device)
     logger.info(f"Loaded model (type={args.model_type})")
     
-    # Create solver
-    solver = IntegerSolver()
+    # Create solver based on model type
+    if args.model_type == "vanilla":
+        solver: Solver = VanillaSolver()
+        logger.info("Using VanillaSolver (token-based, no diagnostic heads)")
+    else:
+        solver = IntegerSolver()
+        logger.info("Using IntegerSolver (with diagnostic heads)")
     
     # Create collator (no masking needed for inference)
     collator = OEISCollator(mask_prob=0.0)
@@ -772,7 +816,7 @@ def main():
     start_time = time.time()
     
     results = evaluate_samples(
-        samples, model_wrapper, solver, collator, device, args.top_k
+        samples, model_wrapper, solver, collator, device, args.top_k, args.model_type
     )
     
     execution_time = time.time() - start_time

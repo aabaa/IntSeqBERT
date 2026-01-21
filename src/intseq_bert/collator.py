@@ -14,39 +14,6 @@ from typing import List, Dict, Any
 from . import config
 
 
-def integer_to_token_id(value: int) -> int:
-    """
-    Convert an integer value to a token ID for Vanilla Transformer.
-    
-    Token ID mapping:
-    - 0: PAD token (reserved)
-    - 1: MASK token (reserved)
-    - 2: UNK token (for out-of-vocabulary integers)
-    - 3 onwards: Actual integer values (shifted by 3)
-    
-    For integers in [0, VOCAB_SIZE-4], we map to [3, VOCAB_SIZE-1].
-    Integers outside this range become UNK.
-    
-    Args:
-        value: Integer value to convert
-        
-    Returns:
-        Token ID
-    """
-    # Special token offsets
-    SPECIAL_TOKENS_OFFSET = 3  # PAD=0, MASK=1, UNK=2
-    
-    # Usable vocab range for integers
-    max_int = config.VANILLA_VOCAB_SIZE - SPECIAL_TOKENS_OFFSET - 1
-    
-    # Map to token ID
-    if 0 <= value <= max_int:
-        return value + SPECIAL_TOKENS_OFFSET
-    else:
-        # Out of vocabulary -> UNK
-        return config.VANILLA_UNK_TOKEN_ID
-
-
 @dataclass
 class OEISCollator:
     """
