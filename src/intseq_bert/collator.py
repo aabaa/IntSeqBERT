@@ -107,28 +107,49 @@ class OEISCollator:
         mod_inputs = mod_padded * content_keep_mask
 
         # --- Token ID Processing (for Vanilla Transformer) ---
-        # Vectorized approach: derive approximate integers from log magnitude
-        # mag_padded[..., 0] contains log10(|value|+1)
-        # We reconstruct |value| = 10^log - 1, then convert to token IDs
+        # Use raw integer sequence ("numbers") if available for accurate token IDs.
+        # Falls back to magnitude-based approximation if "numbers" not present.
         
         # Special token offsets: PAD=0, MASK=1, UNK=2, integers start at 3
         SPECIAL_TOKENS_OFFSET = 3
         max_int = config.VANILLA_VOCAB_SIZE - SPECIAL_TOKENS_OFFSET - 1
         
-        # Reconstruct approximate absolute values from log magnitude
-        log_vals = mag_padded[..., 0]  # (B, L)
-        approx_abs = torch.pow(10.0, log_vals) - 1  # Approximate |value|
-        approx_abs = torch.clamp(approx_abs, min=0).long()  # Ensure non-negative
+        # Check if raw numbers are available
+        has_numbers = "numbers" in batch[0]
         
-        # Map to token IDs: values in [0, max_int] -> [3, vocab_size-1], else UNK
-        in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
-        token_ids = torch.where(
-            in_vocab_mask,
-            approx_abs + SPECIAL_TOKENS_OFFSET,
-            torch.full_like(approx_abs, config.VANILLA_UNK_TOKEN_ID)
-        )
+        if has_numbers:
+            # Use raw integer sequence for accurate token ID generation
+            # This handles negative numbers and avoids rounding errors
+            numbers_list = [torch.tensor(item["numbers"], dtype=torch.long) for item in batch]
+            numbers_padded = pad_sequence(
+                numbers_list, batch_first=True, padding_value=0
+            )  # (B, L)
+            
+            # Map integers to token IDs:
+            # - Non-negative integers in [0, max_int] -> [3, vocab_size-1]
+            # - Negative integers or out-of-range -> UNK (ID=2)
+            in_vocab_mask = (numbers_padded >= 0) & (numbers_padded <= max_int)
+            token_ids = torch.where(
+                in_vocab_mask,
+                numbers_padded + SPECIAL_TOKENS_OFFSET,
+                torch.full_like(numbers_padded, config.VANILLA_UNK_TOKEN_ID)
+            )
+        else:
+            # Fallback: Reconstruct approximate integers from log magnitude
+            # NOTE: This loses sign information and has rounding errors
+            log_vals = mag_padded[..., 0]  # (B, L)
+            approx_abs = torch.pow(10.0, log_vals) - 1  # Approximate |value|
+            approx_abs = torch.clamp(approx_abs, min=0).long()  # Ensure non-negative
+            
+            # Map to token IDs
+            in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
+            token_ids = torch.where(
+                in_vocab_mask,
+                approx_abs + SPECIAL_TOKENS_OFFSET,
+                torch.full_like(approx_abs, config.VANILLA_UNK_TOKEN_ID)
+            )
         
-        # Initialize token_labels from token_ids
+        # Initialize token_labels from token_ids (before masking input)
         token_labels = token_ids.clone()
         
         # Apply MASK token (ID=1) at masked positions for input

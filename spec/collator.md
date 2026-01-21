@@ -193,24 +193,38 @@ mod_inputs = mod_padded * content_keep_mask
 Token ID 構成:
   0: PAD  - パディング位置
   1: MASK - マスク位置（入力用）
-  2: UNK  - 語彙外の整数
+  2: UNK  - 語彙外の整数 (負の数や大きすぎる数)
   3〜10002: 整数 0〜9999
 ```
 
-```python
-# log magnitude から近似整数値を復元
-log_vals = mag_padded[..., 0]  # (B, L)
-approx_abs = torch.pow(10.0, log_vals) - 1  # |value| ≈ 10^log - 1
-approx_abs = torch.clamp(approx_abs, min=0).long()
+**優先順位:**
+1. 生整数列 (`"numbers"`) が存在する場合 → 正確なトークンIDを生成
+2. 存在しない場合 → log magnitude から近似整数値を復元（フォールバック）
 
-# トークン ID にマッピング
+```python
 max_int = VANILLA_VOCAB_SIZE - 3 - 1  # 9999
-in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
-token_ids = torch.where(
-    in_vocab_mask,
-    approx_abs + 3,  # オフセット 3 (PAD, MASK, UNK)
-    VANILLA_UNK_TOKEN_ID  # 語彙外 → UNK
-)
+
+if "numbers" in batch[0]:
+    # 生整数列から正確なトークンID生成
+    numbers_list = [torch.tensor(item["numbers"]) for item in batch]
+    numbers_padded = pad_sequence(numbers_list, batch_first=True, padding_value=0)
+    
+    # 非負かつ語彙内 → 有効トークン、それ以外 → UNK
+    in_vocab_mask = (numbers_padded >= 0) & (numbers_padded <= max_int)
+    token_ids = torch.where(
+        in_vocab_mask,
+        numbers_padded + 3,  # オフセット 3 (PAD, MASK, UNK)
+        VANILLA_UNK_TOKEN_ID  # 負の数 or 語彙外 → UNK
+    )
+else:
+    # フォールバック: log magnitude から近似整数値を復元
+    # 注: 符号情報が失われ、丸め誤差が発生する
+    log_vals = mag_padded[..., 0]
+    approx_abs = torch.pow(10.0, log_vals) - 1
+    approx_abs = torch.clamp(approx_abs, min=0).long()
+    
+    in_vocab_mask = (approx_abs >= 0) & (approx_abs <= max_int)
+    token_ids = torch.where(in_vocab_mask, approx_abs + 3, VANILLA_UNK_TOKEN_ID)
 
 # マスクトークン適用
 token_ids = torch.where(mask_matrix, VANILLA_MASK_TOKEN_ID, token_ids)

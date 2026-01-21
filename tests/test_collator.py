@@ -434,6 +434,66 @@ class TestTokenIdProcessing:
         masked_labels = result["token_labels"][0, :10]
         assert (masked_labels != config.IGNORE_INDEX).all()
         assert (masked_labels >= config.VANILLA_UNK_TOKEN_ID).all()  # >= 2
+    
+    def test_token_ids_from_raw_numbers(self):
+        """Test that token_ids are correctly generated from raw numbers."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0  # No masking
+        
+        # Create batch with known numbers
+        batch = [{
+            config.KEY_OEIS_ID: "A000001",
+            config.KEY_MAG_FEATURES: torch.randn(5, config.MAG_RAW_DIM),
+            config.KEY_MOD_FEATURES: torch.randn(5, config.MOD_FEATURE_DIM),
+            config.KEY_MOD_INTEGERS: torch.randint(0, 50, (5, config.NUM_MODULI), dtype=torch.long),
+            "numbers": [0, 1, 5, 10, 100],
+        }]
+        result = collator(batch)
+        
+        # Token IDs should be numbers + 3 (offset for special tokens)
+        expected = torch.tensor([3, 4, 8, 13, 103])  # 0+3, 1+3, 5+3, 10+3, 100+3
+        assert torch.equal(result["token_ids"][0, :5], expected)
+    
+    def test_token_ids_negative_numbers_become_unk(self):
+        """Test that negative numbers are mapped to UNK token."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0
+        
+        batch = [{
+            config.KEY_OEIS_ID: "A000002",
+            config.KEY_MAG_FEATURES: torch.randn(4, config.MAG_RAW_DIM),
+            config.KEY_MOD_FEATURES: torch.randn(4, config.MOD_FEATURE_DIM),
+            config.KEY_MOD_INTEGERS: torch.randint(0, 50, (4, config.NUM_MODULI), dtype=torch.long),
+            "numbers": [-5, 0, -1, 10],
+        }]
+        result = collator(batch)
+        
+        # Negative numbers should become UNK (ID=2)
+        assert result["token_ids"][0, 0].item() == config.VANILLA_UNK_TOKEN_ID  # -5 -> UNK
+        assert result["token_ids"][0, 1].item() == 3  # 0 -> 3
+        assert result["token_ids"][0, 2].item() == config.VANILLA_UNK_TOKEN_ID  # -1 -> UNK
+        assert result["token_ids"][0, 3].item() == 13  # 10 -> 13
+    
+    def test_token_ids_out_of_vocab_become_unk(self):
+        """Test that out-of-vocabulary integers become UNK."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0
+        
+        max_valid_int = config.VANILLA_VOCAB_SIZE - 3 - 1  # max_int
+        
+        batch = [{
+            config.KEY_OEIS_ID: "A000003",
+            config.KEY_MAG_FEATURES: torch.randn(3, config.MAG_RAW_DIM),
+            config.KEY_MOD_FEATURES: torch.randn(3, config.MOD_FEATURE_DIM),
+            config.KEY_MOD_INTEGERS: torch.randint(0, 50, (3, config.NUM_MODULI), dtype=torch.long),
+            "numbers": [0, max_valid_int, max_valid_int + 1],
+        }]
+        result = collator(batch)
+        
+        # 0 -> 3, max_valid_int -> valid, max_valid_int + 1 -> UNK
+        assert result["token_ids"][0, 0].item() == 3
+        assert result["token_ids"][0, 1].item() == max_valid_int + 3
+        assert result["token_ids"][0, 2].item() == config.VANILLA_UNK_TOKEN_ID
 
 
 # ==========================================
