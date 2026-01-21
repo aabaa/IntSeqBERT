@@ -233,12 +233,14 @@ def compute_total_score(
     mag_mu: float,
     sigma: float,
     mod_log_probs: List[torch.Tensor],
-    mod_range: List[int]
+    mod_range: List[int],
+    mag_weight: float = config.SOLVER_MAG_WEIGHT,
+    mod_weight: float = config.SOLVER_MOD_WEIGHT
 ) -> float:
     """
     Compute total score combining magnitude and modulo components.
     
-    Total Score = LogLikelihood(Magnitude) + Sum(LogLikelihood(Mods))
+    Total Score = mag_weight * LogLikelihood(Magnitude) + mod_weight * Sum(LogLikelihood(Mods))
     
     Args:
         n: Candidate integer (positive)
@@ -246,13 +248,15 @@ def compute_total_score(
         sigma: Magnitude standard deviation
         mod_log_probs: List of log-probability tensors
         mod_range: List of moduli
+        mag_weight: Weight for magnitude score (default from config)
+        mod_weight: Weight for modulo score (default from config, discounted for redundancy)
     
     Returns:
-        Total log-likelihood score
+        Total weighted log-likelihood score
     """
     mag_score = compute_magnitude_score(n, mag_mu, sigma)
     mod_score = compute_modulo_score(n, mod_log_probs, mod_range)
-    return mag_score + mod_score
+    return (mag_weight * mag_score) + (mod_weight * mod_score)
 
 
 def compute_total_scores_batch(
@@ -260,7 +264,9 @@ def compute_total_scores_batch(
     mag_mu: float,
     sigma: float,
     mod_log_probs: List[torch.Tensor],
-    mod_range: List[int]
+    mod_range: List[int],
+    mag_weight: float = config.SOLVER_MAG_WEIGHT,
+    mod_weight: float = config.SOLVER_MOD_WEIGHT
 ) -> torch.Tensor:
     """
     Vectorized batch scoring for multiple candidates.
@@ -273,6 +279,8 @@ def compute_total_scores_batch(
         sigma: Magnitude standard deviation
         mod_log_probs: List of log-probability tensors (on same device)
         mod_range: List of moduli
+        mag_weight: Weight for magnitude score (default from config)
+        mod_weight: Weight for modulo score (default from config, discounted for redundancy)
     
     Returns:
         Tensor of scores (same length as candidates)
@@ -331,8 +339,8 @@ def compute_total_scores_batch(
         mod_scores[valid_remainders] += log_prob_np[valid_idx]
         mod_scores[~valid_remainders] += -100.0  # Penalty for invalid
     
-    # 4. Total scores
-    total_scores = mag_scores + mod_scores
+    # 4. Total scores (Apply weights)
+    total_scores = (mag_weight * mag_scores) + (mod_weight * mod_scores)
     
     return torch.from_numpy(total_scores)
 

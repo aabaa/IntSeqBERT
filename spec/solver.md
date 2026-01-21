@@ -42,6 +42,10 @@ SOLVER_SIEVE_THRESHOLD = 100_000_000_000_000  # Mode AB → B 切替閾値 (10^1
 SOLVER_SIEVE_TARGET = 100_000               # Anchored Sieve の候補数目標
 SOLVER_BEAM_WIDTH = 10                      # CRT Beam Search のビーム幅
 SOLVER_MAX_ANCHORS = 20                     # アンカーの最大数
+
+# Scoring Weights (Modulo重複計上によるバイアス防止)
+SOLVER_MAG_WEIGHT = 1.0                     # Magnitude スコアの重み
+SOLVER_MOD_WEIGHT = 0.3                     # Modulo スコアの重み (2,4,8等の冗長法を割引)
 ```
 
 ### 関連モジュール
@@ -189,17 +193,23 @@ def from_model_output(
 ### スコアリング関数
 
 ```python
-def _compute_score(self, n: int, mag_mu: float, sigma: float, mod_log_probs: List[Tensor]) -> float:
+def _compute_score(
+    self, n: int, mag_mu: float, sigma: float, mod_log_probs: List[Tensor],
+    mag_weight: float = config.SOLVER_MAG_WEIGHT,
+    mod_weight: float = config.SOLVER_MOD_WEIGHT
+) -> float:
     """
     候補整数 n のスコア（対数尤度）を計算する。
     
-    Total Score = LogLikelihood(Magnitude) + Sum(LogLikelihood(Mods))
+    Total Score = mag_weight × LogLikelihood(Magnitude) + mod_weight × Sum(LogLikelihood(Mods))
     
     Args:
         n: 候補整数 (正の整数)
         mag_mu: Magnitude 予測平均 (1 + log10(|x|) スケール)
         sigma: Magnitude の標準偏差
         mod_log_probs: 各法の対数確率分布リスト
+        mag_weight: Magnitude スコアの重み (デフォルト: 1.0)
+        mod_weight: Modulo スコアの重み (デフォルト: 0.3、冗長法による偏り防止)
     
     Returns:
         float: 対数尤度スコア（大きいほど良い）
@@ -215,7 +225,7 @@ def _compute_score(self, n: int, mag_mu: float, sigma: float, mod_log_probs: Lis
         remainder = n % m
         mod_score += mod_log_probs[i][remainder].item()
     
-    return mag_score + mod_score
+    return (mag_weight * mag_score) + (mod_weight * mod_score)
 ```
 
 ### (1) Mode A: Dense Search (全探索)

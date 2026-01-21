@@ -224,6 +224,10 @@ SOLVER_TOP_K_DEFAULT = 5        # Default number of candidates to return
 SOLVER_MAX_ENUM_CANDIDATES = 200_000  # Hard limit on enumerated candidates per solve
 SOLVER_BEAM_SKIP_THRESHOLD = 10_000_000  # Skip beam if it would generate > this many candidates
 
+# Solver Scoring Weights
+SOLVER_MAG_WEIGHT = 1.0  # Magnitude score weight
+SOLVER_MOD_WEIGHT = 0.3  # Modulo score weight (Discounted due to redundant moduli like 2, 4, 8)
+
 # ==========================================
 # 11. Vanilla Transformer Constants
 # ==========================================

@@ -289,8 +289,10 @@ class TestModuloScore:
 class TestTotalScore:
     """Tests for compute_total_score function."""
     
-    def test_combines_mag_and_mod(self, small_mod_range, uniform_log_probs):
-        """Test that total score combines magnitude and modulo."""
+    def test_combines_mag_and_mod_with_weights(self, small_mod_range, uniform_log_probs):
+        """Test that total score combines magnitude and modulo with default weights."""
+        from intseq_bert import config
+        
         n = 100
         mag_mu = 3.0  # Matches n=100
         sigma = 1.0
@@ -299,7 +301,25 @@ class TestTotalScore:
         mag = compute_magnitude_score(n, mag_mu, sigma)
         mod = compute_modulo_score(n, uniform_log_probs, small_mod_range)
         
-        assert total == pytest.approx(mag + mod, rel=1e-5)
+        expected = (config.SOLVER_MAG_WEIGHT * mag) + (config.SOLVER_MOD_WEIGHT * mod)
+        assert total == pytest.approx(expected, rel=1e-5)
+    
+    def test_custom_weights(self, small_mod_range, uniform_log_probs):
+        """Test that custom weights are applied correctly."""
+        n = 100
+        mag_mu = 3.0
+        sigma = 1.0
+        
+        mag = compute_magnitude_score(n, mag_mu, sigma)
+        mod = compute_modulo_score(n, uniform_log_probs, small_mod_range)
+        
+        # Test with custom weights
+        total = compute_total_score(
+            n, mag_mu, sigma, uniform_log_probs, small_mod_range,
+            mag_weight=2.0, mod_weight=0.5
+        )
+        expected = (2.0 * mag) + (0.5 * mod)
+        assert total == pytest.approx(expected, rel=1e-5)
 
 
 class TestComputeTotalScoresBatch:
@@ -380,6 +400,30 @@ class TestComputeTotalScoresBatch:
         
         assert len(scores) == 3
         assert all(torch.isfinite(s) for s in scores)
+    
+    def test_custom_weights_batch(self, small_mod_range, uniform_log_probs):
+        """Test batch scoring with custom weights matches scalar version."""
+        candidates = [10, 100, 1000]
+        mag_mu, sigma = 2.5, 1.0
+        mag_weight, mod_weight = 2.0, 0.5
+        
+        # Compute scalar scores with custom weights
+        scalar_scores = [
+            compute_total_score(
+                n, mag_mu, sigma, uniform_log_probs, small_mod_range,
+                mag_weight=mag_weight, mod_weight=mod_weight
+            )
+            for n in candidates
+        ]
+        
+        # Compute batch scores with same custom weights
+        batch_scores = compute_total_scores_batch(
+            candidates, mag_mu, sigma, uniform_log_probs, small_mod_range,
+            mag_weight=mag_weight, mod_weight=mod_weight
+        )
+        
+        for i, (scalar, batch) in enumerate(zip(scalar_scores, batch_scores)):
+            assert batch.item() == pytest.approx(scalar, rel=1e-4), f"Mismatch at index {i}"
 
 
 # ============================================================
