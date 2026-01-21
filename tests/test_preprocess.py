@@ -267,6 +267,7 @@ class TestWorkerExtractFeatures:
         assert config.KEY_MAG_FEATURES in data
         assert config.KEY_MOD_FEATURES in data
         assert config.KEY_MOD_INTEGERS in data
+        assert "numbers" in data  # Raw integer sequence for Vanilla Transformer
         
         # Check shapes
         L = 19
@@ -274,6 +275,32 @@ class TestWorkerExtractFeatures:
         assert data[config.KEY_MAG_FEATURES].shape == (L, config.MAG_RAW_DIM)
         assert data[config.KEY_MOD_FEATURES].shape == (L, config.MOD_FEATURE_DIM)
         assert data[config.KEY_MOD_INTEGERS].shape == (L, config.NUM_MODULI)
+        
+        # Check raw numbers
+        assert data["numbers"] == list(range(1, 20))
+    
+    def test_numbers_truncated_to_max_length(self, tmp_path):
+        """Test that numbers are truncated to MAX_SEQUENCE_LENGTH."""
+        output_dir = tmp_path / "features"
+        output_dir.mkdir()
+        
+        # Create sequence longer than MAX_SEQUENCE_LENGTH
+        long_sequence = list(range(1, config.MAX_SEQUENCE_LENGTH + 100))
+        record = schemas.OEISRecord(
+            oeis_id="A000099",
+            sequence=long_sequence
+        )
+        lines = [record.to_json_line()]
+        preprocess._worker_extract_features(lines, output_dir)
+        
+        data = torch.load(output_dir / "A000099.pt")
+        
+        # Check that numbers are truncated to MAX_SEQUENCE_LENGTH
+        assert len(data["numbers"]) == config.MAX_SEQUENCE_LENGTH
+        assert data["numbers"] == long_sequence[:config.MAX_SEQUENCE_LENGTH]
+        
+        # Check consistency: numbers length should match feature tensor length
+        assert len(data["numbers"]) == data[config.KEY_MAG_FEATURES].shape[0]
 
 
 # ==========================================

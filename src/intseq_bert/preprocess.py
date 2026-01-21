@@ -170,6 +170,10 @@ def _worker_extract_features(chunk: List[str], output_dir: Path) -> int:
             # 4. Save
             # Add ID to the dict for safety/verification
             features_dict[config.KEY_OEIS_ID] = record.oeis_id
+            # Add raw integer sequence for Vanilla Transformer token ID generation
+            # Apply same truncation as features.process_sequence for consistency
+            truncated_numbers = record.sequence[:config.MAX_SEQUENCE_LENGTH]
+            features_dict["numbers"] = truncated_numbers
             
             save_path = output_dir / f"{record.oeis_id}.pt"
             torch.save(features_dict, save_path)

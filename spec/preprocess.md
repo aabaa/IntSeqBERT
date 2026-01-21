@@ -179,8 +179,9 @@ def _worker_extract_features(chunk: List[str], output_dir: Path) -> int
 2. MIN_SEQUENCE_LENGTH でフィルタ
 3. features.process_sequence() で特徴量抽出
 4. KEY_OEIS_ID を追加
-5. .pt ファイルとして保存
-6. 処理件数を返却
+5. 生の整数列を "numbers" キーとして追加 (Vanilla Transformer 用)
+6. .pt ファイルとして保存
+7. 処理件数を返却
 ```
 
 ---
@@ -310,7 +311,8 @@ uv run python -m intseq_bert.preprocess split-dataset \
     "mag_features": Tensor(L, 4),
     "mod_features": Tensor(L, 200),
     "mod_integers": Tensor(L, 100),
-    "oeis_id": "A000045"
+    "oeis_id": "A000045",
+    "numbers": [0, 1, 1, 2, 3, 5, ...]  # 生の整数列 (Vanilla Transformer 用)
 }
 ```
 
