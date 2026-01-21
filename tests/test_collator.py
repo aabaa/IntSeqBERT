@@ -494,6 +494,31 @@ class TestTokenIdProcessing:
         assert result["token_ids"][0, 0].item() == 3
         assert result["token_ids"][0, 1].item() == max_valid_int + 3
         assert result["token_ids"][0, 2].item() == config.VANILLA_UNK_TOKEN_ID
+    
+    def test_token_ids_huge_integers_become_unk(self):
+        """Test that integers exceeding int64 range become UNK without overflow."""
+        collator = OEISCollator()
+        collator.mask_prob = 0.0
+        
+        # OEIS contains arbitrarily large integers (e.g., 10^100)
+        huge_int = 10**100  # Far exceeds int64 range
+        
+        batch = [{
+            config.KEY_OEIS_ID: "A000004",
+            config.KEY_MAG_FEATURES: torch.randn(3, config.MAG_RAW_DIM),
+            config.KEY_MOD_FEATURES: torch.randn(3, config.MOD_FEATURE_DIM),
+            config.KEY_MOD_INTEGERS: torch.randint(0, 50, (3, config.NUM_MODULI), dtype=torch.long),
+            "numbers": [0, huge_int, -huge_int],
+        }]
+        
+        # Should not raise overflow error
+        result = collator(batch)
+        
+        # First value (0) -> token 3
+        assert result["token_ids"][0, 0].item() == 3
+        # Large positive and negative integers -> UNK
+        assert result["token_ids"][0, 1].item() == config.VANILLA_UNK_TOKEN_ID
+        assert result["token_ids"][0, 2].item() == config.VANILLA_UNK_TOKEN_ID
 
 
 # ==========================================

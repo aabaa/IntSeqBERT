@@ -206,7 +206,18 @@ max_int = VANILLA_VOCAB_SIZE - 3 - 1  # 9999
 
 if "numbers" in batch[0]:
     # 生整数列から正確なトークンID生成
-    numbers_list = [torch.tensor(item["numbers"]) for item in batch]
+    # 
+    # 重要: OEIS には int64 の範囲を超える巨大整数が含まれる。
+    # torch.tensor(..., dtype=torch.long) でのオーバーフローを防ぐため、
+    # 事前に範囲外の値をセンチネル値に変換する。
+    INT64_MAX = 2**63 - 1
+    INT64_MIN = -(2**63)
+    UNK_SENTINEL = max_int + 1  # 後で UNK にマップされる
+    
+    def safe_clamp(numbers):
+        return [n if INT64_MIN <= n <= INT64_MAX else UNK_SENTINEL for n in numbers]
+    
+    numbers_list = [torch.tensor(safe_clamp(item["numbers"])) for item in batch]
     numbers_padded = pad_sequence(numbers_list, batch_first=True, padding_value=0)
     
     # 非負かつ語彙内 → 有効トークン、それ以外 → UNK
@@ -214,7 +225,7 @@ if "numbers" in batch[0]:
     token_ids = torch.where(
         in_vocab_mask,
         numbers_padded + 3,  # オフセット 3 (PAD, MASK, UNK)
-        VANILLA_UNK_TOKEN_ID  # 負の数 or 語彙外 → UNK
+        VANILLA_UNK_TOKEN_ID  # 負の数、語彙外、巨大整数 → UNK
     )
 else:
     # フォールバック: log magnitude から近似整数値を復元

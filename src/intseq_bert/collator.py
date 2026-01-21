@@ -120,7 +120,26 @@ class OEISCollator:
         if has_numbers:
             # Use raw integer sequence for accurate token ID generation
             # This handles negative numbers and avoids rounding errors
-            numbers_list = [torch.tensor(item["numbers"], dtype=torch.long) for item in batch]
+            # 
+            # IMPORTANT: OEIS contains arbitrarily large integers that exceed int64 range.
+            # We must pre-process to avoid overflow in torch.tensor(..., dtype=torch.long).
+            # Numbers outside [-max_int, max_int] will become UNK anyway, so we clamp them
+            # to a sentinel value that fits in int64.
+            INT64_MAX = 2**63 - 1
+            INT64_MIN = -(2**63)
+            UNK_SENTINEL = max_int + 1  # Will be mapped to UNK later
+            
+            def safe_clamp(numbers: list) -> list:
+                """Clamp numbers to int64 range to prevent tensor overflow."""
+                return [
+                    n if INT64_MIN <= n <= INT64_MAX else UNK_SENTINEL
+                    for n in numbers
+                ]
+            
+            numbers_list = [
+                torch.tensor(safe_clamp(item["numbers"]), dtype=torch.long)
+                for item in batch
+            ]
             numbers_padded = pad_sequence(
                 numbers_list, batch_first=True, padding_value=0
             )  # (B, L)
