@@ -231,7 +231,7 @@ SOLVER_MOD_WEIGHT = 0.3  # Modulo score weight (Discounted due to redundant modu
 # ==========================================
 # 11. Vanilla Transformer Constants
 # ==========================================
-VANILLA_VOCAB_SIZE = 10_003    # Token vocabulary size (covers 0-9,999 + special tokens)
+VANILLA_VOCAB_SIZE = 30_003     # Token vocabulary size (covers 0-29,999 + special tokens)
 VANILLA_PAD_TOKEN_ID = 0        # Padding token ID
 VANILLA_UNK_TOKEN_ID = 2        # Unknown token ID
 VANILLA_MASK_TOKEN_ID = 1       # Mask token ID
