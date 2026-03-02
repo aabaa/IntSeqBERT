@@ -48,9 +48,9 @@ $$
 
 ## 3.3 双ストリーム埋め込み
 
-2 つの特徴ベクトルは独立した線形層によってモデルの隠れ次元 $d$ に射影される：
+2 つの特徴ベクトルは独立した射影層でモデルの隠れ次元 $d$ に写像される。本研究の設定では Magnitude 側に 2 層 MLP を用いる：
 $$
-\mathbf{h}_i^{\text{mag}} = W_{\text{mag}}\,\mathbf{f}_i^{\text{mag}} + \mathbf{b}_{\text{mag}}, \quad
+\mathbf{h}_i^{\text{mag}} = \mathrm{MLP}_{\text{mag}}(\mathbf{f}_i^{\text{mag}}), \quad
 \mathbf{h}_i^{\text{mod}} = W_{\text{mod}}\,\mathbf{f}_i^{\text{mod}} + \mathbf{b}_{\text{mod}}, \quad \mathbf{h}_i^{\text{mag}},\,\mathbf{h}_i^{\text{mod}} \in \mathbb{R}^d.
 $$
 
@@ -64,6 +64,7 @@ $$
 $$
 \mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\text{mag}} + \boldsymbol{\beta}_i.
 $$
+Modulo 側の射影後に ReLU を適用し、さらに FiLM 前にドロップアウトを入れる。
 この定式化により、算術的周期性がパラメータ効率よく（$W_\gamma, W_\beta \in \mathbb{R}^{d \times d}$）連続値の Magnitude 表現を条件付けることができる。
 エンコーダへの入力前に、$\mathbf{e}_i$ に標準的な Sin/Cos 位置エンコーディングを加算する。
 
@@ -91,12 +92,13 @@ $$
 
 マスク位置 $i$ のエンコーダ出力を $\mathbf{z}_i \in \mathbb{R}^d$ とする。
 
-**Magnitude ヘッド**（異分散回帰 / heteroscedastic regression）：
+**Magnitude ヘッド**（回帰）：
 $$
-(\mu_i,\, \log \sigma_i^2) = W_{\text{mag-head}}\,\mathbf{z}_i + \mathbf{b}_{\text{mag-head}}, \quad W_{\text{mag-head}} \in \mathbb{R}^{2 \times d}.
+(\mu_i,\, \log \sigma_i^2) = \mathrm{MLP}_{\text{mag-head}}(\mathbf{z}_i),
 $$
 対数スケールの Magnitude 予測値は $\hat{v}_i = \mu_i$。
-不確かさ $\sigma_i^2$ は第 5 節で報告する校正済み予測区間に利用する。
+$\mathrm{MLP}_{\text{mag-head}}$ は $d \rightarrow d \rightarrow 2$（中間活性化 ReLU）である。
+本研究の実験設定では、損失計算で使用するのは主に $\mu_i$ であり、$\log \sigma_i^2$ は補助出力として保持する。
 
 **符号ヘッド**（3 クラス分類）：
 $$
@@ -118,7 +120,7 @@ $$
 これらの重みは実験的に決定した固定値であり、不確実性に基づく動的重み付け（uncertainty weighting）などの適応的な手法を試みたところ学習が不安定になることが観察されたため、固定値を採用した。
 
 $\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（SmoothL1）とする。
-\texttt{MAG\_LOSS\_TYPE='huber'} を採用し、実験設定では \texttt{USE\_HETEROSCEDASTIC\_LOSS=False} とした。
+Magnitude 損失には Huber 損失（SmoothL1）を採用し、不確実性重み付けは行わない設定とした。
 $\mathcal{L}_{\text{sign}}$ は 3 クラスのクロスエントロピー損失。
 $\mathcal{L}_{\text{mod}}$ は 100 個の Modulo ヘッドのクロスエントロピーの平均であり、クラス数の違いを補正するために $\log m$ で正規化する：
 $$
@@ -149,13 +151,12 @@ Solver はまず、Magnitude 予測から 3σ 区間 $[n_{\min}, n_{\max}]$（$v
 | **Sieve** | $10^6 < \Delta n \leq 10^{14}$ | 確信度上位の法をアンカーとした CRT ビームサーチで候補を絞り込み |
 | **CRT** | $\Delta n > 10^{14}$ | Sparse CRT ビームサーチで巨大整数を直接生成 |
 
-探索失敗時の終了状態として、値を 0 にフォールバックする \texttt{zero} と、有効候補を返せない \texttt{none} を別途定義する。
+\texttt{zero} は \texttt{sign\_idx=zero} のときに 0 を即時返却する分岐であり、探索失敗時のフォールバックではない。\texttt{none} は評価において「有効候補なし」を集計するための結果ラベルである。
 
-各候補 $n$ のスコアは Magnitude Gaussian 対数尤度と全法の Modulo 対数確率の重み付き和として計算される：
+各候補 $n$ のスコアは、Magnitude 項と全法の Modulo 対数確率の重み付き和として計算される：
 $$
 \text{score}(n) =
 -\frac{(v_n - \mu_i)^2}{2\sigma_i^2}
--\frac{1}{2}\log \sigma_i^2
 + 0.3 \cdot \sum_{m=2}^{101} \log P\!\left(n \bmod m\right),
 $$
 ただし
