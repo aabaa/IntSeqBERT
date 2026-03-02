@@ -389,7 +389,7 @@ classDiagram
         +forward(token_ids)
     }
     
-    class MagOnlyEmbeddings {
+    class AblationEmbeddings {
         +mag_proj: Linear
         +forward(mag_features)
     }
@@ -400,11 +400,11 @@ classDiagram
     }
     
     class VanillaTransformerForPreTraining {
-        +encoder: VanillaTransformerModel
+        +backbone: VanillaModel
         +mag_head, sign_head, mod_head
     }
     
-    IntSeqEmbeddings <|-- MagOnlyEmbeddings : simplified
+    IntSeqEmbeddings <|-- AblationEmbeddings : simplified
     IntSeqForPreTraining ..> IntSeqEmbeddings : uses
     VanillaTransformerForPreTraining ..> VanillaEmbeddings : uses
 ```
@@ -457,7 +457,7 @@ dropout:         Dropout(dropout)
 
 ---
 
-### 7.3. `VanillaTransformerModel` (Baseline Backbone)
+### 7.3. `VanillaModel` (Baseline Backbone)
 
 標準的な Transformer Encoder。`IntSeqModel` と同じ Encoder 構造を持つが、入力層が異なる。
 
@@ -540,7 +540,7 @@ VANILLA_UNK_TOKEN_ID = 2
 
 ---
 
-### 7.6. MagOnlyEmbeddings (Ablation: No-Mod)
+### 7.6. AblationEmbeddings (Ablation: No-Mod)
 
 Modulo Stream を除去した Ablation 用 Embedding 層。
 

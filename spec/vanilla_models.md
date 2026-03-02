@@ -51,7 +51,7 @@ IntSeqBERT との比較実験（Baseline）用として、以下の3つのクラ
 ### 3.1. `VanillaEmbeddings`
 
 ```python
-class VanillaEmbeddings(nn.Module):
+class VanillaEmbeddings(BaseEmbeddings):
     """Token embedding with positional encoding for Vanilla Transformer."""
 ```
 
@@ -71,10 +71,10 @@ class VanillaEmbeddings(nn.Module):
 | `layer_norm` | `nn.LayerNorm(d_model)` |
 | `dropout` | `nn.Dropout(dropout)` |
 
-### 3.2. `VanillaTransformerModel`
+### 3.2. `VanillaModel`
 
 ```python
-class VanillaTransformerModel(nn.Module):
+class VanillaModel(BaseTransformerModel):
     """Transformer Encoder backbone for Vanilla model."""
 ```
 
@@ -96,7 +96,7 @@ class VanillaTransformerModel(nn.Module):
 ### 3.3. `VanillaTransformerForPreTraining`
 
 ```python
-class VanillaTransformerForPreTraining(nn.Module):
+class VanillaTransformerForPreTraining(BaseForPreTraining):
     """Vanilla Transformer with multi-task heads for pre-training."""
 ```
 
@@ -104,7 +104,7 @@ class VanillaTransformerForPreTraining(nn.Module):
 
 | コンポーネント | 定義 | 説明 |
 |---------------|------|------|
-| `transformer` | `VanillaTransformerModel(...)` | バックボーン |
+| `backbone` | `VanillaModel(...)` | バックボーン |
 | `lm_head` | `nn.Linear(d_model, vocab_size)` | **メイン**: トークン予測 |
 | `mag_head` | `nn.Linear(d_model, 2)` | 診断用: Magnitude |
 | `sign_head` | `nn.Linear(d_model, 3)` | 診断用: 符号 |
@@ -119,7 +119,7 @@ class VanillaTransformerForPreTraining(nn.Module):
 | クラス | 引数 | 形状 |
 |--------|------|------|
 | `VanillaEmbeddings` | `input_ids` | `(B, L)` LongTensor |
-| `VanillaTransformerModel` | `input_ids`, `src_key_padding_mask` | `(B, L)`, `(B, L)` Bool |
+| `VanillaModel` | `input_ids`, `src_key_padding_mask` | `(B, L)`, `(B, L)` Bool |
 | `VanillaTransformerForPreTraining` | `input_ids`, `src_key_padding_mask`, `labels` | 同上 + Optional Dict |
 
 ### 4.2. Forward 出力
@@ -128,7 +128,7 @@ class VanillaTransformerForPreTraining(nn.Module):
 # VanillaEmbeddings
 embeddings: (B, L, d_model)
 
-# VanillaTransformerModel  
+# VanillaModel  
 last_hidden_state: (B, L, d_model)
 
 # VanillaTransformerForPreTraining
@@ -141,7 +141,7 @@ last_hidden_state: (B, L, d_model)
         "sign_logits": (B, L, 3)           # 診断用
     },
     "loss": Tensor or None,
-    "loss_components": {...} or None
+    "loss_breakdown": {...} or None
 }
 ```
 
@@ -154,7 +154,7 @@ last_hidden_state: (B, L, d_model)
 | ヘッド | 損失関数 | 重み | 備考 |
 |--------|----------|------|------|
 | `lm_head` | `CrossEntropyLoss(ignore_index=PAD_TOKEN_ID)` | 1.0 | **メイン** |
-| `mag_head` | `GaussianNLLLoss` | 0.1 | 診断用 |
+| `mag_head` | `BaseForPreTraining._compute_mag_loss` | 0.1 | 診断用（`config.MAG_LOSS_TYPE` と `USE_HETEROSCEDASTIC_LOSS` に従う） |
 | `sign_head` | `CrossEntropyLoss` | 0.1 | 診断用 |
 | `mod_head` | `CrossEntropyLoss` (per modulus) | 0.1 | 診断用 |
 

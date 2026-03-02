@@ -11,7 +11,7 @@
 1. **Magnitude & Uncertainty Plot**: 増大軌道と不確実性の可視化
 2. **Sign Probability Plot**: 符号クラス確率遷移の可視化
 3. **Modulo Spectrum Heatmap**: 周期性指紋の可視化
-4. **Multi-Model Comparison**: 複数モデルの同一数列比較
+4. **Attention / Summary Panel**: Attention 対応モデルはヒートマップ、非対応モデルは要約表示
 
 ---
 
@@ -21,11 +21,12 @@
 
 ```python
 import torch
+import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import json
 import logging
+import argparse
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 ```
@@ -34,8 +35,14 @@ from typing import Dict, Optional, List, Tuple
 
 ```python
 from intseq_bert import config
-from intseq_bert.loader import load_dataset
-from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
+from intseq_bert.analysis.common import (
+    ModelWrapper,
+    create_model_wrapper,
+    split_mod_logits,
+    get_mod_index,
+    LOG_VAR_CLIP_MIN,
+    LOG_VAR_CLIP_MAX,
+)
 ```
 
 ---
@@ -60,8 +67,7 @@ python -m intseq_bert.analysis.analyze_cases \
 | `--output_dir` | str | ✅ | - | 出力ディレクトリ |
 | `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
 | `--features_dir` | str | | `data/oeis/features` | 特徴量ディレクトリ |
-| `--compare_checkpoints` | str | | - | 比較用チェックポイント (カンマ区切り) |
-| `--compare_labels` | str | | - | 比較モデルのラベル (カンマ区切り) |
+| `--jsonl_path` | str | | `None` | `.pt` が無い場合の JSONL フォールバックパス |
 | `--device` | str | | `auto` | デバイス指定 |
 | `--figsize` | str | | `12,10` | 図のサイズ (width,height) |
 | `--dpi` | int | | `150` | 出力解像度 |
@@ -529,7 +535,7 @@ def generate_case_figure(
     plot_sign_probability(axes[0, 1], positions, sign_probs, gt_sign)
     
     # Panel 3: Modulo Heatmap
-    plot_modulo_heatmap(axes[1, 0], positions, mod_confidences, display_mods, None)
+    plot_modulo_heatmap(axes[1, 0], positions, mod_confidences, display_mods, None, fig=fig)
     
     # Panel 4: Attention or Summary
     if model.supports_attention() and "attention_weights" in preds:
@@ -558,17 +564,21 @@ def _compute_mod_confidences(
     Returns:
         (L, len(display_mods))
     """
-    split_logits = _split_mod_logits(mod_logits)  # List of (L, m)
+    split_logits = split_mod_logits(mod_logits)  # List of (L, m)
     
     confidences = []
     for m in display_mods:
-        idx = config.MOD_RANGE.index(m)
+        idx = get_mod_index(m)
         logits_m = split_logits[idx]  # (L, m)
         probs_m = F.softmax(logits_m, dim=-1)  # (L, m)
-        targets_m = mod_targets[:, idx]  # (L,)
+        targets_m = mod_targets[:, idx].long()  # (L,)
         
-        # 正解クラスの確率を取得
-        conf_m = probs_m.gather(1, targets_m.unsqueeze(1)).squeeze(1)
+        # IGNORE_INDEX / 範囲外ラベルを回避して gather する
+        valid_mask = (targets_m >= 0) & (targets_m < m)
+        safe_targets = targets_m.clone()
+        safe_targets[~valid_mask] = 0
+        conf_m = probs_m.gather(1, safe_targets.unsqueeze(1)).squeeze(1)
+        conf_m[~valid_mask] = 0.0
         confidences.append(conf_m.cpu().numpy())
     
     return np.stack(confidences, axis=1)  # (L, len(display_mods))
@@ -576,87 +586,29 @@ def _compute_mod_confidences(
 
 ---
 
-## 8. マルチモデル比較
+## 8. 出力ファイル
 
-複数モデルを同一数列で比較する機能。
-
-### 8.1. CLI 使用例
-
-```bash
-python -m intseq_bert.analysis.analyze_cases \
-    --checkpoint checkpoints/intseq_std/best_model.pt \
-    --oeis_ids A000045 \
-    --output_dir results/comparison \
-    --model_type intseq \
-    --compare_checkpoints checkpoints/vanilla_std/best_model.pt,checkpoints/ablation_std/best_model.pt \
-    --compare_labels IntSeqBERT,Vanilla,Ablation
-```
-
-### 8.2. `generate_comparison_figure` 関数
-
-```python
-def generate_comparison_figure(
-    oeis_id: str,
-    models: List[ModelWrapper],
-    labels: List[str],
-    batch: Dict,
-    output_path: Path
-):
-    """
-    複数モデルの Magnitude 予測を1枚の図で比較
-    """
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    gt_mag = batch["mag_inputs"][0, :, 0].numpy()
-    positions = np.arange(len(gt_mag))
-    
-    ax.plot(positions, gt_mag, 'k-', label='Ground Truth', linewidth=2)
-    
-    colors = plt.cm.tab10(np.linspace(0, 1, len(models)))
-    for model, label, color in zip(models, labels, colors):
-        preds = model.predict_with_details(batch)
-        pred_mu = preds["mag_mu"][0].cpu().numpy()
-        ax.plot(positions, pred_mu, '--', label=label, color=color, linewidth=1.5)
-    
-    ax.set_xlabel('Position n')
-    ax.set_ylabel('log₁₀(|x|)')
-    ax.set_title(f'Model Comparison: {oeis_id}')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    plt.savefig(output_path, dpi=150)
-    plt.close()
-```
-
----
-
-## 9. 出力ファイル
-
-### 9.1. ディレクトリ構成
+### 8.1. ディレクトリ構成
 
 ```text
-results/analysis/cases/
-├── A000045_fibonacci.png         # 4パネル図
-├── A000040_primes.png
-├── A000290_squares.png
-├── A033999_alternating.png
-├── A000142_factorial.png
-├── comparison_A000045.png        # マルチモデル比較 (オプション)
-└── index.html                    # サマリページ (オプション)
+<output_dir>/
+├── A000045.png
+├── A000040.png
+├── A000290.png
+├── A033999.png
+└── A000142.png
 ```
 
-### 9.2. 図のファイル命名規則
+### 8.2. 図のファイル命名規則
 
 ```python
-def get_output_filename(oeis_id: str, sequence_name: Optional[str] = None) -> str:
-    if sequence_name:
-        return f"{oeis_id}_{sequence_name.lower().replace(' ', '_')}.png"
+def get_output_filename(oeis_id: str) -> str:
     return f"{oeis_id}.png"
 ```
 
 ---
 
-## 10. エラーハンドリング
+## 9. エラーハンドリング
 
 | 状況 | 対応 |
 |------|------|
@@ -666,7 +618,7 @@ def get_output_filename(oeis_id: str, sequence_name: Optional[str] = None) -> st
 
 ---
 
-## 11. 使用例
+## 10. 使用例
 
 ### 単一モデルのケーススタディ
 
@@ -686,15 +638,4 @@ python -m intseq_bert.analysis.analyze_cases \
     --checkpoint checkpoints/intseq_std/best_model.pt \
     --oeis_ids A000001,A000002,A000003 \
     --output_dir results/custom_cases
-```
-
-### モデル間比較
-
-```bash
-python -m intseq_bert.analysis.analyze_cases \
-    --checkpoint checkpoints/intseq_std/best_model.pt \
-    --oeis_ids A000045 \
-    --output_dir results/comparison \
-    --compare_checkpoints checkpoints/vanilla_std/best_model.pt \
-    --compare_labels IntSeqBERT,Vanilla
 ```

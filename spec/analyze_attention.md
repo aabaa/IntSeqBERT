@@ -25,7 +25,10 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
+import json
+import logging
+import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 ```
@@ -33,7 +36,6 @@ from typing import Dict, List, Optional, Tuple
 ### 内部モジュール
 
 ```python
-from intseq_bert import config
 from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 from intseq_bert.analysis.analyze_cases import load_single_sequence
 ```
@@ -62,7 +64,7 @@ python -m intseq_bert.analysis.analyze_attention \
 | `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
 | `--features_dir` | str | | `data/oeis/features` | 特徴量ディレクトリ |
 | `--layer_ids` | str | | `all` | 可視化する層 (`all` or カンマ区切り) |
-| `--head_ids` | str | | `all` | 可視化するヘッド (`all` or カンマ区切り) |
+| `--head_ids` | str | | `all` | 予約引数（現行実装では描画対象の絞り込みには未使用） |
 | `--device` | str | | `auto` | デバイス指定 |
 | `--figsize` | str | | `16,12` | 図のサイズ |
 | `--dpi` | int | | `150` | 出力解像度 |
@@ -101,8 +103,13 @@ class AttentionExtractor:
         """モデルタイプに応じて EncoderLayer を取得"""
         if hasattr(self.model, 'bert'):
             return self.model.bert.encoder.layers
+        elif hasattr(self.model, 'backbone') and hasattr(self.model.backbone, 'encoder'):
+            return self.model.backbone.encoder.layers
         elif hasattr(self.model, 'encoder'):
-            return self.model.encoder.encoder.layers
+            if hasattr(self.model.encoder, 'layers'):
+                return self.model.encoder.layers
+            elif hasattr(self.model.encoder, 'encoder'):
+                return self.model.encoder.encoder.layers
         else:
             raise ValueError("Cannot find encoder layers")
     
@@ -126,7 +133,7 @@ class AttentionExtractor:
 
 ### 4.2. 使用例 (パディングトリミング付き)
 
-OEIS 数列は実際には 30〜50 程度の長さが多く、`MAX_LEN` (512) までパディングされる。
+OEIS 数列は実際には 30〜50 程度の長さが多く、`config.MAX_SEQUENCE_LENGTH` (128) までパディングされる。
 そのままヒートマップを描画すると、左上のごく一部に意味のある模様があり、残り90%が真っ白になる。
 
 **有効長だけを切り取って描画するため、`valid_len` を取得して可視化関数に渡す。**
@@ -418,8 +425,9 @@ def check_pattern_alignment(
 ```
 1. 引数パース & ロギング設定
 2. モデルラッパー作成
-3. AttentionExtractor 初期化
-4. 各 OEIS ID について:
+3. `TransformerEncoderLayer._sa_block` を monkey-patch して `need_weights=True` を強制
+4. AttentionExtractor 初期化
+5. 各 OEIS ID について:
    a. 特徴量読み込み
    b. Attention 抽出
    c. 可視化生成
@@ -427,7 +435,7 @@ def check_pattern_alignment(
       - Head-wise (最終層)
       - Aggregated Summary
    d. 再帰パターン分析
-5. サマリ CSV 出力
+6. サマリ CSV 出力
 ```
 
 ### 7.2. Main 関数
@@ -537,7 +545,7 @@ A000040,0.10,0.08,0.20,0.42,ALIGNED
 
 | 制約 | 説明 |
 |------|------|
-| PyTorch TransformerEncoder | `need_weights=True` が必要（デフォルトで有効） |
+| PyTorch TransformerEncoder | `need_weights=True` が必要（標準実装では `False` のため本スクリプトで monkey-patch） |
 | Vanilla Transformer | 同じ Hook 方式で対応可能 |
 | メモリ | 長系列では Attention (L×L) が大きくなる |
 

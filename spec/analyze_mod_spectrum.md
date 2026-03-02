@@ -244,18 +244,10 @@ class StreamingEvaluator:
         pass
 ```
 
-> **重要: Collator の分析モード互換性**
+> **重要: Collator 出力の互換性**
 >
 > 学習時 (`train.py`) と分析時でデータの読み込み方が同じであることを保証する必要がある。
 > 特に `OEISCollator` が `mod_labels` (全100法) を返すことを確認する。
->
-> **学習時に「ランダムに法を選んで計算」している場合、分析用には「全法計算」モードが必要。**
->
-> ```python
-> # Collator 初期化時に analysis_mode=True を渡す
-> collator = OEISCollator(analysis_mode=True)  # 全法出力モード
-> dataloader = DataLoader(dataset, collate_fn=collator, ...)
-> ```
 
 ### 6.3. `compute_mod_metrics` 関数
 
@@ -272,7 +264,7 @@ def compute_mod_metrics(
         DataFrame with columns: [modulus, accuracy, ce_loss, nig_score]
     """
     results = []
-    split_logits = _split_mod_logits(mod_logits)  # List of (N, L, m)
+    split_logits = split_mod_logits(mod_logits)  # List of (N, L, m)
     
     for i, m in enumerate(config.MOD_RANGE):
         logits_m = split_logits[i]  # (N, L, m)

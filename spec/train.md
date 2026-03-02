@@ -163,7 +163,7 @@ def prepare_labels(batch: Dict) -> Dict:
 > FP16 の最大値（約65504）を超える中間計算が発生し、勾配がNaN/Infになるため、
 > `autocast` と `GradScaler` は使用せず、FP32で訓練する。
 >
-> 詳細は `spec/models.md` の数値安定性セクションを参照。
+> 詳細は `spec/intseq_models.md` の数値安定性セクションを参照。
 
 **ループ処理 (Epoch単位):**
 
@@ -173,7 +173,7 @@ def prepare_labels(batch: Dict) -> Dict:
      - `prepare_labels()` でラベル変換
      - Forward → Loss計算 → Backward
    * `accum_steps` ごとに Optimizer Step & Zero Grad。
-   * ログ記録: Total Loss と、学習されている重みパラメータ (`s_mag`, `s_sign`, `s_mod`)。
+   * ログ記録: Total Loss と検証指標（`mag_acc`, `sign_acc`, `mod_acc`, `mag_mse`）。
 
 2. **Validation Phase:**
    * モデルを `eval()` モードに設定。
@@ -195,24 +195,12 @@ def prepare_labels(batch: Dict) -> Dict:
 
 ## 6. ロギング設計
 
-**TensorBoard / WandB への記録項目:**
+本実装は TensorBoard / WandB 連携ではなく、`TrainingLogger` によるファイル出力を行う。
 
-* **Losses:**
-  * `train/total_loss`
-  * `train/raw_loss_mag` (Huber + Heteroscedastic, 詳細は `spec/models.md` 参照)
-  * `train/raw_loss_sign` (CE)
-  * `train/raw_loss_mod` (CE)
-  * `val/total_loss`
-
-* **Fixed Loss Weights:**
-  * 損失重みは固定値: `w_mag = 1.0`, `w_sign = 1.0`, `w_mod = 2.0`
-  * Modulo タスクに2倍の重みを与え、周期性情報の学習を促進する
-
-* **Metrics (Accuracy %):**
-  * `val/acc_mag`
-  * `val/acc_sign`
-  * `val/acc_mod`
-  * `val/mse_mag`
+* `config.json`: 実験設定、環境情報、データ統計
+* `history.csv`: エポックごとの `train_loss`, `val_loss`, `val_mag_acc`, `val_sign_acc`, `val_mod_acc`, `val_mag_mse` と法別精度
+* `best_metrics.json`: ベストエポック時の主要指標
+* `train.log`: コンソール出力の保存
 
 ---
 
