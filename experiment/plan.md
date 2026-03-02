@@ -64,35 +64,38 @@ $ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --c
 #### IntSeq
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/small_std_v5/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/small_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/intseq/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/small_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/intseq/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/small_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/small_std_v5/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/small_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/small_std_v5/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/small_std_v5/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std_v5/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/small_std/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/small_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/intseq/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/small_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/intseq/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/small_std/intseq/last_checkpoint.pt --output_dir checkpoints/small_std/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/small_std/intseq/last_checkpoint.pt --output_dir checkpoints/small_std/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/small_std/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type intseq --test_only --test_split test --model_path checkpoints/small_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/intseq/
 ```
 
 #### Vanilla
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/small_std_v5/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/small_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/vanilla/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/small_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/vanilla/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/small_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/small_std_v5/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/small_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/small_std_v5/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/small_std_v5/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std_v5/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/small_std/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/small_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/vanilla/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/small_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/vanilla/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/small_std/vanilla/last_checkpoint.pt --output_dir checkpoints/small_std/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/small_std/vanilla/last_checkpoint.pt --output_dir checkpoints/small_std/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/small_std/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type vanilla --test_only --test_split test --model_path checkpoints/small_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/vanilla/
 ```
 
 
 #### Ablation
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/small_std_v5/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/small_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/ablation/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/small_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std_v5/ablation/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/small_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/small_std_v5/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/small_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/small_std_v5/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/small_std_v5/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std_v5/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/small_std/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 6 --d_model 256 --nhead 4 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/small_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/ablation/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/small_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/ablation/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/small_std/ablation/last_checkpoint.pt --output_dir checkpoints/small_std/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/small_std/ablation/last_checkpoint.pt --output_dir checkpoints/small_std/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/small_std/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/small_std/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type ablation --test_only --test_split test --model_path checkpoints/small_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/small_std/ablation/
 ```
 
 ### Middle (num_layers=8, d_model=512, nhead=8)
@@ -100,34 +103,37 @@ $ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --c
 #### IntSeq
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/middle_std_v5/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/middle_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/intseq/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/middle_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/intseq/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/middle_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/middle_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/middle_std_v5/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std_v5/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/middle_std/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/middle_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/intseq/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/middle_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/intseq/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/middle_std/intseq/last_checkpoint.pt --output_dir checkpoints/middle_std/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/middle_std/intseq/last_checkpoint.pt --output_dir checkpoints/middle_std/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/middle_std/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type intseq --test_only --test_split test --model_path checkpoints/middle_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/intseq/
 ```
 
 #### Vanilla
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/middle_std_v5/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/middle_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/vanilla/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/middle_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/vanilla/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/middle_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/middle_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/middle_std_v5/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std_v5/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/middle_std/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/middle_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/vanilla/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/middle_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/vanilla/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/middle_std/vanilla/last_checkpoint.pt --output_dir checkpoints/middle_std/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/middle_std/vanilla/last_checkpoint.pt --output_dir checkpoints/middle_std/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/middle_std/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type vanilla --test_only --test_split test --model_path checkpoints/middle_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/vanilla/
 ```
 
 #### Ablation
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/middle_std_v5/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/middle_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/ablation/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/middle_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std_v5/ablation/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/middle_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/middle_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/middle_std_v5/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/middle_std_v5/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std_v5/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/middle_std/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 8 --d_model 512 --nhead 8 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/middle_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/ablation/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/middle_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/ablation/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/middle_std/ablation/last_checkpoint.pt --output_dir checkpoints/middle_std/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/middle_std/ablation/last_checkpoint.pt --output_dir checkpoints/middle_std/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/middle_std/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/middle_std/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type ablation --test_only --test_split test --model_path checkpoints/middle_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/middle_std/ablation/
 ```
 
 
@@ -136,32 +142,35 @@ $ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --c
 #### IntSeq
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/large_std_v5/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/large_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/intseq/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/large_std_v5/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/intseq/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/large_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/large_std_v5/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/large_std_v5/intseq/last_checkpoint.pt --output_dir checkpoints/large_std_v5/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/large_std_v5/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std_v5/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type intseq --split_type std --output_dir checkpoints/large_std/intseq --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type intseq --checkpoint checkpoints/large_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/intseq/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type intseq --checkpoint checkpoints/large_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/intseq/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type intseq --checkpoint checkpoints/large_std/intseq/last_checkpoint.pt --output_dir checkpoints/large_std/intseq/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type intseq --checkpoint checkpoints/large_std/intseq/last_checkpoint.pt --output_dir checkpoints/large_std/intseq/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type intseq --checkpoint checkpoints/large_std/intseq/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std/intseq/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type intseq --test_only --test_split test --model_path checkpoints/large_std/intseq/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/intseq/
 ```
 
 #### Vanilla
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/large_std_v5/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/large_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/vanilla/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/large_std_v5/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/vanilla/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/large_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/large_std_v5/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/large_std_v5/vanilla/last_checkpoint.pt --output_dir checkpoints/large_std_v5/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/large_std_v5/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std_v5/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type vanilla --split_type std --output_dir checkpoints/large_std/vanilla --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type vanilla --checkpoint checkpoints/large_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/vanilla/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type vanilla --checkpoint checkpoints/large_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/vanilla/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type vanilla --checkpoint checkpoints/large_std/vanilla/last_checkpoint.pt --output_dir checkpoints/large_std/vanilla/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type vanilla --checkpoint checkpoints/large_std/vanilla/last_checkpoint.pt --output_dir checkpoints/large_std/vanilla/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type vanilla --checkpoint checkpoints/large_std/vanilla/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std/vanilla/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type vanilla --test_only --test_split test --model_path checkpoints/large_std/vanilla/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/vanilla/
 ```
 
 #### Ablation
 
 ```bash
-$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/large_std_v5/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
-$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/large_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/ablation/analysis/magnitude
-$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/large_std_v5/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std_v5/ablation/analysis/mod_spectrum
-$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/large_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/large_std_v5/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
-$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/large_std_v5/ablation/last_checkpoint.pt --output_dir checkpoints/large_std_v5/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
-$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/large_std_v5/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std_v5/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ nohup uv run python -m intseq_bert.train --model_type ablation --split_type std --output_dir checkpoints/large_std/ablation --epochs 200 --patience 200 --batch_size 32 --accum_steps 2 --lr 5e-5 --num_workers 8 --num_layers 12 --d_model 768 --nhead 12 &
+$ uv run python -m intseq_bert.analysis.analyze_magnitude --model_type ablation --checkpoint checkpoints/large_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/ablation/analysis/magnitude
+$ uv run python -m intseq_bert.analysis.analyze_mod_spectrum --model_type ablation --checkpoint checkpoints/large_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/ablation/analysis/mod_spectrum
+$ uv run python -m intseq_bert.analysis.analyze_attention --model_type ablation --checkpoint checkpoints/large_std/ablation/last_checkpoint.pt --output_dir checkpoints/large_std/ablation/analysis/attention --oeis_ids A107413,A022433,A023622,A047961,A106589
+$ uv run python -m intseq_bert.analysis.analyze_cases --model_type ablation --checkpoint checkpoints/large_std/ablation/last_checkpoint.pt --output_dir checkpoints/large_std/ablation/analysis/cases --oeis_ids A139249,A079414,A017408,A094407,A134717,A284479,A196527
+$ uv run python -m intseq_bert.analysis.analyze_solver --model_type ablation --checkpoint checkpoints/large_std/ablation/last_checkpoint.pt --split_type std  --output_dir checkpoints/large_std/ablation/analysis/solver --max_samples 10000 --top_k 10
+$ uv run python -m intseq_bert.train --model_type ablation --test_only --test_split test --model_path checkpoints/large_std/ablation/last_checkpoint.pt --split_type std --output_dir checkpoints/large_std/ablation/
 ```
