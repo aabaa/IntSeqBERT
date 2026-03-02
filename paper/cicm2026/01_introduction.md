@@ -26,7 +26,8 @@
 
 <!-- TODO: 紙面に余裕があればSolverコンポーネントについて簡単に言及する -->
 
-本研究では OEIS 標準 split の 3 モデルサイズ（Small・Middle・Large）において IntSeqBERT を 2 つのベースラインと比較した。
+本研究では OEIS 標準 split の 3 モデルサイズ（Small: \textasciitilde9M・Middle: \textasciitilde44M・Large: \textasciitilde110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
+全実験は **GeForce RTX 3070 Ti（VRAM 8 GB）1 枚**で実施しており、コンシューマー GPU のメモリ制約下での結果である点は解釈の際に留意されたい。
 主要な発見は以下の通りである：
 
 - Large スケールの IntSeqBERT はテスト split において **Magnitude 精度 95.85%**、**平均 Modulo 精度（MMA）50.38%** を達成し、Vanilla Transformer ベースラインをそれぞれ **+8.9pt**・**+4.5pt** 上回る。
