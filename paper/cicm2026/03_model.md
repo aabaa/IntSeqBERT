@@ -123,3 +123,23 @@ $$
 
 **アブレーション（Magnitude-only）** は IntSeqBERT と同一だが Magnitude ストリームのみを使用し、FiLM モジュールを取り除いて $\mathbf{e}_i = \mathbf{h}_i^{\text{mag}}$ とする。
 これにより Modulo ストリームの寄与を単独で定量化できる。
+
+## 3.9 整数復元ソルバー（Solver）
+
+事前学習済みモデルはマスク位置の Magnitude $(\mu_i, \sigma_i^2)$・符号・Modulo 確率分布を出力するが、これらから具体的な整数値を復元するために **IntegerSolver** を用いる。
+
+Solver はまず、Magnitude 予測から 3σ 区間 $[n_{\min}, n_{\max}]$（$v = 1 + \log_{10}(|x|)$ スケール）を導出し、探索範囲の広さに応じて以下の 3 モードを動的に選択する：
+
+| モード | 適用範囲 | 手法 |
+|--------|---------|------|
+| **Dense** | $|n_{\max} - n_{\min}| \leq 10^6$ | 全整数を列挙して評価 |
+| **Sieve** | $10^6 < \Delta n \leq 10^{14}$ | 確信度上位の法をアンカーとした CRT ビームサーチで候補を絞り込み |
+| **CRT** | $\Delta n > 10^{14}$ | Sparse CRT ビームサーチで巨大整数を直接生成 |
+
+各候補 $n$ のスコアは Magnitude Gaussian 対数尤度と全法の Modulo 対数確率の重み付き和として計算される：
+$$
+\text{score}(n) = -\frac{(v_n - \mu_i)^2}{2\sigma_i^2} + 0.3 \cdot \sum_{m=2}^{101} \log P\!\left(n \bmod m\right),
+$$
+ただし $v_n = 1 + \log_{10}(n)$。Modulo 項の係数 0.3 は法間の冗長性（例：$m=2,4,8$ が同一パリティ情報を保持）によるスコアの偏りを補正する。
+
+上位 $k$ 件の候補を返し、次項予測精度（Solver Top-$k$）として第 5.4 節で評価する。
