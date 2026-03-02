@@ -529,7 +529,7 @@ Vanilla Transformer では数値を離散トークンに変換する必要があ
 
 ```python
 # config.py
-VANILLA_VOCAB_SIZE = 10003    # [PAD], [MASK], [UNK] + 頻出数値 10000個
+VANILLA_VOCAB_SIZE = 20003    # [PAD], [MASK], [UNK] + 数値 0..19,999
 VANILLA_PAD_TOKEN_ID = 0
 VANILLA_MASK_TOKEN_ID = 1
 VANILLA_UNK_TOKEN_ID = 2
@@ -580,4 +580,3 @@ dropout:      Dropout(dropout)
 ```
 
 > **Note:** FiLM 変調なしの単純な投影。IntSeqBERT との差分を測定することで、Modulo Stream の寄与度を評価する。
-

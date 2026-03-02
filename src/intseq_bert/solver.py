@@ -1049,7 +1049,7 @@ class VanillaSolver:
         Initialize VanillaSolver.
         
         Args:
-            vocab_size: Total vocabulary size (default: 10003)
+            vocab_size: Total vocabulary size (default: 20003)
             special_offset: Number of special tokens before integer IDs (default: 3)
         """
         self.vocab_size = vocab_size
@@ -1165,4 +1165,3 @@ class VanillaSolver:
         # Extract token logits at the specified position
         token_logits = predictions["logits"][batch_idx, position]
         return token_logits
-

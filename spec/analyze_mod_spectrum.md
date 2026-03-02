@@ -218,7 +218,7 @@ def compute_nig(ce_loss: float, modulus: int) -> float:
 
 ### 6.2. Streaming Evaluation (Memory Efficiency)
 
-大規模データセット（例: 30k sequences）において、全ての予測結果（logits: 30000 x 128 x 5150）をメモリに保持すると 70GB+ のメモリを消費し OOM が発生するため、**Streaming Evaluation** 方式を採用する。
+大規模データセット（例: 30k sequences）において、全ての予測結果（logits: 20003 x 128 x 5150）をメモリに保持すると 70GB+ のメモリを消費し OOM が発生するため、**Streaming Evaluation** 方式を採用する。
 
 1. **バッチ毎の集計:**
    - 予測 (`mod_logits`) と正解データ (`mod_labels`) をバッチ単位で処理する。

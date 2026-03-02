@@ -40,7 +40,7 @@ class VanillaEmbeddings(BaseEmbeddings):
         super().__init__(d_model, dropout, max_len)
         
         # Get vocab config with defaults
-        self.vocab_size = vocab_size or getattr(config, "VANILLA_VOCAB_SIZE", 30000)
+        self.vocab_size = vocab_size or getattr(config, "VANILLA_VOCAB_SIZE", 20003)
         self.pad_token_id = pad_token_id or getattr(config, "VANILLA_PAD_TOKEN_ID", 0)
         
         # Token embedding
@@ -161,7 +161,7 @@ class VanillaTransformerForPreTraining(BaseForPreTraining):
         super().__init__(d_model)
         
         # Get vocab config
-        self.vocab_size = vocab_size or getattr(config, "VANILLA_VOCAB_SIZE", 30000)
+        self.vocab_size = vocab_size or getattr(config, "VANILLA_VOCAB_SIZE", 20003)
         self.pad_token_id = pad_token_id or getattr(config, "VANILLA_PAD_TOKEN_ID", 0)
         
         # Backbone

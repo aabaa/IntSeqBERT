@@ -8,7 +8,12 @@ OEIS から取り出した整数数列の有限プレフィックスを $\mathbf
 本研究では**マスク付き系列モデリング**（masked sequence modelling）目標を採用する。位置の一部をランダムにマスクし、モデルはマスクされた値を予測するよう学習される。
 具体的には、マスクされた各位置 $i$ において以下の 3 量を予測する：
 
-1. **Magnitude**：$v_i = 1 + \log_{10}(|x_i| + 1) \in \mathbb{R}_{\geq 0}$（対数スケールの絶対値）
+1. **Magnitude**：$v_i =
+\begin{cases}
+0 & (x_i = 0), \\
+1 + \log_{10}(|x_i|) & (x_i \neq 0)
+\end{cases}
+\in \mathbb{R}_{\geq 0}$（対数スケールの絶対値）
 2. **符号（Sign）**：$s_i \in \{+, -, 0\}$（3 クラスラベル）
 3. **剰余（Residues）**：各 $m \in \{2, 3, \ldots, 101\}$ に対して $r_i^{(m)} = x_i \bmod m$（100 個の独立した分類ターゲット）
 
@@ -22,14 +27,21 @@ OEIS から取り出した整数数列の有限プレフィックスを $\mathbf
 $$
 \mathbf{f}_i^{\text{mag}} = \bigl[v_i,\; \mathbf{1}[x_i > 0],\; \mathbf{1}[x_i < 0],\; \mathbf{1}[x_i = 0]\bigr]
 $$
-ただし $v_i = 1 + \log_{10}(|x_i| + 1)$。
+ただし
+$
+v_i =
+\begin{cases}
+0 & (x_i = 0), \\
+1 + \log_{10}(|x_i|) & (x_i \neq 0)
+\end{cases}
+$。
 float64 の表現範囲を超える天文学的な整数については、$|x_i|$ の十進桁数でフォールバックする。
-極端な桁数での精度損失を避けるため、全計算に FP32 を使用する。
+極端な桁数でのオーバーフローを避けるため、Magnitude 関連の計算は FP16 ではなく FP32 で実行する。
 
 **Modulo 特徴量** $\mathbf{f}_i^{\text{mod}} \in \mathbb{R}^{200}$：
 各法 $m \in \{2, 3, \ldots, 101\}$ について $r = x_i \bmod m \in \{0, \ldots, m-1\}$ とし、剰余を単位円上の点として埋め込む：
 $$
-\phi_m(r) = \left[\cos\!\left(\frac{2\pi r}{m}\right),\; \sin\!\left(\frac{2\pi r}{m}\right)\right] \in \mathbb{R}^2.
+\phi_m(r) = \left[\sin\!\left(\frac{2\pi r}{m}\right),\; \cos\!\left(\frac{2\pi r}{m}\right)\right] \in \mathbb{R}^2.
 $$
 100 個の法すべてを連結することで $\mathbf{f}_i^{\text{mod}} \in \mathbb{R}^{200}$ を得る。
 この Sin/Cos 埋め込みは $\mathbb{Z}/m\mathbb{Z}$ の群構造に対して同変であり、剰余 0 と $m$ が同じ点に写像されるため、折り返し境界での不連続性が生じない。
@@ -105,7 +117,8 @@ $$
 ただし $w_{\text{mag}} = 1.0$、$w_{\text{sign}} = 1.0$、$w_{\text{mod}} = 2.0$。
 これらの重みは実験的に決定した固定値であり、不確実性に基づく動的重み付け（uncertainty weighting）などの適応的な手法を試みたところ学習が不安定になることが観察されたため、固定値を採用した。
 
-$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失。
+$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（SmoothL1）とする。
+\texttt{MAG\_LOSS\_TYPE='huber'} を採用し、実験設定では \texttt{USE\_HETEROSCEDASTIC\_LOSS=False} とした。
 $\mathcal{L}_{\text{sign}}$ は 3 クラスのクロスエントロピー損失。
 $\mathcal{L}_{\text{mod}}$ は 100 個の Modulo ヘッドのクロスエントロピーの平均であり、クラス数の違いを補正するために $\log m$ で正規化する：
 $$
@@ -113,15 +126,13 @@ $$
 $$
 すべての損失はマスク位置のみで計算する。
 
-<!-- TODO: 損失の種類（Huber / MSE / L1）を spec/intseq_models.md で確認する -->
-
 ## 3.8 ベースライン
 
-**Vanilla Transformer** は各整数を 30,000 エントリの語彙（値 $-9{,}999$ から $+19{,}999$、加えて \texttt{PAD}・\texttt{MASK}・\texttt{UNK}）のトークン ID に変換する。
+**Vanilla Transformer** は各整数を 20,003 エントリの語彙（値 $0$ から $19{,}999$ の 20,000 値に、\texttt{PAD}・\texttt{MASK}・\texttt{UNK} を加えたもの）のトークン ID に変換する。
 語彙外の値は \texttt{UNK} で置換される。
 同じ 3 つの予測ヘッドをトークン埋め込みの出力に適用する。
 このベースラインは LLM における数値トークンの標準的な扱いに対応する。
-語彙サイズ 30,000 は VRAM 8 GB という制約の下で IntSeqBERT と同等のメモリ消費となるよう設定した。先行研究 FACT [cite:zurich-fact] では 0 から数百万の値を扱っており、本実験より大規模な計算資源を前提としている。
+語彙サイズ 20,003 は VRAM 8 GB という制約の下で IntSeqBERT と同等のメモリ消費となるよう設定した。先行研究 FACT [cite:zurich-fact] では 0 から数百万の値を扱っており、本実験より大規模な計算資源を前提としている。
 
 **アブレーション（Magnitude-only）** は IntSeqBERT と同一だが Magnitude ストリームのみを使用し、FiLM モジュールを取り除いて $\mathbf{e}_i = \mathbf{h}_i^{\text{mag}}$ とする。
 これにより Modulo ストリームの寄与を単独で定量化できる。
@@ -138,10 +149,23 @@ Solver はまず、Magnitude 予測から 3σ 区間 $[n_{\min}, n_{\max}]$（$v
 | **Sieve** | $10^6 < \Delta n \leq 10^{14}$ | 確信度上位の法をアンカーとした CRT ビームサーチで候補を絞り込み |
 | **CRT** | $\Delta n > 10^{14}$ | Sparse CRT ビームサーチで巨大整数を直接生成 |
 
+探索失敗時の終了状態として、値を 0 にフォールバックする \texttt{zero} と、有効候補を返せない \texttt{none} を別途定義する。
+
 各候補 $n$ のスコアは Magnitude Gaussian 対数尤度と全法の Modulo 対数確率の重み付き和として計算される：
 $$
-\text{score}(n) = -\frac{(v_n - \mu_i)^2}{2\sigma_i^2} + 0.3 \cdot \sum_{m=2}^{101} \log P\!\left(n \bmod m\right),
+\text{score}(n) =
+-\frac{(v_n - \mu_i)^2}{2\sigma_i^2}
+-\frac{1}{2}\log \sigma_i^2
++ 0.3 \cdot \sum_{m=2}^{101} \log P\!\left(n \bmod m\right),
 $$
-ただし $v_n = 1 + \log_{10}(n)$。Modulo 項の係数 0.3 は法間の情報冗長性を補正するために導入した。$m = 2$ から $101$ までの 100 個のモジュラスのうち素数は 26 個（$\{2, 3, 5, \ldots, 97, 101\}$）であり、合成数モジュラスはその素因数と情報を共有する（例：$m = 4, 8, 16, \ldots$ はいずれも $m = 2$ と同一のパリティ情報を保持）。このとき情報の実質的な重複度は概ね $100/26 \approx 3.8$ 倍であり、補正係数として $1/3.8 \approx 0.26$ が理論的に自然である。係数 0.3 はこの値を僅かに上回る切りの良い値として採用した。
+ただし
+$
+v_n =
+\begin{cases}
+0 & (n = 0), \\
+1 + \log_{10}(|n|) & (n \neq 0)
+\end{cases}
+$。
+Modulo 項の係数 0.3 は、法間の情報重複（例：合成数モジュラスとその素因数モジュラスの相関）でスコアが過大になりやすいことを抑えるための経験的ハイパーパラメータとして採用した。
 
 上位 $k$ 件の候補を返し、次項予測精度（Solver Top-$k$）として第 5.4 節で評価する。

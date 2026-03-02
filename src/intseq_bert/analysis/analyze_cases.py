@@ -203,7 +203,7 @@ def _add_token_ids(batch: Dict[str, torch.Tensor]) -> None:
     
     SPECIAL_TOKENS_OFFSET = 3
     # Use fallback if config values missing, though they should be present
-    vocab_size = getattr(config, "VANILLA_VOCAB_SIZE", 10003)
+    vocab_size = getattr(config, "VANILLA_VOCAB_SIZE", 20003)
     unk_token_id = getattr(config, "VANILLA_UNK_TOKEN_ID", 2)
     
     max_int = vocab_size - SPECIAL_TOKENS_OFFSET - 1

@@ -35,7 +35,7 @@ IntSeqBERT との比較実験（Baseline）用として、以下の3つのクラ
 
 | 定数 | デフォルト値 | 説明 |
 |------|------------|------|
-| `VANILLA_VOCAB_SIZE` | 30000 | トークン語彙サイズ |
+| `VANILLA_VOCAB_SIZE` | 20003 | トークン語彙サイズ（0..19,999 + 特殊トークン3種） |
 | `VANILLA_PAD_TOKEN_ID` | 0 | パディングトークンID |
 | `VANILLA_UNK_TOKEN_ID` | 2 | 未知トークンID |
 | `VANILLA_MASK_TOKEN_ID` | 1 | マスクトークンID |
@@ -182,8 +182,8 @@ IntSeqBERT と同じ **Masked Language Model (MLM)** 方式:
 
 ```python
 def tokenize_number(n: int) -> int:
-    if 0 <= n < VANILLA_VOCAB_SIZE:
-        return n
+    # PAD/MASK/UNK の 3 トークンぶんをオフセット
+    if 0 <= n <= VANILLA_VOCAB_SIZE - 4:
+        return n + 3
     return VANILLA_UNK_TOKEN_ID  # 範囲外は UNK
 ```
-

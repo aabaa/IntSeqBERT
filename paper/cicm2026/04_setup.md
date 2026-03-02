@@ -21,15 +21,23 @@
 
 <!-- TODO: 分割基準の詳細を spec/preprocess.md または loader.md で確認する -->
 
-スケール別評価のため、$v = \log_{10}(|x| + 1)$ に基づく 5 つの Magnitude バケットを定義する：
+スケール別評価のため、
+$
+v =
+\begin{cases}
+0 & (x=0), \\
+1 + \log_{10}(|x|) & (x \neq 0)
+\end{cases}
+$
+に基づく 5 つの Magnitude バケットを定義する：
 
 | バケット     | $v$ の範囲          | 元の値の目安                       |
 |--------------|--------------------|------------------------------------|
-| Small        | $v < 1$            | $|x| < 10$                         |
-| Medium       | $1 \leq v < 3$     | $10 \leq |x| < 1{,}000$            |
-| Large        | $3 \leq v < 6$     | $10^3 \leq |x| < 10^6$             |
-| Huge         | $6 \leq v < 10$    | $10^6 \leq |x| < 10^{10}$          |
-| Astronomical | $v \geq 10$        | $|x| \geq 10^{10}$                 |
+| Small        | $v < 2$            | $|x| < 10$                         |
+| Medium       | $2 \leq v < 4$     | $10 \leq |x| < 1{,}000$            |
+| Large        | $4 \leq v < 7$     | $10^3 \leq |x| < 10^6$             |
+| Huge         | $7 \leq v < 11$    | $10^6 \leq |x| < 10^{10}$          |
+| Astronomical | $v \geq 11$        | $|x| \geq 10^{10}$                 |
 
 ## 4.2 学習設定
 
@@ -43,7 +51,7 @@
 | ウォームアップ比率  | 10%                                      |
 | オプティマイザ      | AdamW、weight decay $0.01$               |
 | 数値精度            | FP32（AMP 無効）                         |
-| マスク確率          | <!-- TODO: config から確認する -->         |
+| マスク確率          | 0.15                                     |
 | 乱数シード          | 42                                       |
 | フレームワーク      | PyTorch 2.9.1、CUDA 12.8                |
 | GPU                 | GeForce RTX 3070 Ti（VRAM 8 GB）× 1     |

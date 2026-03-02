@@ -39,7 +39,7 @@ from . import config
 | `KEY_MOD_FEATURES` | `"mod_features"` | データキー |
 | `KEY_MOD_INTEGERS` | `"mod_integers"` | データキー |
 | `KEY_OEIS_ID` | `"oeis_id"` | データキー |
-| `VANILLA_VOCAB_SIZE` | 10003 | Vanilla トークン語彙サイズ |
+| `VANILLA_VOCAB_SIZE` | 20003 | Vanilla トークン語彙サイズ |
 | `VANILLA_PAD_TOKEN_ID` | 0 | パディングトークン ID |
 | `VANILLA_MASK_TOKEN_ID` | 1 | マスクトークン ID |
 | `VANILLA_UNK_TOKEN_ID` | 2 | 未知語トークン ID |
@@ -194,7 +194,7 @@ Token ID 構成:
   0: PAD  - パディング位置
   1: MASK - マスク位置（入力用）
   2: UNK  - 語彙外の整数 (負の数や大きすぎる数)
-  3〜10002: 整数 0〜9999
+  3〜20002: 整数 0〜19999
 ```
 
 **優先順位:**
@@ -202,7 +202,7 @@ Token ID 構成:
 2. 存在しない場合 → log magnitude から近似整数値を復元（フォールバック）
 
 ```python
-max_int = VANILLA_VOCAB_SIZE - 3 - 1  # 9999
+max_int = VANILLA_VOCAB_SIZE - 3 - 1  # 19999
 
 if "numbers" in batch[0]:
     # 生整数列から正確なトークンID生成
@@ -325,4 +325,4 @@ for batch in dataloader:
 | `mag_labels` は全位置保持 | Regression 損失は `mask_matrix` でフィルタリング |
 | Vectorized Token ID 生成 | Python ループを避けて高速化 |
 | log magnitude からの整数復元 | データセットに生整数がない場合の近似方法 |
-| `VOCAB_SIZE = 10003` | GPU メモリ 8GB 環境での実用的な上限 |
+| `VOCAB_SIZE = 20003` | GPU メモリ 8GB 環境での実用的な上限 |
