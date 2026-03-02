@@ -119,8 +119,7 @@ $$
 ただし $w_{\text{mag}} = 1.0$、$w_{\text{sign}} = 1.0$、$w_{\text{mod}} = 2.0$。
 これらの重みは実験的に決定した固定値であり、不確実性に基づく動的重み付け（uncertainty weighting）などの適応的な手法を試みたところ学習が不安定になることが観察されたため、固定値を採用した。
 
-$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（SmoothL1）とする。
-Magnitude 損失には Huber 損失（SmoothL1）を採用し、不確実性重み付けは行わない設定とした。
+$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（SmoothL1）とし、不確実性重み付けは行わない設定とした。
 $\mathcal{L}_{\text{sign}}$ は 3 クラスのクロスエントロピー損失。
 $\mathcal{L}_{\text{mod}}$ は 100 個の Modulo ヘッドのクロスエントロピーの平均であり、クラス数の違いを補正するために $\log m$ で正規化する：
 $$
@@ -141,7 +140,7 @@ $$
 
 ## 3.9 整数復元ソルバー（Solver）
 
-事前学習済みモデルはマスク位置の Magnitude $(\mu_i, \sigma_i^2)$・符号・Modulo 確率分布を出力するが、これらから具体的な整数値を復元するために **IntegerSolver** を用いる。
+事前学習済みモデルはマスク位置の Magnitude $(\mu_i, \log \sigma_i^2)$・符号・Modulo 確率分布を出力するが、これらから具体的な整数値を復元するために **IntegerSolver** を用いる。
 
 Solver はまず、Magnitude 予測から 3σ 区間 $[n_{\min}, n_{\max}]$（$v = 1 + \log_{10}(|x|)$ スケール）を導出し、探索範囲の広さ $\Delta n = |n_{\max} - n_{\min}|$ に応じて以下の 3 モードを動的に選択する：
 
