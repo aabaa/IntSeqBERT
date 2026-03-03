@@ -114,6 +114,10 @@ python -m intseq_bert.analysis.analyze_solver \
 2. 入力系列に対して `features.process_sequence()` でテンソル化
 3. ターゲットは Python int として保持
 
+> **系列長の前提条件：** 前処理（`preprocess.py`）にて `config.MIN_SEQUENCE_LENGTH = 10` による明示的なフィルタが適用されるため、std split のテストデータには系列長 < 10 の系列が存在しない（実測値：最小 10 項・中央値 36 項・平均 42.5 項）。
+> `len(seq) < 2` フィルタはコード上の安全弁として残存するが、実データでは不要。
+> したがって Solver への入力文脈は常に **9 項以上**が保証されており、「文脈なし（1 項のみ）での予測」という極端に困難なケースは本評価に含まれない。
+
 ```python
 def load_test_samples(
     jsonl_path: Path,
