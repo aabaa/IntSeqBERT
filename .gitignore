@@ -1,5 +1,5 @@
 # Ignore all data files
-data/
+data/oeis/
 checkpoints/
 nohup.out
 *.tar.gz

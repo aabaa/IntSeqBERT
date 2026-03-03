@@ -18,7 +18,7 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 import matplotlib.patheffects as pe
 
-OUT_DIR = Path(__file__).resolve().parent
+OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
 
 # ── 色パレット ──────────────────────────────────────────────────────────────
 C_MAG   = "#3b82f6"   # 青 — Magnitude stream

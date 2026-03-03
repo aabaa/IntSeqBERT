@@ -20,9 +20,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 # ── パス設定 ──────────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 CKPT      = REPO_ROOT / "checkpoints"
-OUT_DIR   = Path(__file__).resolve().parent
+OUT_DIR   = Path(__file__).resolve().parent.parent / "figures"
 
 SIZES  = ["small", "middle", "large"]
 MODELS = ["intseq", "vanilla", "ablation"]

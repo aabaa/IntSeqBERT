@@ -25,11 +25,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 # ── パス設定 ──────────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 CKPT = REPO_ROOT / "checkpoints" / "large_std"
-OUT_DIR = Path(__file__).resolve().parent
+OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
 
 MODELS = ["intseq", "vanilla", "ablation"]
 LABELS = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
@@ -72,7 +72,7 @@ def collect_and_cache(model_name: str) -> Path:
     モデルを推論して (gt, pred) を CSV に保存。
     既に CSV があればスキップ。
     """
-    cache_path = OUT_DIR / f"scatter_cache_{model_name}.csv"
+    cache_path = Path(__file__).resolve().parent.parent / "data" / f"scatter_cache_{model_name}.csv"
     if cache_path.exists():
         print(f"[{model_name}] Using cache: {cache_path}")
         return cache_path

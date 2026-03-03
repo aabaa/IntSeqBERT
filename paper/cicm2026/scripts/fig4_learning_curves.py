@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 # ── パス設定 ──────────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT_ROOT = REPO_ROOT / "checkpoints"
-OUT_DIR = Path(__file__).resolve().parent
+OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
 
 SIZES   = ["Small", "Middle", "Large"]
 SIZE_DIRS = {"Small": "small_std", "Middle": "middle_std", "Large": "large_std"}

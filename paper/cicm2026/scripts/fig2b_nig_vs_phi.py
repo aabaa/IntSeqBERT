@@ -22,9 +22,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # ── データ準備 ────────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 CKPT = REPO_ROOT / "checkpoints" / "large_std"
-OUT_DIR = Path(__file__).resolve().parent
+OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
 
 df = pd.read_csv(CKPT / "intseq" / "analysis" / "mod_spectrum" / "mod_spectrum_ranking.csv")
 df = df.sort_values("modulus").reset_index(drop=True)
