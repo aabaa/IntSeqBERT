@@ -1,0 +1,115 @@
+%% IntSeqBERT — CICM 2026
+%% Main LaTeX file (LNCS format)
+%% Compile: pdflatex main && bibtex main && pdflatex main && pdflatex main
+%% -----------------------------------------------------------------------
+
+\documentclass[runningheads]{llncs}
+
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}  % for \toprule, \midrule, \bottomrule (optional)
+\usepackage{url}
+\usepackage{hyperref}
+%\usepackage{microtype} % improve text justification (disabled: font expansion issue)
+
+% If you use the hyperref package, uncomment below for Springer eBook style URLs:
+%\usepackage{color}
+%\renewcommand\UrlFont{\color{blue}\rmfamily}
+
+\begin{document}
+
+%% -----------------------------------------------------------------------
+%% Title and authors
+%% -----------------------------------------------------------------------
+
+\title{IntSeqBERT: Dual-Stream Masked Modelling for Integer Sequences
+       via Magnitude and Modular Arithmetic Embeddings}
+
+\titlerunning{IntSeqBERT: Dual-Stream Masked Modelling for Integer Sequences}
+
+\author{Kazuhisa Nakasho\inst{1}}
+
+\authorrunning{K. Nakasho}
+
+\institute{Iwate Prefectural University, Takizawa, Iwate, Japan\\
+\email{nakasho\_k@iwate-pu.ac.jp}}
+
+\maketitle
+
+%% -----------------------------------------------------------------------
+%% Abstract
+%% -----------------------------------------------------------------------
+
+\begin{abstract}
+% TODO: write English abstract (150--250 words)
+%
+% 下書き（日本語）:
+% 整数数列の穴埋め（マスク付き系列モデリング）タスクに対して、IntSeqBERT を提案する。
+% IntSeqBERT は Magnitude ストリーム（連続対数スケール埋め込み）と Modulo ストリーム
+% （100 個の剰余に対する Sin/Cos 埋め込み）を FiLM で融合した双ストリーム Transformer
+% エンコーダであり、OEIS 上でマルチタスク事前学習される。
+% Large スケール（91.5M）の IntSeqBERT は OEIS 274,705 数列のテストデータにおいて
+% Magnitude 精度 95.85%・平均 Modulo 精度 50.38% を達成し、標準的なトークン化 Transformer
+% をそれぞれ +8.9pt・+4.5pt 上回る。Solver による次項予測では 7.4 倍の精度向上が得られた。
+% Modulo スペクトル解析により、NIG とオイラーのトーシェント比 φ(m)/m の間に強い負の相関
+% （r = -0.851、p < 10^{-28}）を発見した。
+Integer sequences in the OEIS span values from single-digit constants to astronomical
+factorials and exponentials, making prediction challenging for standard tokenised models that
+cannot handle out-of-vocabulary values or exploit periodic arithmetic structure.
+We present \textbf{IntSeqBERT}, a dual-stream Transformer encoder for masked integer-sequence
+modelling on OEIS. Each sequence element is encoded along two complementary axes: a continuous
+log-scale Magnitude embedding and Sin/Cos Modulo embeddings for 100 residues (moduli
+$2$--$101$), fused via FiLM. Three prediction heads (magnitude regression,
+sign classification, and Modulo prediction for 100 moduli) are trained jointly
+on 274,705 OEIS sequences.
+At the Large scale (91.5M parameters), IntSeqBERT achieves 95.85\% Magnitude accuracy and
+50.38\% Mean Modulo Accuracy (MMA) on the test set, outperforming a standard tokenised
+Transformer baseline by $+8.9$\,pt and $+4.5$\,pt, respectively. An ablation removing the
+Modulo stream confirms it accounts for $+15.2$\,pt of the MMA gain and contributes an
+additional $+6.2$\,pt to Magnitude accuracy. A CRT-based IntegerSolver converts the model's
+predictions into concrete integers, yielding a 7.4$\times$ improvement in next-term prediction
+(Top-1: 19.09\% vs.\ 2.59\%). Modulo spectrum analysis reveals a strong negative correlation
+between Normalised Information Gain (NIG) and Euler's totient ratio $\varphi(m)/m$
+($r = -0.851$, $p < 10^{-28}$), providing empirical evidence that composite moduli capture
+OEIS arithmetic structure more efficiently via CRT aggregation.
+
+\keywords{Integer sequences \and OEIS \and Masked sequence modelling \and
+          Modular arithmetic \and Transformer \and FiLM}
+\end{abstract}
+
+%% -----------------------------------------------------------------------
+%% Sections
+%% -----------------------------------------------------------------------
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_model}
+\input{sections/04_setup}
+\input{sections/05_experiments}
+\input{sections/06_analysis}
+\input{sections/07_conclusion}
+
+%% -----------------------------------------------------------------------
+%% Acknowledgements and Competing Interests
+%% -----------------------------------------------------------------------
+
+\begin{credits}
+\subsubsection{\ackname}
+% TODO: fill in acknowledgements (or remove if none)
+% This work was supported by ...
+
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are relevant to the content of this
+article.
+\end{credits}
+
+%% -----------------------------------------------------------------------
+%% Bibliography
+%% -----------------------------------------------------------------------
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

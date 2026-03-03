@@ -4,6 +4,20 @@ checkpoints/
 nohup.out
 *.tar.gz
 
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

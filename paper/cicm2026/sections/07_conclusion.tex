@@ -1,0 +1,76 @@
+%% Section 7: Conclusion
+%% Japanese draft (draft2/07_conclusion.md) embedded as comments.
+%% English translation written below each paragraph.
+%% -----------------------------------------------------------------------
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+% 本研究では IntSeqBERT を提案した。整数数列向けの双ストリーム Transformer エンコーダであり、各要素を
+% 2 つの相補的な軸で表現する。1 つ目はスケールと成長挙動を捉える連続的な対数 Magnitude 埋め込みであり、
+% 2 つ目は周期的算術構造を捉える Sin/Cos Modulo 埋め込みである。
+% 2 つのストリームは FiLM で融合され、219,765 件の OEIS 数列に対して Magnitude 回帰・符号分類・
+% 100 次元 Modulo 予測を組み合わせたマルチタスク目標で共同学習される。
+We have presented \textbf{IntSeqBERT}, a dual-stream Transformer encoder for integer sequences.
+Each sequence element is represented along two complementary axes: a continuous log-scale
+Magnitude embedding capturing growth behaviour, and a Sin/Cos Modulo embedding capturing
+periodic arithmetic structure. The two streams are fused via FiLM and jointly trained on
+219,765 OEIS sequences with a multi-task objective combining magnitude regression, sign
+classification, and 100-dimensional Modulo prediction.
+
+% テストデータにおいて、Large IntSeqBERT は Magnitude 精度 95.85%・符号精度 98.54%・
+% 平均 Modulo 精度 50.38% を達成し、Vanilla Transformer をそれぞれ +8.9pt・+0.9pt・+4.5pt 上回った。
+% Solver による次項予測では IntSeqBERT が Top-1 完全一致精度 19.09% を達成し、Vanilla の 7.4 倍。
+% アブレーション実験により、Modulo ストリームが Modulo 予測改善の大半を担い（+15.2pt）、Magnitude
+% 回帰にも副次的な改善をもたらすこと（+6.2pt）が確認された。
+% モジュラス間解析では NIG と φ(m)/m の間に極めて強い負の相関（r = -0.851、p < 10^{-28}）が確認
+% された。これは合成数法ほど CRT 集約効果により OEIS 数列の算術構造を効率的に捉えるという数論的
+% 規則性の実証的根拠となる。
+On the test set, Large IntSeqBERT achieves 95.85\% Magnitude accuracy, 98.54\% sign accuracy,
+and 50.38\% MMA, surpassing the Vanilla Transformer by $+8.9$\,pt, $+0.9$\,pt, and $+4.5$\,pt,
+respectively. For next-term prediction via the Solver, IntSeqBERT achieves Top-1 accuracy of
+19.09\%, a 7.4$\times$ improvement over the Vanilla baseline. Ablation experiments confirm that
+the Modulo stream accounts for most of the Modulo-prediction gain ($+15.2$\,pt) and also
+provides a secondary benefit to magnitude regression ($+6.2$\,pt). Cross-modulus analysis
+reveals a very strong negative correlation between NIG and $\varphi(m)/m$
+($r = -0.851$, $p < 10^{-28}$), providing empirical evidence that composite moduli
+capture the arithmetic structure of OEIS sequences more efficiently via CRT aggregation.
+
+% 今後の課題として以下が挙げられる：
+\textbf{Future work.}
+\begin{itemize}
+  % Magnitude の不確かさ推定と近似 CRT を組み合わせた大きな整数の予測改善。
+  \item Combining Magnitude uncertainty estimation with approximate CRT to improve prediction
+        of large integers.
+
+  % Modulo ストリームの対象を 101 より大きな素数や Z/mZ 以外の代数的構造へと拡張。
+  \item Extending the Modulo stream beyond $m = 101$ to larger primes and to algebraic
+        structures beyond $\mathbb{Z}/m\mathbb{Z}$.
+
+  % どの漸化式構造に各アテンションヘッドが特化するかを特定するための、より精細なアテンション
+  % アライメント指標の開発。
+  \item Developing finer-grained attention-alignment metrics to identify which recurrence
+        structures each attention head specialises in.
+
+  % 数学的系統を考慮した分割設計の構築。
+  \item Constructing family-aware dataset splits that respect mathematical relationships among
+        sequences to prevent leakage between related sequences.
+
+  % Solver 評価における予測位置の改善：中間位置のマスク予測との比較分析は今後の課題。
+  \item Extending Solver evaluation to intermediate masked positions, enabling full exploitation
+        of the bidirectional encoder's ability to leverage subsequent context.
+
+  % FACT で採用されているような数列合成によるデータ拡張の導入：漸化式テンプレートや代数的規則から
+  % 人工的に生成した数列を訓練データに加えることで、Huge・Astronomical バケットでの汎化性能向上が
+  % 期待される。
+  \item Introducing sequence-synthesis data augmentation as in FACT~\cite{zurich-fact}:
+        adding synthetically generated sequences from recurrence templates and algebraic rules
+        to the training data is expected to improve generalisation, particularly in the sparse
+        Huge and Astronomical buckets.
+
+  % モデルの大規模化：Huge スケール（数百 M〜数十億パラメータ）への拡張や OEIS 全数列を対象とした
+  % 事前学習により、Modulo 精度および CRT モードでの性能向上が期待される。
+  \item Scaling to larger models (hundreds of millions to billions of parameters) and
+        pre-training on the full OEIS corpus, which is expected to yield further gains in
+        Modulo accuracy and CRT-mode performance.
+\end{itemize}
