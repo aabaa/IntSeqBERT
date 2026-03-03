@@ -25,7 +25,7 @@
 学習では、Magnitude 回帰・符号分類・100 個の法に対する Modulo 予測の 3 つの予測器を多目的に同時学習する（マルチタスク事前学習）。
 マスク位置の予測値（大きさ・符号・剰余分布）から具体的な整数値を復元するために、中国剰余定理（CRT）に基づく **IntegerSolver** を用いる（第 3.9 節）。
 
-本研究では OEIS 標準データ分割（train/validation/test）の 3 モデルサイズ（Small: \textasciitilde9M・Middle: \textasciitilde44M・Large: \textasciitilde110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
+本研究では OEIS 標準データ分割（train/validation/test）の 3 モデルサイズ（Small: ~9M・Middle: ~44M・Large: ~110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
 全実験は **GeForce RTX 3070 Ti（VRAM 8 GB）1 枚**で実施しており、コンシューマー GPU のメモリ制約下での結果である点は解釈の際に留意されたい。
 主要な発見は以下の通りである：
 
