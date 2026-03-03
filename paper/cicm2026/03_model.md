@@ -5,8 +5,8 @@
 ## 3.1 問題定式化
 
 OEIS から取り出した整数数列の有限プレフィックスを $\mathbf{x} = (x_1, x_2, \ldots, x_L)$（$x_i \in \mathbb{Z}$、$L \leq 128$）とする。
-本研究では**マスク付き系列モデリング**（masked sequence modelling）目標を採用する。位置の一部をランダムにマスクし、モデルはマスクされた値を予測するよう学習される。
-具体的には、マスクされた各位置 $i$ において以下の 3 量を予測する：
+本研究では**マスク付き系列モデリング**（masked sequence modelling）を採用する。位置の一部をランダムにマスクし、モデルはマスクされた値を予測するよう学習される。
+具体的には、マスクされた各位置 $i$ において以下の 3 つの量を予測する：
 
 1. **Magnitude**：$v_i =
 \begin{cases}
@@ -27,7 +27,7 @@ OEIS から取り出した整数数列の有限プレフィックスを $\mathbf
 $$
 \mathbf{f}_i^{\text{mag}} = \bigl[v_i,\; \mathbf{1}[x_i > 0],\; \mathbf{1}[x_i < 0],\; \mathbf{1}[x_i = 0]\bigr]
 $$
-ただし
+後ろ 3 成分は符号（正・負・零）の one-hot 表現である。ただし
 $
 v_i =
 \begin{cases}
@@ -36,7 +36,6 @@ v_i =
 \end{cases}
 $。
 float64 の表現範囲を超える天文学的な整数については、$|x_i|$ の十進桁数でフォールバックする。
-極端な桁数でのオーバーフローを避けるため、Magnitude 関連の計算は FP16 ではなく FP32 で実行する。
 
 **Modulo 特徴量** $\mathbf{f}_i^{\text{mod}} \in \mathbb{R}^{200}$：
 各法 $m \in \{2, 3, \ldots, 101\}$ について $r = x_i \bmod m \in \{0, \ldots, m-1\}$ とし、剰余を単位円上の点として埋め込む：
@@ -48,7 +47,7 @@ $$
 
 ## 3.3 双ストリーム埋め込み
 
-2 つの特徴ベクトルは独立した射影層でモデルの隠れ次元 $d$ に写像される。本研究の設定では Magnitude 側に 2 層 MLP を用いる：
+2 つの特徴ベクトルは独立した射影層でモデルの隠れ次元 $d$ に写像される。本研究では Magnitude 側に 2 層 MLP を用いる：
 $$
 \mathbf{h}_i^{\text{mag}} = \mathrm{MLP}_{\text{mag}}(\mathbf{f}_i^{\text{mag}}), \quad
 \mathbf{h}_i^{\text{mod}} = W_{\text{mod}}\,\mathbf{f}_i^{\text{mod}} + \mathbf{b}_{\text{mod}}, \quad \mathbf{h}_i^{\text{mag}},\,\mathbf{h}_i^{\text{mod}} \in \mathbb{R}^d.
@@ -97,8 +96,8 @@ $$
 (\mu_i,\, \log \sigma_i^2) = \mathrm{MLP}_{\text{mag-head}}(\mathbf{z}_i),
 $$
 対数スケールの Magnitude 予測値は $\hat{v}_i = \mu_i$。
-$\mathrm{MLP}_{\text{mag-head}}$ は $d \rightarrow d \rightarrow 2$（中間活性化 ReLU）である。
-本研究の実験設定では、損失計算で使用するのは主に $\mu_i$ であり、$\log \sigma_i^2$ は補助出力として保持する。
+$\mathrm{MLP}_{\text{mag-head}}$ は隠れ次元 $d$・活性化 ReLU の 2 層 MLP（$d \to d \to 2$）である。
+本研究では、損失計算で使用するのは主に $\mu_i$ であり、$\log \sigma_i^2$ は補助出力として保持する。
 
 **符号ヘッド**（3 クラス分類）：
 $$
@@ -108,7 +107,7 @@ $$
 **Modulo ヘッド**（独立した $m$ 値分類器 × 100）：
 各法 $m \in \{2, \ldots, 101\}$ について、$\{0, \ldots, m-1\}$ 上のロジットを出力する線形層を用意する。
 100 個の分類器は同じ入力 $\mathbf{z}_i$ を共有するが、パラメータは独立する。
-総出力次元：$\sum_{m=2}^{101} m = 5{,}150$。
+総出力次元は、 $\sum_{m=2}^{101} m = 5{,}150$ である。
 
 ## 3.7 学習目標
 
@@ -117,10 +116,10 @@ $$
 \mathcal{L} = w_{\text{mag}}\,\mathcal{L}_{\text{mag}} + w_{\text{sign}}\,\mathcal{L}_{\text{sign}} + w_{\text{mod}}\,\mathcal{L}_{\text{mod}},
 $$
 ただし $w_{\text{mag}} = 1.0$、$w_{\text{sign}} = 1.0$、$w_{\text{mod}} = 2.0$。
-これらの重みは実験的に決定した固定値であり、不確実性に基づく動的重み付け（uncertainty weighting）などの適応的な手法を試みたところ学習が不安定になることが観察されたため、固定値を採用した。
+これらの重みに対して不確実性に基づく動的重み付け（uncertainty weighting）などの適応的な手法を試みたところ学習が不安定になることが観察されたため、上述の固定値を採用した。
 
-$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（SmoothL1）とし、不確実性重み付けは行わない設定とした。
-$\mathcal{L}_{\text{sign}}$ は 3 クラスのクロスエントロピー損失。
+$\mathcal{L}_{\text{mag}}$ は $\hat{v}_i$ と $v_i$ の間の Huber 損失（Smooth L1）とし、不確実性重み付けは行わない設定とした。
+$\mathcal{L}_{\text{sign}}$ は 3 クラスのクロスエントロピー損失である。
 $\mathcal{L}_{\text{mod}}$ は 100 個の Modulo ヘッドのクロスエントロピーの平均であり、クラス数の違いを補正するために $\log m$ で正規化する：
 $$
 \mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}\frac{1}{\log m}\,\mathcal{L}_{\text{CE}}^{(m)}.
@@ -128,6 +127,7 @@ $$
 すべての損失はマスク位置のみで計算する。
 
 ## 3.8 ベースライン
+以下2つのモデルを比較対象とした。
 
 **Vanilla Transformer** は各整数を 20,003 エントリの語彙（値 $0$ から $19{,}999$ の 20,000 値に、`PAD`・`MASK`・`UNK` を加えたもの）のトークン ID に変換する。
 語彙外の値は `UNK` で置換される。
@@ -150,7 +150,7 @@ Solver はまず、Magnitude 予測から 3σ 区間 $[n_{\min}, n_{\max}]$（$v
 | **Sieve** | $10^6 < \Delta n \leq 10^{14}$ | 確信度上位の法をアンカーとした CRT ビームサーチで候補を絞り込み |
 | **CRT** | $\Delta n > 10^{14}$ | Sparse CRT ビームサーチで巨大整数を直接生成 |
 
-`zero` は `sign_idx=zero` のときに 0 を即時返却する分岐であり、探索失敗時のフォールバックではない。`none` は評価において「有効候補なし」を集計するための結果ラベルである。
+なお、符号予測が零（$x_i = 0$）の場合は整数探索を省略して即時に 0 を返す。探索範囲内に有効な候補が存在しなかった場合は「候補なし」として別途集計する。
 
 各候補 $n$ のスコアは、Magnitude 項と全法の Modulo 対数確率の重み付き和として計算される：
 $$
