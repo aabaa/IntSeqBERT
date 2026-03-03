@@ -45,9 +45,22 @@ Magnitude 精度は急速に飽和し（Small→Large で +1.1pt）、一方 **M
 これは剰余算術がより合成的（compositional）であり、表現容量の増加から不均衡に恩恵を受けるという直観と一致する。
 Solver Top-1 精度は Modulo 精度の傾向に追随して一貫してスケールする（+5.0pt）。
 
-<!-- 図のプレースホルダー -->
-<!-- 図3（スケーリング折れ線グラフ）: Small/Middle/Large の 3 スケールにおける Mag Acc・MMA・Solver Top-1 の推移。
-     IntSeqBERT / Vanilla / Ablation の 3 系列を重ねる。 -->
+表~\ref{tab:scale_trend} の傾向は図~\ref{fig:scaling} にも可視化されており、
+MMA の急峻なスケーリングと Magnitude 精度の飽和が折れ線グラフで対比的に示される。
+
+<!-- 図3（スケーリング折れ線グラフ — 未生成、必要に応じて作成）
+     縦軸: Mag Acc・MMA・Solver Top-1（各指標を別パネル or 同一パネルで正規化）
+     横軸: Small / Middle / Large
+     3 系列: IntSeqBERT / Vanilla / Ablation
+     \begin{figure}[t]
+       \centering
+       \includegraphics[width=\linewidth]{figures/fig3_scaling}
+       \caption{モデルサイズに対する各指標のスケーリング挙動。
+                MMA（Modulo 精度）は Small → Large で +9.95pt と急峻に改善するのに対し、
+                Magnitude 精度は +1.12pt で早期に飽和する。
+                Solver Top-1 は Modulo 精度の傾向に連動して一貫してスケールする。}
+       \label{fig:scaling}
+     \end{figure} -->
 
 ## 6.3 アテンションパターン
 
@@ -68,9 +81,16 @@ A107413（線形漸化式）、A022433（Hofstadter 系）、A023622（Lucas 数
 （i）線形漸化式の数列 A107413 は直前項への強い依存を反映して一貫して高い局所アテンション比率を示す。
 （ii）モデルが大きくなるほどアテンションがより広域に分散し（Small→Large でローカル比率が低下）、容量の増加が長距離コンテキストの利用を可能にすることが示唆される。
 
-<!-- 図のプレースホルダー -->
-<!-- 図3: A107413 に対するアテンションヒートマップ（Large IntSeqBERT、層平均）。
-     出典: checkpoints/large_std/intseq/analysis/attention/ -->
+<!-- アテンションヒートマップ（補足図、必要に応じて作成）
+     出典: checkpoints/large_std/intseq/analysis/attention/
+     \begin{figure}[t]
+       \centering
+       \includegraphics[width=0.72\linewidth]{figures/fig_attn_A107413}
+       \caption{A107413（線形漸化式）に対する Large IntSeqBERT の層平均アテンションヒートマップ。
+                行が Query 位置、列が Key 位置を表す。局所アテンション比率 0.347 は
+                直前 3 位置への集中度を示す。}
+       \label{fig:attn_heatmap}
+     \end{figure} -->
 
 **制限事項。** アテンションが A107413 の漸化式係数を正確に反映しているかどうかの自動判定（パターンアライメント）は、全数列・全モデルで `UNKNOWN` となった。
 定性的な視覚的整合が定量的閾値を満たさないことを示しており、より鋭敏なアライメント指標の開発を今後の課題とする。
