@@ -69,7 +69,7 @@ def load_dataset(split_type: str, split_name: str, *, data_root: Optional[str] =
     Does NOT perform any shuffling or splitting logic.
     
     Args:
-        split_type: e.g., config.SPLIT_STRICT ('strict')
+        split_type: e.g., config.SPLIT_STRICT ('std')
         split_name: 'train', 'val', or 'test'
         data_root: Optional override for config.DATA_ROOT (for testing)
         

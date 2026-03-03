@@ -16,10 +16,11 @@ FEATURES_DIR_NAME = "features"
 SPLIT_DIR_NAME = "splits"
 
 # Split Types (Corresponds to subdirectory names under splits/)
-# Example path: data/oeis/splits/strict/train.txt
-SPLIT_STRICT = "strict"
+# Example path: data/oeis/splits/std/train.txt
+# SPLIT_STRICT = "strict"
+SPLIT_STD = "std"
 SPLIT_EASY = "easy"
-SPLIT_CLEAN = "clean"
+# SPLIT_CLEAN = "clean"
 SPLIT_ALL = "all"
 
 # ==========================================
