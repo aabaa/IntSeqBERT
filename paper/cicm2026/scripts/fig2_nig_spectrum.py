@@ -50,7 +50,7 @@ primes = [m for m in moduli if isprime(m)]
 
 # ── プロット ──────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(13, 4.2))
-fig.subplots_adjust(left=0.06, right=0.99, top=0.88, bottom=0.14)
+fig.subplots_adjust(left=0.06, right=0.99, top=0.96, bottom=0.14)
 
 # 素数法にグレー背景シェーディング
 for p in primes:
@@ -74,17 +74,17 @@ nig96  = dfs["intseq"].loc[dfs["intseq"]["modulus"] == 96,  "nig_score"].values[
 nig2   = dfs["intseq"].loc[dfs["intseq"]["modulus"] == 2,   "nig_score"].values[0]
 nig60  = dfs["intseq"].loc[dfs["intseq"]["modulus"] == 60,  "nig_score"].values[0]
 
-# m=96
+# m=96 (枠内に収まるよう下方に配置)
 ax.annotate(
     f"$m=96$\n({nig96:.3f})",
-    xy=(96, nig96), xytext=(88, nig96 + 0.04),
+    xy=(96, nig96), xytext=(88, nig96 + 0.01),
     arrowprops=dict(arrowstyle="->", color="#333333", lw=1.2),
     fontsize=9, color="#333333", ha="center",
 )
-# m=2
+# m=2 (枠内に収まるよう下方に配置)
 ax.annotate(
     f"$m=2$\n({nig2:.3f})",
-    xy=(2, nig2), xytext=(10, nig2 + 0.04),
+    xy=(2, nig2), xytext=(10, nig2 + 0.01),
     arrowprops=dict(arrowstyle="->", color="#333333", lw=1.2),
     fontsize=9, color="#333333", ha="center",
 )
@@ -112,11 +112,6 @@ prime_patch = mpatches.Patch(color="#e0e0e0", label="Prime $m$ (shaded)")
 handles, labels = ax.get_legend_handles_labels()
 ax.legend(handles=handles + [prime_patch], loc="lower right", fontsize=9.5,
           framealpha=0.9, ncol=2)
-
-fig.suptitle(
-    "Fig. 2  NIG Spectrum over Moduli $m = 2, \\ldots, 101$ (Large models)",
-    fontsize=12, y=0.97,
-)
 
 # ── 保存 ──────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):

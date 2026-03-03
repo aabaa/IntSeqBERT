@@ -44,7 +44,7 @@ y_line = slope * x_line + intercept
 
 # ── プロット ──────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7.5, 5.0))
-fig.subplots_adjust(left=0.11, right=0.97, top=0.88, bottom=0.13)
+fig.subplots_adjust(left=0.11, right=0.97, top=0.96, bottom=0.13)
 
 # 回帰直線（背景）
 ax.plot(x_line, y_line, color="#aaaaaa", linewidth=1.2, linestyle="--",
@@ -70,7 +70,7 @@ cbar.set_label("Modulus $m$ (composite)", fontsize=9)
 
 # 注目モジュラスのアノテーション
 ANNOTATE = {
-    2:  ("m=2\n(parity)",   (-0.12, +0.005)),
+    2:  ("m=2\n(parity)",   (+0.05, -0.025)),   # 右下に移動 (m=96と重ならないよう)
     60: ("m=60\n(Babylonian)", (-0.13, -0.018)),
     96: ("m=96",            (+0.015, +0.003)),
     3:  ("m=3",             (+0.010, -0.010)),
@@ -97,11 +97,6 @@ ax.set_xlabel(r"$\varphi(m)/m$  (Euler totient ratio)", fontsize=11)
 ax.set_ylabel("Normalized Information Gain (NIG)", fontsize=11)
 ax.legend(loc="lower left", fontsize=9.5, framealpha=0.9)
 ax.grid(linestyle=":", linewidth=0.6, alpha=0.6)
-
-fig.suptitle(
-    r"Fig. 2b  NIG vs. Euler totient ratio $\varphi(m)/m$ (Large IntSeqBERT)",
-    fontsize=11, y=0.97
-)
 
 # ── 保存 ──────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):

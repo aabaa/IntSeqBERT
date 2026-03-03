@@ -75,7 +75,7 @@ METRICS = [
 ]
 
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.5))
-fig.subplots_adjust(left=0.07, right=0.99, top=0.88, bottom=0.18, wspace=0.30)
+fig.subplots_adjust(left=0.07, right=0.99, top=0.96, bottom=0.18, wspace=0.30)
 
 for ax, (key, ylabel, ylim) in zip(axes, METRICS):
     for model in MODELS:
@@ -106,11 +106,6 @@ axes[1].legend(loc="lower right", fontsize=9, framealpha=0.9)
 axes[0].set_title("Magnitude Accuracy", fontsize=11, fontweight="bold")
 axes[1].set_title("Mean Modulo Accuracy (MMA)", fontsize=11, fontweight="bold")
 axes[2].set_title("Solver Top-1 Accuracy", fontsize=11, fontweight="bold")
-
-fig.suptitle(
-    "Fig. 3  Scaling Behaviour: Small → Middle → Large",
-    fontsize=12, y=0.97,
-)
 
 # ── 保存 ──────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):

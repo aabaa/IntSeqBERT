@@ -38,7 +38,7 @@ def load_history(size_key: str, model: str) -> pd.DataFrame:
 
 # ── プロット ──────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.2), sharey=False)
-fig.subplots_adjust(left=0.06, right=0.88, top=0.88, bottom=0.13, wspace=0.32)
+fig.subplots_adjust(left=0.06, right=0.88, top=0.96, bottom=0.13, wspace=0.32)
 
 for ax, model in zip(axes, MODELS):
     for size in SIZES:
@@ -88,11 +88,6 @@ fig.legend(
     framealpha=0.9,
     title="Size / Split",
     title_fontsize=10,
-)
-
-fig.suptitle(
-    "Fig. 4b  Train vs. Validation Loss (solid = Val, dotted = Train)",
-    fontsize=12, y=0.97,
 )
 
 # ── 保存 ──────────────────────────────────────────────────────────────────

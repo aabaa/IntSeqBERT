@@ -44,7 +44,7 @@ def load_cal(model: str):
 
 # ── プロット ──────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.5))
-fig.subplots_adjust(left=0.07, right=0.99, top=0.88, bottom=0.14, wspace=0.32)
+fig.subplots_adjust(left=0.07, right=0.99, top=0.96, bottom=0.14, wspace=0.32)
 
 for ax, model in zip(axes, MODELS):
     cal_df, ece = load_cal(model)
@@ -105,13 +105,8 @@ handles = [
     plt.Rectangle((0, 0), 1, 1, fc="#e8edf8", alpha=0.7,
                   label="Over-uncertain region"),
 ]
-axes[2].legend(handles=handles, loc="lower right", fontsize=8.5,
+axes[2].legend(handles=handles, loc="upper left", fontsize=8.5,
                framealpha=0.9, handlelength=1.5)
-
-fig.suptitle(
-    r"Fig. 6  Uncertainty Calibration: Predicted $\sigma$ vs. Actual RMSE (Large models)",
-    fontsize=12, y=0.97,
-)
 
 # ── 保存 ──────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):

@@ -118,7 +118,7 @@ def collect_and_cache(model_name: str) -> Path:
 SAMPLE_PER_BUCKET = 3000   # 各バケットからサンプリングする最大点数
 
 fig, axes = plt.subplots(1, 3, figsize=(14, 4.8))
-fig.subplots_adjust(left=0.06, right=0.88, top=0.88, bottom=0.13, wspace=0.30)
+fig.subplots_adjust(left=0.06, right=0.88, top=0.96, bottom=0.13, wspace=0.30)
 
 for ax, model_name in zip(axes, MODELS):
     cache_path = collect_and_cache(model_name)
@@ -196,11 +196,6 @@ fig.legend(
     framealpha=0.9,
     title="Bucket",
     title_fontsize=10,
-)
-
-fig.suptitle(
-    "Fig. 5  Predicted vs. True Magnitude (Large models, log$_{10}$ scale)",
-    fontsize=12, y=0.97,
 )
 
 # ── 保存 ──────────────────────────────────────────────────────────────

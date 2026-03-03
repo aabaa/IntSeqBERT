@@ -37,7 +37,7 @@ def load_history(size_key: str, model: str) -> pd.DataFrame:
 
 # ── プロット ──────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.0), sharey=False)
-fig.subplots_adjust(left=0.06, right=0.99, top=0.88, bottom=0.13, wspace=0.32)
+fig.subplots_adjust(left=0.06, right=0.99, top=0.96, bottom=0.13, wspace=0.32)
 
 for ax, size in zip(axes, SIZES):
     for model in MODELS:
@@ -63,11 +63,6 @@ axes[0].set_ylabel("Validation Loss", fontsize=11)
 
 # 凡例は Large パネルの右上
 axes[2].legend(loc="upper right", fontsize=10, framealpha=0.8)
-
-fig.suptitle(
-    "Fig. 4  Validation Loss over Training (all sizes and variants)",
-    fontsize=12, y=0.97
-)
 
 # ── 保存 ──────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
