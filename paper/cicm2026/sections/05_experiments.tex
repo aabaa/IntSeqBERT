@@ -264,26 +264,31 @@ Large  & Ablation        & 11.75          & 21.79          & 98.94          & 86
 \end{tabular}
 \end{table}
 
-% Magnitude 別精度（Large IntSeqBERT）。Solver 精度は Magnitude に強く依存する。
-% Small バケットでは Top-1 精度 68.34% を達成しており、低スケール領域では次項復元が実用的な精度。
-\textbf{Accuracy by Magnitude bucket (Large IntSeqBERT).} Solver accuracy degrades sharply
-with value magnitude, consistent with the Magnitude MSE results of Section~\ref{sec:magnitude}.
-In the Small bucket, Top-1 accuracy reaches 68.34\%, demonstrating practical next-term
-recovery at low scale.
+% Magnitude 別精度（Large 3モデル比較）。Solver 精度は Magnitude に強く依存する。
+% Small バケットでは IntSeqBERT Top-1 68.34%、Ablation 54.55%、Vanilla 14.11%。
+% Vanilla は Medium 以上で完全にゼロ（UNK トークン崩壊の影響）。
+\textbf{Accuracy by Magnitude bucket.} Table~\ref{tab:solver-bucket} compares Solver
+Top-1 accuracy across buckets for all three Large models. IntSeqBERT achieves 68.34\%
+Top-1 in the Small bucket, while the Ablation reaches 54.55\% and Vanilla only 14.11\%.
+Vanilla collapses to 0\% for Medium and above due to the UNK-token degradation of its
+Magnitude predictions, whereas IntSeqBERT retains meaningful accuracy up to the Medium
+bucket (20.82\%).
 
 \begin{table}[t]
-\caption{Solver accuracy by Magnitude bucket (Large IntSeqBERT).}
+\caption{Solver Top-1 / Top-10 accuracy (\%) by Magnitude bucket (Large models).
+         \textbf{Bold}: best per bucket.}
 \label{tab:solver-bucket}
 \centering
-\begin{tabular}{lrr}
+\begin{tabular}{l rr rr rr}
 \hline
-Bucket       & Top-1 (\%) & Top-10 (\%) \\
+ & \multicolumn{2}{c}{\textbf{IntSeqBERT}} & \multicolumn{2}{c}{Vanilla} & \multicolumn{2}{c}{Ablation} \\
+Bucket & Top-1 & Top-10 & Top-1 & Top-10 & Top-1 & Top-10 \\
 \hline
-Small        & 68.34      & 88.50  \\
-Medium       & 20.82      & 31.50  \\
-Large        &  0.31      &  0.67  \\
-Huge         &  0.09      &  0.18  \\
-Astronomical &  0.00      &  0.00  \\
+Small        & \textbf{68.34} & \textbf{88.50} & 14.11 & 20.71 & 54.55 & 86.92 \\
+Medium       & \textbf{20.82} & \textbf{31.50} &  0.00 &  0.00 &  5.61 & 18.88 \\
+Large        & \textbf{ 0.31} & \textbf{ 0.67} &  0.00 &  0.00 &  0.03 &  0.05 \\
+Huge         & \textbf{ 0.09} & \textbf{ 0.18} &  0.00 &  0.00 &  0.00 &  0.00 \\
+Astronomical &  0.00          &  0.00          &  0.00 &  0.00 &  0.00 &  0.00 \\
 \hline
 \end{tabular}
 \end{table}
