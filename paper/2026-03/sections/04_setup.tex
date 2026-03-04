@@ -30,8 +30,9 @@ The corpus is split 8:1:1 (seed~42): 219,765 training / 27,470 validation / 27,4
 % テストデータで最短 10 項・最長 168 項（平均 42.5 項）。Solver 評価では常に 9 項以上の先行文脈が
 % 利用される。数列には OEIS キーワードタグが付与されており、第 5 節の層別解析に用いる。
 Each sample corresponds to a sequence prefix of at most $L = 128$ terms (longer sequences are
-truncated). In the test set, sequence lengths range from 10 to 168 terms (mean 42.5), ensuring
-that the Solver always receives at least 9 terms of preceding context (Section~\ref{sec:solver-eval}).
+truncated). In the raw test corpus (before truncation), sequence lengths range from 10 to 168
+terms (mean 42.5). After truncation, all model inputs satisfy $L \le 128$, while still ensuring
+that the Solver receives at least 9 terms of preceding context (Section~\ref{sec:solver-eval}).
 
 % スケール別評価のため、u = log10(|x|) (x≠0), u=0 (x=0) に基づく 5 つの Magnitude バケットを定義：
 For scale-stratified evaluation, we define five Magnitude buckets based on $u = \log_{10}|x|$

@@ -21,8 +21,8 @@ consistently outperforms both baselines on all scales and metrics. At the Large 
 IntSeqBERT surpasses the Vanilla baseline by $+8.9$\,pt in Mag Acc and $+4.5$\,pt in MMA.
 The Ablation model shows the largest MMA drop at Large scale ($-15.2$\,pt), directly
 quantifying the contribution of the arithmetic-periodicity features. Notably, the Ablation
-maintains competitive Mag Acc, indicating that sign and Modulo information contribute only
-marginally to magnitude regression but are essential for Modulo prediction.
+maintains non-trivial Mag Acc, but the remaining gap confirms that Modulo information contributes
+meaningfully to magnitude regression as well, while being essential for Modulo prediction.
 
 \begin{table}[t]
 \caption{Test results. Mag Acc = Accuracy$_{0.5}$ (\%), Sign Acc (\%), MMA = Mean Modulo
@@ -205,7 +205,7 @@ $m$ & IntSeq & Vanilla & Ablation & Interpretation \\
 \hline
   2 & 85.65  & 81.40   & 72.13    & Parity \\
   3 & 72.62  & 65.22   & 53.72    & Ternary residue \\
-  5 & 60.37  & 50.07   & 42.63    & Last decimal digit parity \\
+  5 & 60.37  & 50.07   & 42.63    & Last decimal digit modulo 5 \\
  10 & 58.38  & 49.25   & 39.47    & Least significant decimal digit \\
  60 & 53.97  & 47.87   & 35.12    & Babylonian number (highly composite) \\
  96 & 51.82  & 47.29   & 34.44    & Highly composite \\
@@ -236,7 +236,8 @@ IntSeqBERT and Ablation may fail to find a valid candidate within the search ran
 % Large スケールの IntSeqBERT は Top-1 精度 19.09% を達成し、Vanilla の 7.4 倍。
 Table~\ref{tab:solver-eval} shows Solver evaluation results. Large-scale IntSeqBERT achieves
 a Top-1 accuracy of 19.09\%, a \textbf{7.4-fold} improvement over the Vanilla
-baseline (2.59\%).
+baseline (2.59\%). This 7.4-fold factor is computed over all 10,000 evaluation samples,
+counting \texttt{none} returns as misses.
 
 \begin{table}[t]
 \caption{Solver evaluation: Top-1 and Top-10 exact-match accuracy (\%) and valid-candidate rate.}

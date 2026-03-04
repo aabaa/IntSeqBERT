@@ -85,6 +85,8 @@ Astronomical-bucket metrics are based on few samples and should be interpreted w
 
 \textbf{Compute constraints.} All experiments were conducted on a single consumer GPU
 (GeForce RTX 3070 Ti, 8\,GB VRAM), which constrains model size and vocabulary capacity.
+Due to this budget, all reported runs use a single random seed (42), and we do not provide
+multi-seed variance estimates.
 The Vanilla baseline's vocabulary (20,003) is smaller than that of
 FACT~\cite{zurich-fact}, which handles values up to several million using larger compute
 resources. Consequently, our Vanilla results represent a FACT-equivalent architecture under
