@@ -112,11 +112,15 @@ by FiLM, and passed to the Transformer encoder.
   \centering
   \includegraphics[width=\linewidth]{figures/fig1_architecture}
   \caption{IntSeqBERT architecture. The Dual-Stream Embedding block projects
-           $\mathbf{f}^{\mathrm{mag}}\!\in\!\mathbb{R}^4$ and
-           $\mathbf{f}^{\mathrm{mod}}\!\in\!\mathbb{R}^{200}$ each to $\mathbb{R}^d$ and
-           fuses them via FiLM. Positional encodings are added to the fused embedding before
-           the Pre-LN Transformer encoder, which outputs to three prediction heads
-           (magnitude regression, sign classification, $100\times$ Modulo classification).}
+           $\mathbf{f}_i^{\mathrm{mag}}\!\in\!\mathbb{R}^4$ and
+           $\mathbf{f}_i^{\mathrm{mod}}\!\in\!\mathbb{R}^{200}$ to $\mathbb{R}^d$ via
+           $\mathrm{MLP}_{\mathrm{mag}}$ and $W_{\mathrm{mod}}$, then fuses them with FiLM:
+           $\mathbf{e}_i = (1+\boldsymbol{\gamma}_i)\odot\mathbf{h}_i^{\mathrm{mag}}+\boldsymbol{\beta}_i$.
+           Positional encodings are added before the Pre-LN Transformer encoder.
+           Three prediction heads produce
+           $\hat{v},\hat{\sigma}^2\!\in\!\mathbb{R}$ (magnitude regression),
+           $\hat{s}\!\in\!\{+,-,0\}$ (sign classification), and
+           $\hat{r}^{(m)}\!\in\!\{0,\ldots,m{-}1\}$ ($100\times$ Modulo classification).}
   \label{fig:architecture}
 \end{figure}
 
