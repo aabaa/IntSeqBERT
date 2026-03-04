@@ -82,38 +82,33 @@ using a Chinese Remainder Theorem (CRT) based \textbf{IntegerSolver} (Section~\r
 % 全実験は GeForce RTX 3070 Ti（VRAM 8 GB）1 枚で実施しており、コンシューマー GPU のメモリ制約下
 % での結果である点は解釈の際に留意されたい。
 % 主要な発見は以下の通りである：
-We evaluate IntSeqBERT against two baselines on a dataset of 274,705 OEIS sequences across
-three model sizes (Small: ${\sim}9$M, Middle: ${\sim}44$M, Large: ${\sim}110$M parameters).
-All experiments are conducted on a single GeForce RTX 3070 Ti (8\,GB VRAM), and results
-should be interpreted in light of this consumer-GPU memory constraint.
-Our main findings are:
-
-\begin{itemize}
-  \item Large-scale IntSeqBERT achieves \textbf{95.85\%} Magnitude accuracy and
-        \textbf{50.38\%} MMA on the test set ($+8.9$\,pt and $+4.5$\,pt over Vanilla).
-  \item The dual-stream representation yields a \textbf{7.4$\times$} improvement in exact-match
-        next-term prediction (Solver Top-1: 19.09\% vs.\ 2.59\%).
-  \item Modulo spectrum analysis reveals NIG is strongly negatively correlated with
-        $\varphi(m)/m$ ($r = {-}0.851$, $p < 10^{-28}$): composite moduli aggregate arithmetic
-        structure more efficiently via CRT.
-  \item Modulo and Solver accuracy scale more steeply with model size than Magnitude accuracy.
-\end{itemize}
+We evaluate IntSeqBERT against two baselines on 274,705 OEIS sequences across three model
+sizes (Small: ${\sim}9$M, Middle: ${\sim}44$M, Large: ${\sim}110$M parameters), all on a
+single GeForce RTX 3070 Ti (8\,GB VRAM).
 
 % 貢献のまとめ。
 \noindent\textbf{Contributions.}
 \begin{enumerate}
   % IntSeqBERT: Magnitude と剰余算術の特徴埋め込みを FiLM で融合した整数数列向け双ストリーム
   % Transformer アーキテクチャ。
-  \item \textit{IntSeqBERT}: a dual-stream Transformer architecture fusing magnitude and
-        modular-arithmetic feature embeddings via FiLM, jointly trained on OEIS with
-        magnitude regression, sign classification, and 100-dimensional Modulo prediction.
+  \item \textit{IntSeqBERT architecture}: a dual-stream Transformer fusing magnitude and
+        modular-arithmetic embeddings via FiLM, jointly trained on OEIS with magnitude
+        regression, sign classification, and 100-dimensional Modulo prediction. At the
+        Large scale, IntSeqBERT achieves \textbf{95.85\%} Magnitude accuracy and
+        \textbf{50.38\%} MMA, surpassing Vanilla by $+8.9$\,pt and $+4.5$\,pt, respectively.
+        The dual-stream representation yields a \textbf{7.4-fold} improvement in
+        Solver-based next-term prediction (Top-1: 19.09\% vs.\ 2.59\%).
 
-  % 包括的評価: スケール別 Magnitude 解析・Modulo スペクトル解析・Solver 統合次項予測の
-  % 評価軸。
-  \item \textit{Comprehensive evaluation}: scale-stratified Magnitude analysis, Modulo
-        spectrum analysis, and Solver-based next-term prediction demonstrating that
-        composite moduli capture periodic arithmetic structure more efficiently
-        (NIG vs.\ $\varphi(m)/m$: $r={-}0.851$).
+  % Modulo スペクトル解析: NIG と φ(m)/m の強い負の相関の発見
+  \item \textit{Number-theoretic finding}: Modulo spectrum analysis reveals that NIG is
+        strongly negatively correlated with $\varphi(m)/m$ ($r = {-}0.851$, $p < 10^{-28}$),
+        providing quantitative evidence that composite moduli aggregate arithmetic structure
+        more efficiently via CRT.
+
+  % スケーリング分析
+  \item \textit{Scaling behaviour}: Modulo accuracy and Solver accuracy improve more steeply
+        with model size than Magnitude accuracy, suggesting arithmetic reasoning benefits
+        disproportionately from increased capacity.
 \end{enumerate}
 
 % 論文の構成。
