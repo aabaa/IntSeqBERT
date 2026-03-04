@@ -31,8 +31,8 @@ context. This task directly probes how well a model has internalised the arithme
 combinatorial laws governing integer sequences; next-term prediction is treated as a special
 case and evaluated via a dedicated Solver component. The prior benchmark FACT~\cite{zurich-fact}
 defines and evaluates six tasks including unmasking, establishing what a plain Transformer can
-achieve, but it faces fundamental limitations in handling large integer values unseen at training
-time and in learning multiplicative structure.
+achieve, but it faces fundamental limitations in handling large integer values outside its fixed
+token vocabulary and in learning multiplicative structure.
 
 % このタスクの主要な困難は、整数数列の極端な不均質性にある。
 % 値の範囲は一桁の定数から天文学的な階乗・指数関数的数列まで及び、単一の学習コーパス内で数十桁以上の
@@ -47,8 +47,8 @@ sequences, with differences of tens of orders of magnitude within a single train
 At the same time, many sequences obey \emph{residue constraints}---parity, combinatorial
 patterns, or periodic remainders---that are independent of the magnitude of individual values.
 The standard tokenisation approach of assigning each integer a discrete vocabulary token is
-fundamentally ill-suited to this setting: it cannot handle large integers unseen at training
-time, embeds arithmetic structure in opaque token IDs, and breaks down in scale for large numbers.
+fundamentally ill-suited to this setting: it cannot represent integers outside its fixed token
+vocabulary, embeds arithmetic structure in opaque token IDs, and breaks down in scale for large numbers.
 
 % 本研究では IntSeqBERT を提案する。
 % これは OEIS コーパス全体で穴埋め問題により大規模学習（事前学習）された Transformer エンコーダで
@@ -68,14 +68,14 @@ complementary axes:
 \begin{itemize}
   \item \textbf{Magnitude stream}: a continuous log\-scale embedding of the
         absolute value, capturing growth behaviour and scale.
-  \item \textbf{Modulo stream}: Sin/Cos embeddings for 100 residues modulo $2$ through $101$,
+  \item \textbf{Modulo stream}: sin/cos embeddings for 100 residues modulo $2$ through $101$,
         capturing periodicity and number-theoretic structure.
 \end{itemize}
 The two streams are fused via FiLM (Feature-wise Linear Modulation)~\cite{perez2018film}.
 During training, three predictors are jointly optimised in a multi-task objective: magnitude
-regression, sign classification, and Modulo prediction for 100 moduli. Concrete integer values
+regression, sign classification, and modulo prediction for 100 moduli. Concrete integer values
 are recovered from the masked-position predictions (magnitude, sign, residue distributions)
-using a Chinese Remainder Theorem (CRT) based \textbf{IntegerSolver} (Section~\ref{sec:solver}).
+using a probabilistic Chinese Remainder Theorem (CRT)-based \textbf{IntegerSolver} (Section~\ref{sec:solver}).
 
 % 本研究では OEIS から抽出した274,705件のデータセットに対して、3 モデルサイズ（Small: ~9M・
 % Middle: ~44M・Large: ~110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
@@ -93,21 +93,21 @@ single GeForce RTX 3070 Ti (8\,GB VRAM).
   % Transformer アーキテクチャ。
   \item \textit{IntSeqBERT architecture}: a dual-stream Transformer fusing magnitude and
         modular-arithmetic embeddings via FiLM, jointly trained on OEIS with magnitude
-        regression, sign classification, and 100-dimensional Modulo prediction. At the
-        Large scale, IntSeqBERT achieves \textbf{95.85\%} Magnitude accuracy and
+        regression, sign classification, and 100-dimensional modulo prediction. At the
+        Large scale, IntSeqBERT achieves \textbf{95.85\%} magnitude accuracy and
         \textbf{50.38\%} MMA, surpassing Vanilla by $+8.9$\,pt and $+4.5$\,pt, respectively.
         The dual-stream representation yields a \textbf{7.4-fold} improvement in
         Solver-based next-term prediction (Top-1: 19.09\% vs.\ 2.59\%).
 
   % Modulo スペクトル解析: NIG と φ(m)/m の強い負の相関の発見
-  \item \textit{Number-theoretic finding}: Modulo spectrum analysis reveals that NIG is
-        strongly negatively correlated with $\varphi(m)/m$ ($r = {-}0.851$, $p < 10^{-28}$),
+  \item \textit{Number-theoretic finding}: modulo spectrum analysis reveals that NIG is
+        strongly negatively correlated with $\varphi(m)/m$ (where $\varphi$ denotes Euler's totient function; $r = {-}0.851$, $p < 10^{-28}$),
         providing quantitative evidence that composite moduli aggregate arithmetic structure
         more efficiently via CRT.
 
   % スケーリング分析
-  \item \textit{Scaling behaviour}: Modulo accuracy and Solver accuracy improve more steeply
-        with model size than Magnitude accuracy, suggesting arithmetic reasoning benefits
+  \item \textit{Scaling behaviour}: modulo accuracy and Solver accuracy improve more steeply
+        with model size than magnitude accuracy, suggesting arithmetic reasoning benefits
         disproportionately from increased capacity.
 \end{enumerate}
 
