@@ -48,17 +48,17 @@ factorials and exponentials, making prediction challenging for standard tokenise
 cannot handle out-of-vocabulary values or exploit periodic arithmetic structure.
 We present \textbf{IntSeqBERT}, a dual-stream Transformer encoder for masked integer-sequence
 modelling on OEIS. Each sequence element is encoded along two complementary axes: a continuous
-log-scale Magnitude embedding and Sin/Cos Modulo embeddings for 100 residues (moduli
+log-scale magnitude embedding and sin/cos modulo embeddings for 100 residues (moduli
 $2$--$101$), fused via FiLM. Three prediction heads (magnitude regression,
-sign classification, and Modulo prediction for 100 moduli) are trained jointly
+sign classification, and modulo prediction for 100 moduli) are trained jointly
 on 274,705 OEIS sequences.
-At the Large scale (91.5M parameters), IntSeqBERT achieves 95.85\% Magnitude accuracy and
+At the Large scale (91.5M parameters), IntSeqBERT achieves 95.85\% magnitude accuracy and
 50.38\% Mean Modulo Accuracy (MMA) on the test set, outperforming a standard tokenised
 Transformer baseline by $+8.9$\,pt and $+4.5$\,pt, respectively. An ablation removing the
-Modulo stream confirms it accounts for $+15.2$\,pt of the MMA gain and contributes an
-additional $+6.2$\,pt to Magnitude accuracy. A CRT-based IntegerSolver converts the model's
+modulo stream confirms it accounts for $+15.2$\,pt of the MMA gain and contributes an
+additional $+6.2$\,pt to magnitude accuracy. A probabilistic Chinese Remainder Theorem (CRT)-based IntegerSolver converts the model's
 predictions into concrete integers, yielding a 7.4-fold improvement in next-term prediction
-(Top-1: 19.09\% vs.\ 2.59\%). Modulo spectrum analysis reveals a strong negative correlation
+over the tokenised-Transformer baseline (Top-1: 19.09\% vs.\ 2.59\%). Modulo spectrum analysis reveals a strong negative correlation
 between Normalised Information Gain (NIG) and Euler's totient ratio $\varphi(m)/m$
 ($r = -0.851$, $p < 10^{-28}$), providing empirical evidence that composite moduli capture
 OEIS arithmetic structure more efficiently via CRT aggregation.
