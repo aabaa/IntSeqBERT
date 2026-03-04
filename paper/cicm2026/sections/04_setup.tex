@@ -17,10 +17,10 @@
 % (ii) 予測タスクの定義不能——fini（有限列）、tabl（二次元配列を1次元に平坦化した系列）；
 % (iii) 品質・完全性——dead（廃止済み）、unkn/less（不完全）、dumb（低品質）
 As of January 2026, OEIS contains 391,710 sequences. We exclude sequences with fewer than ten
-terms and those carrying any of eleven OEIS tags incompatible with integer-sequence prediction
-(\texttt{cons}/\texttt{cofr}/\texttt{frac}/\texttt{base}/\texttt{word} for out-of-scope
-representations; \texttt{fini}/\texttt{tabl} for undefined task; \texttt{dead}/\texttt{unkn}/\texttt{less}/\texttt{dumb}
-for quality), yielding 274,705 sequences (70.1\%) as our standard dataset (\texttt{std}).
+terms and those carrying any of eleven incompatible OEIS tags (out-of-scope representations:
+\texttt{cons}/\texttt{cofr}/\texttt{frac}/\texttt{base}/\texttt{word}; undefined task:
+\texttt{fini}/\texttt{tabl}; quality: \texttt{dead}/\texttt{unkn}/\texttt{less}/\texttt{dumb}),
+yielding 274,705 sequences (70.1\%) as our standard dataset (\texttt{std}).
 
 % コーパスはシード 42 で固定したランダムシャッフル後に数列レベルで重複のない 8:1:1 に分割される：
 % 学習 219,765 / 検証 27,470 / テスト 27,470

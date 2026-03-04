@@ -31,8 +31,8 @@ each masked position $i$, three quantities are predicted:
 This decomposition separates magnitude, sign, and periodic arithmetic structure into
 complementary supervision signals.
 
-\subsection{Input Feature Extraction}
-\label{sec:features}
+\subsection{Dual-Stream Representation}
+\label{sec:dualstream}
 
 % 各要素 x_i について、学習可能な埋め込みの前段で 2 種類の特徴ベクトルを計算する。
 % Magnitude 特徴量 f_i^mag ∈ R^4：
@@ -63,23 +63,17 @@ Concatenating all 100 moduli gives $\mathbf{f}_i^{\text{mod}} \in \mathbb{R}^{20
 This Sin/Cos embedding is equivariant to the group structure of $\mathbb{Z}/m\mathbb{Z}$ and
 avoids discontinuities at wrap-around boundaries.
 
-\subsection{Dual-Stream Embedding}
-\label{sec:dualstream}
-
 % 2 つの特徴ベクトルは独立した射影層でモデルの隠れ次元 d に写像される。
 % Magnitude 側に 2 層 MLP を用いる：
 % h_i^mag = MLP_mag(f_i^mag),  h_i^mod = W_mod f_i^mod + b_mod,  h_i^mag, h_i^mod ∈ R^d.
 The two feature vectors are projected to the model hidden dimension $d$ by independent
-projection layers. A two-layer MLP is used for the Magnitude side:
+projection layers (two-layer MLP for Magnitude; linear for Modulo):
 \[
   \mathbf{h}_i^{\text{mag}} = \mathrm{MLP}_{\text{mag}}\!\left(\mathbf{f}_i^{\text{mag}}\right),
   \quad
   \mathbf{h}_i^{\text{mod}} = W_{\text{mod}}\,\mathbf{f}_i^{\text{mod}} + \mathbf{b}_{\text{mod}},
   \quad \mathbf{h}_i^{\text{mag}},\,\mathbf{h}_i^{\text{mod}} \in \mathbb{R}^d.
 \]
-
-\subsection{FiLM Fusion}
-\label{sec:film}
 
 % 2 つのストリームを Feature-wise Linear Modulation（FiLM）[cite:perez2018film] で融合する。
 % Modulo 埋め込みが要素ごとのスケール γ_i とシフト β_i を生成し、Magnitude 埋め込みを変調する：
@@ -88,25 +82,19 @@ projection layers. A two-layer MLP is used for the Magnitude side:
 % Modulo 側の射影後に ReLU を適用し、さらに FiLM 前にドロップアウトを入れる。
 % この定式化により、算術的周期性がパラメータ効率よく連続値の Magnitude 表現を条件付けることができる。
 % エンコーダへの入力前に、e_i に標準的な Sin/Cos 位置エンコーディングを加算する。
-The two streams are fused by Feature-wise Linear Modulation
-(FiLM)~\cite{perez2018film}. The Modulo embedding generates element-wise scale $\boldsymbol{\gamma}_i$
-and shift $\boldsymbol{\beta}_i$ to modulate the Magnitude embedding:
+The two streams are fused by FiLM~\cite{perez2018film}: the Modulo embedding generates
+element-wise scale $\boldsymbol{\gamma}_i$ and shift $\boldsymbol{\beta}_i$:
 \[
   \boldsymbol{\gamma}_i = W_\gamma\,\mathbf{h}_i^{\text{mod}},
   \quad
   \boldsymbol{\beta}_i = W_\beta\,\mathbf{h}_i^{\text{mod}},
-\]
-\[
+  \quad
   \mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\text{mag}} + \boldsymbol{\beta}_i.
 \]
-A ReLU is applied after the Modulo projection, and dropout is inserted before FiLM. This
-formulation allows arithmetic periodicity to condition continuous-value Magnitude representations
-with parameter efficiency ($W_\gamma, W_\beta \in \mathbb{R}^{d \times d}$). Standard
-sinusoidal positional encodings are added to $\mathbf{e}_i$ before the encoder.
+A ReLU is applied after the Modulo projection, and dropout is inserted before FiLM.
+Standard sinusoidal positional encodings are added to $\mathbf{e}_i$ before the encoder.
 
-The overall architecture is illustrated in Fig.~\ref{fig:architecture}: each element is
-projected independently via the Magnitude stream (blue) and the Modulo stream (orange), fused
-by FiLM, and passed to the Transformer encoder.
+The overall architecture is illustrated in Fig.~\ref{fig:architecture}.
 
 \begin{figure}[t]
   \centering
@@ -124,7 +112,7 @@ by FiLM, and passed to the Transformer encoder.
   \label{fig:architecture}
 \end{figure}
 
-\subsection{Transformer Encoder}
+\subsection{Encoder, Heads, and Training}
 \label{sec:encoder}
 
 % 融合された系列を Pre-Layer Normalisation [cite:xiong2020layer] を採用した標準 Transformer
@@ -150,49 +138,24 @@ Large   & 12     & 768 & 12    & 91.5M      \\
 \end{tabular}
 \end{table}
 
-\subsection{Prediction Heads}
-\label{sec:heads}
-
 % マスク位置 i のエンコーダ出力を z_i ∈ R^d とする。
-% Magnitude ヘッド（回帰）：
-%   (μ_i, log σ_i^2) = MLP_mag-head(z_i)、予測値は v_hat_i = μ_i
-%   MLP_mag-head は隠れ次元 d・活性化 ReLU の 2 層 MLP（d → d → 2）
-%   損失計算では主に μ_i を使用し、log σ_i^2 は補助出力として保持する。
-% 符号ヘッド（3 クラス分類）：
-%   s_hat_i = softmax(W_sign z_i)、W_sign ∈ R^{3×d}
-% Modulo ヘッド（独立した m 値分類器 × 100）：
-%   各法 m について {0,...,m-1} 上のロジットを出力する線形層。
-%   総出力次元 = Σ_{m=2}^{101} m = 5,150
+% Magnitude ヘッド（回帰）：MLP_mag-head は 2 層 MLP（d → d → 2）
+% 符号ヘッド（3 クラス分類）：softmax(W_sign z_i)
+% Modulo ヘッド（独立した m 値分類器 × 100）：総出力次元 = 5,150
 Let $\mathbf{z}_i \in \mathbb{R}^d$ be the encoder output at masked position $i$.
+Three prediction heads are applied: (i)~\textbf{Magnitude head} --- a two-layer MLP
+($d \to d \to 2$, ReLU) outputting $(\mu_i, \log\sigma_i^2)$, predicting $\hat{v}_i = \mu_i$;
+(ii)~\textbf{Sign head} --- $\hat{s}_i = \operatorname{softmax}(W_{\text{sign}}\mathbf{z}_i)$;
+(iii)~\textbf{Modulo head} --- 100 independent linear classifiers, one per modulus, with total
+output dimension $\sum_{m=2}^{101}m = 5{,}150$.
 
-\textbf{Magnitude head} (regression): A two-layer MLP ($d \to d \to 2$, ReLU activation)
-outputs $(\mu_i, \log \sigma_i^2)$; the prediction is $\hat{v}_i = \mu_i$.
-
-\textbf{Sign head} (3-class classification):
-$\hat{s}_i = \operatorname{softmax}(W_{\text{sign}}\,\mathbf{z}_i)$, $W_{\text{sign}} \in \mathbb{R}^{3 \times d}$.
-
-\textbf{Modulo head} (100 independent classifiers): For each $m \in \{2, \ldots, 101\}$, a
-linear layer outputs logits over $\{0, \ldots, m-1\}$ sharing the same input $\mathbf{z}_i$
-but with independent parameters. The total output dimension is $\sum_{m=2}^{101} m = 5{,}150$.
-
-\subsection{Training Objective}
-\label{sec:training}
-
-% マルチタスク損失：
-%   L = w_mag L_mag + w_sign L_sign + w_mod L_mod
-%   w_mag = 1.0, w_sign = 1.0, w_mod = 2.0
-% 不確実性に基づく動的重み付けは学習不安定化のため採用せず、固定値を採用。
-% L_mag: Huber 損失（Smooth L1）
-% L_sign: 3 クラスのクロスエントロピー損失
-% L_mod: 100 個の Modulo ヘッドのクロスエントロピーの平均（log m 正規化）：
-%   L_mod = (1/100) Σ_{m=2}^{101} (1/log m) L_CE^(m)
-% すべての損失はマスク位置のみで計算する。
+% マルチタスク損失：L = L_mag + L_sign + 2 L_mod（固定重み）
+% L_mod = (1/100) Σ (1/log m) L_CE^(m)（log m 正規化）
 The multi-task loss is $\mathcal{L} = \mathcal{L}_{\text{mag}} + \mathcal{L}_{\text{sign}} + 2\,\mathcal{L}_{\text{mod}}$
 (weights fixed; adaptive weighting caused instability).
 $\mathcal{L}_{\text{mag}}$ is Huber loss; $\mathcal{L}_{\text{sign}}$ is cross-entropy over
-three sign classes; $\mathcal{L}_{\text{mod}}$ is the mean cross-entropy of the 100 Modulo
-heads, normalised by $\log m$: $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
-\frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$.
+three sign classes; $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
+\frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$ normalises for varying class counts.
 All losses are computed only at masked positions.
 
 \subsection{Baselines}
@@ -250,7 +213,8 @@ CRT      & $\Delta n > 10^{14}$                   & Sparse CRT beam search to ge
 When the sign prediction is zero, the Solver immediately returns 0. If no valid candidate is
 found in the search range, the call is recorded as \texttt{none}.
 
-Each candidate $n$ is scored by
-$\text{score}(n) = -(v_n - \mu_i)^2/(2\sigma_i^2) + 0.3\sum_{m}\log P(n \bmod m)$;
+Each candidate $n$ is scored by $\text{score}(n) = \alpha_{\text{mag}} + 0.3\,\alpha_{\text{mod}}$,
+where $\alpha_{\text{mag}} = -(v_n-\mu_i)^2/(2\sigma_i^2)$ and
+$\alpha_{\text{mod}} = \sum_{m}\log P(n\bmod m)$;
 the coefficient 0.3 suppresses score inflation from moduli sharing prime factors.
 The top $k$ candidates are returned and evaluated as Solver Top-$k$ (Section~\ref{sec:solver-eval}).

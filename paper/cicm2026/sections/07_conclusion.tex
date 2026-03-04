@@ -11,19 +11,15 @@
 % 2 つ目は周期的算術構造を捉える Sin/Cos Modulo 埋め込みである。
 % 2 つのストリームは FiLM で融合され、219,765 件の OEIS 数列に対して Magnitude 回帰・符号分類・
 % 100 次元 Modulo 予測を組み合わせたマルチタスク目標で共同学習される。
-We have presented \textbf{IntSeqBERT}, a dual-stream Transformer encoder for integer sequences
-that fuses a continuous log-scale Magnitude embedding with Sin/Cos Modulo embeddings via FiLM,
-and is jointly trained on 219,765 OEIS sequences. Experiments (Section~\ref{sec:experiments})
-demonstrate that the dual-stream design substantially outperforms both a standard tokenised
-Transformer and a Magnitude-only ablation across all scales and metrics, with especially large
-gains in Modulo accuracy and Solver-based next-term prediction.
+We have presented \textbf{IntSeqBERT}, a dual-stream Transformer encoder that fuses a
+continuous log-scale Magnitude embedding with Sin/Cos Modulo embeddings via FiLM, jointly
+trained on 219,765 OEIS sequences. Experiments (Section~\ref{sec:experiments}) demonstrate
+that the dual-stream design substantially outperforms both a standard tokenised Transformer
+and a Magnitude-only ablation across all scales and metrics.
 
 % 今後の課題として以下が挙げられる：
-\textbf{Future work.}
-\begin{itemize}
-  \item Combining Magnitude uncertainty estimation with approximate CRT to improve large-integer
-        prediction, and extending the Modulo stream beyond $m = 101$.
-  \item Constructing family-aware dataset splits and introducing sequence-synthesis data
-        augmentation~\cite{zurich-fact} to improve generalisation in sparse Magnitude buckets.
-  \item Scaling to larger models and pre-training on the full OEIS corpus.
-\end{itemize}
+\textbf{Future work} includes combining Magnitude uncertainty estimation with approximate CRT
+to improve large-integer prediction; extending the Modulo stream beyond $m = 101$;
+constructing family-aware dataset splits and introducing sequence-synthesis data
+augmentation~\cite{zurich-fact} to improve generalisation in sparse Magnitude buckets;
+and scaling to larger models pre-trained on the full OEIS corpus.
