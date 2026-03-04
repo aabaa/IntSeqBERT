@@ -224,8 +224,8 @@ $m$ & IntSeq & Vanilla & Ablation & Interpretation \\
 The Solver reconstructs candidate integers from the model's Magnitude, sign, and Modulo
 predictions and ranks them by likelihood. We evaluate exact-match accuracy on 10,000 test
 samples, where each sample corresponds to one OEIS sequence and the target is the \emph{last
-term} (all preceding terms are given as context). Sequence lengths in the test set range from
-10 to 168 (median 36, mean 42.5), so the Solver always receives at least 9 terms of context.
+term} (all preceding terms are given as context). With the sequence-length distribution described
+in Section~\ref{sec:dataset}, the Solver always receives at least 9 terms of context.
 
 \emph{Valid-candidate rate} is the fraction of samples for which the Solver returns at least
 one candidate. Vanilla always returns a candidate from its vocabulary softmax (rate = 100\%).

@@ -151,8 +151,9 @@ output dimension $\sum_{m=2}^{101}m = 5{,}150$.
 
 % マルチタスク損失：L = L_mag + L_sign + 2 L_mod（固定重み）
 % L_mod = (1/100) Σ (1/log m) L_CE^(m)（log m 正規化）
-The multi-task loss is $\mathcal{L} = \mathcal{L}_{\text{mag}} + \mathcal{L}_{\text{sign}} + 2\,\mathcal{L}_{\text{mod}}$
-(weights fixed; adaptive weighting caused instability).
+The multi-task loss is $\mathcal{L} = \mathcal{L}_{\text{mag}} + \mathcal{L}_{\text{sign}} + 2\,\mathcal{L}_{\text{mod}}$.
+The weight~2 on $\mathcal{L}_{\text{mod}}$ is intentionally set higher to emphasise the
+newly introduced Modulo stream; adaptive weighting was attempted but caused training instability.
 $\mathcal{L}_{\text{mag}}$ is Huber loss; $\mathcal{L}_{\text{sign}}$ is cross-entropy over
 three sign classes; $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
 \frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$ normalises for varying class counts.
@@ -215,6 +216,8 @@ found in the search range, the call is recorded as \texttt{none}.
 
 Each candidate $n$ is scored by $\text{score}(n) = \alpha_{\text{mag}} + 0.3\,\alpha_{\text{mod}}$,
 where $\alpha_{\text{mag}} = -(v_n-\mu_i)^2/(2\sigma_i^2)$ and
-$\alpha_{\text{mod}} = \sum_{m}\log P(n\bmod m)$;
-the coefficient 0.3 suppresses score inflation from moduli sharing prime factors.
+$\alpha_{\text{mod}} = \sum_{m}\log P(n\bmod m)$.
+The coefficient 0.3 approximates the proportion of primes between 2 and 101
+($26/100 = 0.26$), compensating for the information overlap among composite moduli
+that share prime factors.
 The top $k$ candidates are returned and evaluated as Solver Top-$k$ (Section~\ref{sec:solver-eval}).

@@ -18,12 +18,17 @@
 % AIがこのプロセスを大規模に自動化できれば、未知の数学的予想候補の発見に貢献できる可能性がある。
 Throughout mathematics, numerical pattern observation has seeded important
 conjectures---from Monstrous Moonshine~\cite{conway1979monstrous} and the
-BSD conjecture~\cite{birch1965} to Candelas et al.'s mirror-symmetry prediction of 317,206,375
+BSD conjecture~\cite{birch1965} to Wiles's proof of the Shimura--Taniyama conjecture
+for semistable elliptic curves, which resolved Fermat's Last Theorem~\cite{wiles1995},
+and Candelas et al.'s mirror-symmetry prediction of 317,206,375
 rational curves~\cite{candelas1991}.
 Recent AI systems including AlphaGeometry~\cite{trinh2024alphageometry},
 AlphaProof~\cite{alphaproof2024}, the Ramanujan Machine~\cite{raayoni2021ramanujan}, and
 FunSearch~\cite{romera2023funsearch} demonstrate the viability of AI-driven mathematical
-discovery; yet extracting arithmetic laws from integer sequences at scale remains largely
+discovery. On the formalisation front, Urban's large-scale autoformalization
+work~\cite{urban-autoformalization} shows that natural-language mathematics can be
+automatically translated into machine-verifiable form.
+Yet extracting arithmetic laws from integer sequences at scale remains largely
 unexplored. This work aims to establish representational foundations for that capability.
 
 \subsection{AI Research on OEIS}
@@ -84,7 +89,7 @@ Remainder Theorem (CRT), motivating the use of both prime and composite moduli i
 Our Modulo features cover $m \in \{2, 3, \ldots, 101\}$ (100 moduli), capturing power-residue
 structure broadly across primes and composites.
 
-\subsection{Neural Representations and Positioning of This Work}
+\subsection{Positioning and Neural Representations}
 \label{sec:background:repr-position}
 
 % --- 旧 §2.5  Neural Representations ---

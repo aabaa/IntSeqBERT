@@ -43,18 +43,6 @@
 %% -----------------------------------------------------------------------
 
 \begin{abstract}
-% TODO: write English abstract (150--250 words)
-%
-% 下書き（日本語）:
-% 整数数列の穴埋め（マスク付き系列モデリング）タスクに対して、IntSeqBERT を提案する。
-% IntSeqBERT は Magnitude ストリーム（連続対数スケール埋め込み）と Modulo ストリーム
-% （100 個の剰余に対する Sin/Cos 埋め込み）を FiLM で融合した双ストリーム Transformer
-% エンコーダであり、OEIS 上でマルチタスク事前学習される。
-% Large スケール（91.5M）の IntSeqBERT は OEIS 274,705 数列のテストデータにおいて
-% Magnitude 精度 95.85%・平均 Modulo 精度 50.38% を達成し、標準的なトークン化 Transformer
-% をそれぞれ +8.9pt・+4.5pt 上回る。Solver による次項予測では 7.4 倍の精度向上が得られた。
-% Modulo スペクトル解析により、NIG とオイラーのトーシェント比 φ(m)/m の間に強い負の相関
-% （r = -0.851、p < 10^{-28}）を発見した。
 Integer sequences in the OEIS span values from single-digit constants to astronomical
 factorials and exponentials, making prediction challenging for standard tokenised models that
 cannot handle out-of-vocabulary values or exploit periodic arithmetic structure.
