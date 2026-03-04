@@ -50,11 +50,9 @@ Large  & Ablation       & 89.70          & 98.29          & 35.22          \\
 % 継続的に低下した。学習損失と検証損失はほぼ一致して推移しており（Epoch 200: Train 1.00 / Val 1.01）、
 % 過学習は観察されない。Vanilla（最終 Val Loss = 1.77）は全期間を通じて IntSeqBERT（1.01）および
 % Ablation（1.39）より高い損失を示した。
-\textbf{Learning curves.} Fig.~\ref{fig:learning_curve} shows the validation loss across all
-model sizes and variants. Large IntSeqBERT decreases from Val Loss 2.17 at epoch 1 to 1.01 at
-epoch 200. Training and validation losses remain closely aligned throughout (epoch 200:
-Train~1.00 / Val~1.01), indicating no overfitting. Vanilla (final Val Loss 1.77) maintains
-higher loss than both IntSeqBERT and Ablation (1.39) across the entire training.
+\textbf{Learning curves.} Fig.~\ref{fig:learning_curve} shows validation loss across all
+variants. Large IntSeqBERT converges from 2.17 to 1.01 over 200 epochs with no overfitting
+(Train~1.00 / Val~1.01). Vanilla (1.77) and Ablation (1.39) maintain higher final loss.
 
 \begin{figure}[t]
   \centering
@@ -124,13 +122,10 @@ Vanilla ($R^2 = 0.943$), visually corroborating the MSE results of Table~\ref{ta
 % 校正精度。図6 に Large モデルの不確かさ校正曲線を示す。
 % Vanilla は ECE = 5.36 と著しく校正ずれ（低スケールで過信、高スケールで過大推定）。
 % IntSeqBERT は ECE = 0.65 と大幅に良好であり、Ablation（ECE = 0.66）と同等。
-\textbf{Calibration.} Fig.~\ref{fig:calibration} shows uncertainty calibration curves for
-Large models (x-axis: predicted $\sigma$; y-axis: actual RMSE; perfect calibration on the
-diagonal). Vanilla is severely miscalibrated (ECE = 5.36), with overconfidence at low scale
-($\sigma \approx 0$ but RMSE $\approx 1$--2) and exploding $\sigma$ at high scale.
-IntSeqBERT (ECE = 0.65) is substantially better and comparable to Ablation (ECE = 0.66),
-indicating that calibration improvement is driven primarily by the continuous vs.\ tokenised
-representation rather than by the presence of the Modulo stream.
+\textbf{Calibration.} Fig.~\ref{fig:calibration} shows uncertainty calibration for Large
+models. Vanilla is severely miscalibrated (ECE = 5.36), with overconfidence at low scale and
+exploding $\sigma$ at high scale. IntSeqBERT (ECE = 0.65) matches Ablation (ECE = 0.66),
+indicating calibration is driven by continuous representation rather than the Modulo stream.
 
 \begin{figure}[t]
   \centering
@@ -295,28 +290,7 @@ Astronomical &  0.00          &  0.00          &  0.00 &  0.00 &  0.00 &  0.00 \
 
 % モード別内訳（Large IntSeqBERT）。dense モードが Top-1 61.06% と最も高精度。
 % CRT モードは現状ほぼゼロ（Top-1 = 0.09%）。この制限については第 6.3 節で議論する。
-\textbf{Mode breakdown (Large IntSeqBERT).} The Solver operates in three modes based on
-the search width $\Delta n$ (Section~\ref{sec:solver}):
-
-\begin{table}[t]
-\caption{Solver mode breakdown for Large IntSeqBERT.}
-\label{tab:solver-mode}
-\centering
-\begin{tabular}{lrrl}
-\hline
-Mode  & Usage (\%) & Top-1 (\%) & Description \\
-\hline
-dense & 24.0       & 61.06      & Direct integer enumeration \\
-sieve & 36.7       &  5.36      & Sieve-based enumeration \\
-crt   & 23.2       &  0.09      & CRT-based reconstruction \\
-zero  &  2.7       & 89.96      & Next term predicted as zero \\
-none  & 13.4       &  0.00      & No valid candidate found \\
-\hline
-\end{tabular}
-\end{table}
-
-% 中国剰余定理を用いて Modulo 予測から整数を再構成しようとする CRT モードは、現状ほぼゼロに近い精度
-% しか達成していない。この制限については第 6.3 節で議論する。
-The CRT mode, which attempts to reconstruct large integers directly from Modulo predictions,
-currently achieves near-zero accuracy (Top-1 = 0.09\%). This limitation is discussed in
-Section~\ref{sec:limitations}.
+\textbf{Mode breakdown (Large IntSeqBERT).} Dense mode (24.0\% of calls) achieves the highest
+Top-1 accuracy at 61.06\%; Sieve mode (36.7\%) achieves 5.36\%; the zero-prediction shortcut
+(2.7\%) achieves 89.96\%. CRT mode (23.2\%) achieves near-zero accuracy (0.09\%); 13.4\% of
+calls return no valid candidate. The CRT limitation is discussed in Section~\ref{sec:limitations}.

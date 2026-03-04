@@ -13,43 +13,13 @@
 % Magnitude-only のアブレーションモデルを比較する。
 % 表4 に Large 設定における差分をまとめる。
 To isolate the contribution of the Modulo stream and FiLM fusion, we compare IntSeqBERT with
-the Magnitude-only Ablation model across all three scales. Table~\ref{tab:ablation} summarises
-the differences at the Large scale.
-
-\begin{table}[t]
-\caption{IntSeqBERT vs.\ Ablation at the Large scale (test performance).
-         $\Delta$ = IntSeq $-$ Ablation.}
-\label{tab:ablation}
-\centering
-\begin{tabular}{lrrr}
-\hline
-Metric              & IntSeq & Ablation & $\Delta$ \\
-\hline
-Mag Acc (\%)        &  95.85 &    89.70 &   $+6.15$ \\
-Sign accuracy (\%)  &  98.54 &    98.29 &   $+0.25$ \\
-MMA (\%)            &  50.38 &    35.22 &  $+15.16$ \\
-mod-2 accuracy (\%) &  85.65 &    72.13 &  $+13.52$ \\
-Solver Top-1 (\%)   &  19.09 &    11.75 &   $+7.34$ \\
-Magnitude MSE       &  0.142 &     0.371&   $-0.228$\\
-\hline
-\end{tabular}
-\end{table}
-
-% 設計通り、Modulo ストリームは Modulo 予測において最大の改善をもたらす（MMA +15.2pt、パリティ
-% +13.5pt）。Magnitude 予測への寄与は比較的小さいが（Acc_{0.5} +6.2pt、MSE -0.228）、一貫して
-% 有意である。これは周期的算術構造がスケール回帰に対して相補的な帰納バイアスを提供していることを示す。
-% すなわち、x_i の 2 から 101 に対する剰余を知ることは、とりうる Magnitude の範囲を大幅に絞り込む。
-% 符号精度の差は小さく（+0.25pt）、符号は Magnitude のみからおおむね推定可能であることを示す。
-% Solver 精度は Modulo ストリームによって +7.3pt 改善される。Dense および Sieve モードにおいてより
-% 正確な剰余情報がスコアリングを精緻化することが主な要因である。
-As designed, the Modulo stream delivers the largest improvement in Modulo prediction (MMA
-$+15.2$\,pt, parity $+13.5$\,pt). Its contribution to Magnitude prediction is smaller but
-consistently significant (Acc$_{0.5}$ $+6.2$\,pt, MSE $-0.228$), suggesting that periodic
-arithmetic structure provides a complementary inductive bias for scale regression: knowing
-$x_i \bmod m$ for $m \in \{2, \ldots, 101\}$ substantially constrains the set of plausible
-Magnitude values. The sign accuracy gap is small ($+0.25$\,pt), indicating that sign is largely
-inferrable from magnitude alone. Solver accuracy improves by $+7.3$\,pt, primarily because
-more accurate residue information refines scoring in Dense and Sieve modes.
+the Magnitude-only Ablation model. As seen in Table~\ref{tab:main}, the Modulo stream
+delivers the largest gains in Modulo prediction (MMA $+15.2$\,pt, parity $+13.5$\,pt at Large
+scale). Its contribution to Magnitude prediction is smaller but significant (Acc$_{0.5}$
+$+6.2$\,pt, MSE $-0.228$), consistent with the intuition that knowing $x_i \bmod m$ for
+$m \in \{2,\ldots,101\}$ substantially constrains the set of plausible Magnitude values.
+Solver accuracy improves by $+7.3$\,pt, primarily because more accurate residue information
+refines scoring in Dense and Sieve modes.
 
 \subsection{Scaling Behaviour}
 \label{sec:scaling}
@@ -87,16 +57,12 @@ Magnitude MSE       &  0.228 &  0.164 &  0.142 & $-0.086$\\
 The trends in Table~\ref{tab:scale_trend} are visualised in Fig.~\ref{fig:scaling}, which
 contrasts the differential scaling of Modulo and Magnitude accuracy across model sizes.
 
-\begin{figure}[t]
+\begin{figure}[hbt]
   \centering
   \includegraphics[width=\linewidth]{figures/fig3_scaling}
-  \caption{Scaling behaviour across model sizes (Small / Middle / Large).
-           Left: Magnitude accuracy (Mag Acc) remains high for both IntSeqBERT and Ablation,
-           with only $+1.1$\,pt improvement from Small to Large.
-           Centre: MMA (Mean Modulo Accuracy) for IntSeqBERT improves from 40.3\% (Small) to
-           50.4\% (Large, $+10.1$\,pt), consistently exceeding Ablation at all scales.
-           Right: Solver Top-1 accuracy for IntSeqBERT improves from 14.1\% to 19.1\%
-           ($+5.0$\,pt), with a growing gap over Vanilla (${\approx}2.4$\%, flat).}
+  \caption{Scaling behaviour (Small / Middle / Large). Left: Mag Acc improves only $+1.1$\,pt.
+           Centre: MMA for IntSeqBERT improves $+10.1$\,pt (40.3\%$\to$50.4\%).
+           Right: Solver Top-1 improves $+5.0$\,pt, with a growing gap over Vanilla.}
   \label{fig:scaling}
 \end{figure}
 
@@ -107,26 +73,12 @@ contrasts the differential scaling of Modulo and Magnitude accuracy across model
 % ボトルネックは不十分な Modulo 予測精度にある。CRT による復元には複数の法に対する正確な剰余が必要
 % であり、MMA が 50% 程度であっても剰余の誤りが頻発し、再構成が失敗する。
 \textbf{Difficulty with large integers.} Solver accuracy collapses to near zero for
-$|x| \geq 10^{20}$ (Huge and Astronomical buckets). The bottleneck is insufficient Modulo
-prediction accuracy: CRT-based reconstruction requires \emph{exact} residues for multiple
-moduli simultaneously, and with MMA at approximately 50\%, residue errors are frequent enough
-to cause reconstruction failure even in the CRT mode (Top-1 = 0.09\%).
+$|x| \geq 10^{20}$ (Huge and Astronomical buckets): CRT-based reconstruction requires
+\emph{exact} residues for multiple moduli simultaneously, and errors are frequent enough
+at MMA$\approx$50\% to cause failure (Top-1 = 0.09\% in CRT mode).
+Approximately 13\% of IntSeqBERT Solver calls return no valid candidate (\texttt{none} mode),
+primarily due to CRT failures; approximate CRT or relaxed residue constraints are a natural remedy.
 
-% 有効候補率の低下。IntSeqBERT の Solver 呼び出しの約 13% で有効候補が返らない（mode = none）。
-% 主に CRT 失敗が原因。残差制約の緩和や近似 CRT の利用など Solver のフォールバック戦略の改善で
-% 一部を回収できる可能性がある。
-\textbf{Low valid-candidate rate.} Approximately 13\% of IntSeqBERT Solver calls return no
-valid candidate (\texttt{none} mode), primarily due to CRT failures. Recovery may be possible
-by relaxing residue constraints or adopting approximate CRT in Solver fallback strategies.
-
-% データセットバイアス。OEIS の収録数列は nonn（非負・非全零）タグを持つものが多数を占める。
-% 符号精度 98.54% という高い値の一部はこのバイアスに起因し、負の整数を多く含む数列に対しての
-% 評価では下振れる可能性がある。
-% 値が極めて大きい数列（天文学的バケット）は相対的に少数であり、そのバケットでのメトリクスは
-% 少数サンプルで算出されている点にも留意が必要である。
-\textbf{Dataset bias.} OEIS sequences are predominantly non-negative
-(tagged \texttt{nonn}\hspace{0pt}). Our training and test data inherit this
-distribution, so the high sign accuracy (98.54\%) may partially reflect this
-bias and could degrade on sequences with many negative terms.
-Additionally, Astronomical-bucket metrics are based on a small number of samples and should
-be interpreted with caution.
+\textbf{Dataset bias.} OEIS sequences are predominantly non-negative (\texttt{nonn}).
+The high sign accuracy (98.54\%) may partially reflect this bias.
+Astronomical-bucket metrics are based on few samples and should be interpreted with caution.

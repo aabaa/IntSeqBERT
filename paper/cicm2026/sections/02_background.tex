@@ -16,44 +16,15 @@
 % 317,206,375 を先取りした Candelas らの事例 [cite:candelas1991] はその典型例である。
 % このように、数列の類似性・数値パターンの観察は新たな数学的発見の源泉となり得る。
 % AIがこのプロセスを大規模に自動化できれば、未知の数学的予想候補の発見に貢献できる可能性がある。
-Throughout the history of mathematics, observing numerical similarities among sequence
-coefficients has seeded important conjectures. Landmark examples include the Monstrous
-Moonshine conjecture~\cite{conway1979monstrous}, the BSD conjecture motivated by numerical
-experiments on ranks of elliptic curves~\cite{birch1965}, the proof of Fermat's Last Theorem
-via the Shimura--Taniyama conjecture~\cite{wiles1995}, and Candelas et al.'s prediction of
-317,206,375 rational curves of degree~3 from mirror symmetry~\cite{candelas1991}.
-Numerical pattern observation can thus serve as a source of mathematical discovery; automating
-this process at scale with AI could contribute to finding new conjectural candidates.
-
-% 近年、数学の各分野においてAIの活用が急速に進んでいる。
-% 問題解決・証明の方面では、DeepMind の AlphaGeometry [cite:trinh2024alphageometry]（Nature 2024）
-% は IMO 幾何問題を高精度で自動解法し、AlphaProof [cite:alphaproof2024]（2024）は Lean 形式証明
-% として IMO 2024 の 6 問中 4 問を解決した。形式化の方面では、Urban らが推進する Autoformalization
-% 研究 [cite:urban-autoformalization] が著しい発展を遂げており、自然言語の数学的記述を機械検証可能な
-% 形式へ自動変換する技術が現実のものとなりつつある。
-% 数値パターンからの予想自動生成という観点では Ramanujan Machine [cite:raayoni2021ramanujan]
-% （Raayoni et al., Nature 2021）が特筆される。また FunSearch [cite:romera2023funsearch]
-% （Romera-Paredes et al., Nature 2023）は大規模言語モデルと進化的探索を組み合わせ、cap set 問題
-% において既知の上界を超える新構成を発見した。
-Recent years have seen rapid progress in AI for mathematics.
-On problem-solving and proof, AlphaGeometry~\cite{trinh2024alphageometry} automatically solves
-IMO geometry problems at high accuracy, and AlphaProof~\cite{alphaproof2024} resolved four of
-six problems at IMO 2024 in Lean formal proofs.
-On formalisation, Urban's autoformalization research~\cite{urban-autoformalization} is
-advancing towards automatic translation of mathematical text into machine-verifiable form.
-On conjecture generation from numerical patterns, the Ramanujan Machine~\cite{raayoni2021ramanujan}
-automatically conjectures continued-fraction identities for fundamental constants such as $\pi$
-and $e$, with some subsequently proved by mathematicians.
-FunSearch~\cite{romera2023funsearch} combines large language models with evolutionary search to
-discover constructions exceeding known bounds for the cap-set problem.
-
-% これらの成果は AI による数学的発見の現実性を示す重要な先例であるが、上で見たような「数列のパターン
-% 観察から法則抽出へ」というプロセスを多様な整数数列に対して大規模に自動化する技術は依然として
-% 開拓途上であり、本研究はその基盤となる表現学習の確立を目指す。
-While these achievements demonstrate the viability of AI-driven mathematical discovery, the
-process of automatically extracting laws from numerical sequence patterns across diverse
-mathematical domains remains largely unexplored. This work aims to establish the representational
-foundations for such a capability.
+Throughout the history of mathematics, numerical pattern observation has seeded important
+conjectures---from the Monstrous Moonshine conjecture~\cite{conway1979monstrous} and the BSD
+conjecture~\cite{birch1965} to Candelas et al.'s mirror-symmetry prediction of 317,206,375
+rational curves of degree~3~\cite{candelas1991}.
+Recent AI systems---AlphaGeometry~\cite{trinh2024alphageometry}, AlphaProof~\cite{alphaproof2024},
+the Ramanujan Machine~\cite{raayoni2021ramanujan}, and FunSearch~\cite{romera2023funsearch}---%
+demonstrate the viability of AI-driven mathematical discovery. Automatically extracting
+arithmetic laws from integer sequence patterns at scale remains, however, largely unexplored;
+this work aims to establish representational foundations for that capability.
 
 \subsection{AI Research on OEIS}
 \label{sec:background:oeis}
@@ -65,38 +36,15 @@ foundations for such a capability.
 % プログラムを自動生成することに成功した。また Learning Conjecturing from Scratch
 % [cite:gauthier2025conjecturing]（AITP 2025）では帰納的予想を自動生成する自己学習型フィードバック
 % 手法を提案し、5,565 件の問題を自動証明している。
-Urban et al.'s Alien Coding~\cite{urban-alien-coding} proposes a program-synthesis framework
-that, given an OEIS sequence, searches for the shortest code reproducing it.
-Follow-up work QSynt~\cite{gauthier2023qsynt} by Gauthier and Urban introduces efficient
-program synthesis via self-learning tree search, successfully generating programs for 43,516
-OEIS sequences.
-Learning Conjecturing from Scratch~\cite{gauthier2025conjecturing} further proposes a
-self-learning feedback method for inductive conjecture generation, automatically proving 5,565
-arithmetic problems.
-
-% FACT [cite:zurich-fact]（Belčák et al., NeurIPS 2022）は OEIS を対象とした包括的ベンチマークを
-% 構築した研究である。分類・類似度・部分列予測・次項外挿・穴埋め・継続の 6 タスクを定義し、
-% MLP・RNN・CNN・Transformer の各ベースラインで評価している。
-% FACT が報告する主要な知見として、穴埋めタスクは 6 タスク中で最も難しく、オーガニックな OEIS 数列
-% では特にモデル間の性能差が顕著である。
-% 本研究はこの穴埋めタスクを主要目標として直接取り組む。本研究の Vanilla ベースラインは FACT の素の
-% Transformer アプローチに対応し、IntSeqBERT はその上に Modulo 特徴量エンジニアリングと FiLM 融合
-% を加えて穴埋め精度の大幅な向上を目指す。
-FACT~\cite{zurich-fact} (Bel\v{c}\'{a}k et al., NeurIPS 2022) constructs a comprehensive
-benchmark on OEIS, defining six tasks---classification, similarity, sequence-part prediction,
-next-element extrapolation, \emph{unmasking}, and continuation---and evaluating MLP, RNN, CNN,
-and Transformer baselines. A key finding is that the unmasking task is the most challenging of
-the six. This work directly targets unmasking as its primary objective. Our Vanilla baseline
-corresponds to FACT's plain Transformer, and IntSeqBERT builds upon it with Modulo feature
-engineering and FiLM fusion to substantially improve unmasking accuracy.
-
-% Alien Coding はプログラム合成によって数列生成規則を明示的に記述しようとするのに対し、FACT および
-% 本研究は表現学習に立脚する。FACT が「素の Transformer で何が達成できるか」を明らかにしたのに対し、
-% 本研究は「特徴量エンジニアリングによってその限界をどこまで押し上げられるか」を問う。
-While Alien Coding aims to explicitly describe the generation rule for each individual sequence
-via program synthesis, FACT and this work are grounded in representation learning. Where FACT
-established what a plain Transformer can achieve, this work asks how far feature engineering
-can push that frontier.
+Program-synthesis approaches to OEIS include Alien Coding~\cite{urban-alien-coding},
+which searches for the shortest reproducing code; QSynt~\cite{gauthier2023qsynt}, which
+synthesises programs for 43,516 sequences via self-learning tree search; and Learning
+Conjecturing~\cite{gauthier2025conjecturing}, which automatically proves 5,565 arithmetic problems.
+FACT~\cite{zurich-fact} (Bel\v{c}\'{a}k et al., NeurIPS 2022) constructs a comprehensive OEIS
+benchmark covering six tasks---including \emph{unmasking}, identified as the hardest.
+Our Vanilla baseline corresponds to FACT's plain Transformer; IntSeqBERT extends it with
+Modulo feature engineering and FiLM fusion to overcome FACT's limitations with large integers
+and multiplicative structure.
 
 \subsection{Deep Learning and Arithmetic: Spectral Bias}
 \label{sec:background:spectral}
@@ -155,15 +103,11 @@ structure broadly across primes and composites.
 % FiLM（Feature-wise Linear Modulation）[cite:perez2018film] は Visual QA において視覚特徴を
 % 言語特徴で動的に変調するために提案された手法であり、本研究では Modulo ストリームによる Magnitude
 % ストリームの変調として再利用する。
-Approaches to neural number representation include (i)~tokenisation, the LLM mainstream, which
-cannot handle out-of-vocabulary values and buries arithmetic structure in opaque token IDs;
-(ii)~log-scale continuous embeddings, which improve scale invariance but cannot capture
-arithmetic periodicity; and (iii)~sinusoidal embeddings, as used for positional encoding in
-Transformers~\cite{vaswani2017attention}, which exploit periodicity. In this work we repurpose
-sinusoidal embeddings from \emph{positions} to \emph{modular residues of values}.
-FiLM~\cite{perez2018film}, originally proposed for conditioning visual features on language
-features in visual QA, is reused here to modulate the Magnitude stream via the Modulo stream,
-allowing arithmetic periodicity to condition continuous-value regression.
+Tokenisation~(the LLM mainstream) cannot handle out-of-vocabulary values and buries
+arithmetic structure in opaque token IDs. Log-scale continuous embeddings improve scale
+invariance but miss arithmetic periodicity. We instead repurpose sinusoidal
+embeddings~\cite{vaswani2017attention} from positions to \emph{modular residues of values},
+and apply FiLM~\cite{perez2018film} to modulate the Magnitude stream via the Modulo stream.
 
 \subsection{Positioning of This Work}
 \label{sec:background:position}
@@ -177,15 +121,8 @@ allowing arithmetic periodicity to condition continuous-value regression.
 %   これらの限界を克服する。
 % - 双ストリーム設計は、「数値パターン観察から法則抽出へ」という数学的知識獲得プロセスを
 %   アーキテクチャレベルで実装したものとも見なせる。
-In summary, the contribution of this work can be positioned as follows.
-While the Urban group's programme of Alien Coding~\cite{urban-alien-coding},
-QSynt~\cite{gauthier2023qsynt}, and Learning Conjecturing~\cite{gauthier2025conjecturing}
-aims at \emph{program synthesis} and conjecture generation for individual sequences,
-this work pursues \emph{representation learning} to acquire, in a shared latent space,
-the arithmetic structure common to the entire OEIS corpus.
-Where FACT~\cite{zurich-fact} identified the limits of a plain tokenised Transformer
-(out-of-vocabulary values, scale collapse, failure to learn multiplicative structure),
-this work overcomes those limits by adding Modulo-spectrum feature engineering and FiLM fusion.
-The resulting dual-stream design can also be viewed as an architectural implementation of the
-mathematical knowledge-acquisition process of moving from numerical-pattern observation to
-law extraction, as described in Section~\ref{sec:background:ai-math}.
+In contrast to the Urban group's program-synthesis line~\cite{urban-alien-coding,gauthier2023qsynt,gauthier2025conjecturing},
+which explicitly describes each sequence's generation rule, this work uses \emph{representation
+learning} to acquire shared arithmetic structure across the OEIS corpus.
+Where FACT~\cite{zurich-fact} identified the limits of a plain tokenised Transformer,
+IntSeqBERT overcomes them via Modulo-spectrum feature engineering and FiLM fusion.

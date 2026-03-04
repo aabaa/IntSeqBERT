@@ -187,21 +187,12 @@ but with independent parameters. The total output dimension is $\sum_{m=2}^{101}
 % L_mod: 100 個の Modulo ヘッドのクロスエントロピーの平均（log m 正規化）：
 %   L_mod = (1/100) Σ_{m=2}^{101} (1/log m) L_CE^(m)
 % すべての損失はマスク位置のみで計算する。
-The multi-task loss is:
-\[
-  \mathcal{L} = w_{\text{mag}}\,\mathcal{L}_{\text{mag}}
-              + w_{\text{sign}}\,\mathcal{L}_{\text{sign}}
-              + w_{\text{mod}}\,\mathcal{L}_{\text{mod}},
-\]
-with $w_{\text{mag}} = 1.0$, $w_{\text{sign}} = 1.0$, $w_{\text{mod}} = 2.0$ (fixed; adaptive
-weighting based on uncertainty caused instability in preliminary experiments).
-$\mathcal{L}_{\text{mag}}$ is Huber loss (Smooth L1) between $\hat{v}_i$ and $v_i$.
-$\mathcal{L}_{\text{sign}}$ is cross-entropy over three sign classes.
-$\mathcal{L}_{\text{mod}}$ is the mean cross-entropy of the 100 Modulo heads, normalised by
-$\log m$ to correct for varying numbers of classes:
-\[
-  \mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}\frac{1}{\log m}\,\mathcal{L}_{\text{CE}}^{(m)}.
-\]
+The multi-task loss is $\mathcal{L} = \mathcal{L}_{\text{mag}} + \mathcal{L}_{\text{sign}} + 2\,\mathcal{L}_{\text{mod}}$
+(weights fixed; adaptive weighting caused instability).
+$\mathcal{L}_{\text{mag}}$ is Huber loss; $\mathcal{L}_{\text{sign}}$ is cross-entropy over
+three sign classes; $\mathcal{L}_{\text{mod}}$ is the mean cross-entropy of the 100 Modulo
+heads, normalised by $\log m$: $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
+\frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$.
 All losses are computed only at masked positions.
 
 \subsection{Baselines}
@@ -259,14 +250,7 @@ CRT      & $\Delta n > 10^{14}$                   & Sparse CRT beam search to ge
 When the sign prediction is zero, the Solver immediately returns 0. If no valid candidate is
 found in the search range, the call is recorded as \texttt{none}.
 
-Each candidate $n$ is scored as a weighted sum of the Magnitude term and the log-probabilities
-over all moduli:
-\[
-  \text{score}(n) =
-  -\frac{(v_n - \mu_i)^2}{2\sigma_i^2}
-  + 0.3 \cdot \sum_{m=2}^{101} \log P\!\left(n \bmod m\right),
-\]
-where $v_n = 1 + \log_{10}|n|$ ($n \neq 0$) or $0$ ($n = 0$). The coefficient 0.3 is an
-empirical hyperparameter that suppresses score inflation due to information overlap between
-composite and prime moduli. The top $k$ candidates are returned and evaluated as
-Solver Top-$k$ accuracy (Section~\ref{sec:solver-eval}).
+Each candidate $n$ is scored by
+$\text{score}(n) = -(v_n - \mu_i)^2/(2\sigma_i^2) + 0.3\sum_{m}\log P(n \bmod m)$;
+the coefficient 0.3 suppresses score inflation from moduli sharing prime factors.
+The top $k$ candidates are returned and evaluated as Solver Top-$k$ (Section~\ref{sec:solver-eval}).
