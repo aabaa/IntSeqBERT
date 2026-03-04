@@ -46,9 +46,11 @@ which searches for the shortest reproducing code; QSynt~\cite{gauthier2023qsynt}
 synthesises programs for 43,516 sequences via self-learning tree search; and Learning
 Conjecturing~\cite{gauthier2025conjecturing}, which automatically proves 5,565 arithmetic problems.
 FACT~\cite{zurich-fact} (Bel\v{c}\'{a}k et al., NeurIPS 2022) constructs a comprehensive OEIS
-benchmark covering six tasks---including \emph{unmasking}, identified as the hardest.
+benchmark covering six tasks in order of difficulty---classification, similarity,
+sequence-part prediction, next-element extrapolation, continuation, and
+\emph{unmasking} (identified as the hardest).
 Our Vanilla baseline corresponds to FACT's plain Transformer; IntSeqBERT extends it with
-Modulo feature engineering and FiLM fusion to overcome FACT's limitations with large integers
+modulo feature engineering and FiLM fusion to overcome FACT's limitations with large integers
 and multiplicative structure.
 
 \subsection{Modulo Spectra as Arithmetic Feature Engineering}
@@ -68,7 +70,7 @@ sequences, this is particularly problematic for multiplicatively growing sequenc
 (e.g., $n^2$, $n!$), where learning the growth law from token sequences alone requires
 many layers.
 This work mitigates the problem through feature engineering: because the results of
-multiplication appear naturally in modular residues, supplying the Modulo spectrum as explicit
+multiplication appear naturally in modular residues, supplying the modulo spectrum as explicit
 input features reduces the network depth required to ``rediscover'' multiplicative structure.
 
 % OEIS に収録される数列の大部分は、加減乗算と剰余操作を組み合わせた有限アルゴリズムによって生成
@@ -84,9 +86,9 @@ Fermat's little theorem implies that $(a^n \bmod p)$ is periodic with period div
 for prime $p$ with $\gcd(a,p)=1$. Gauss's law of quadratic
 reciprocity~\cite{gauss-reciprocity} and its generalisations further link residue information
 across different primes.
-Composite moduli simultaneously retain information from all prime power factors via the Chinese
-Remainder Theorem (CRT), motivating the use of both prime and composite moduli in our spectrum.
-Our Modulo features cover $m \in \{2, 3, \ldots, 101\}$ (100 moduli), capturing power-residue
+Composite moduli simultaneously retain information from all prime power factors via CRT,
+motivating the use of both prime and composite moduli in our spectrum.
+Our modulo features cover $m \in \{2, 3, \ldots, 101\}$ (100 moduli), capturing power-residue
 structure broadly across primes and composites.
 
 \subsection{Positioning and Neural Representations}
@@ -105,7 +107,7 @@ Tokenisation~(the LLM mainstream) cannot handle out-of-vocabulary values and bur
 arithmetic structure in opaque token IDs. Log-scale continuous embeddings improve scale
 invariance but miss arithmetic periodicity. We instead repurpose sinusoidal
 embeddings~\cite{vaswani2017attention} from positions to \emph{modular residues of values},
-and apply FiLM~\cite{perez2018film} to modulate the Magnitude stream via the Modulo stream.
+and apply FiLM~\cite{perez2018film} to modulate the magnitude stream via the modulo stream.
 
 
 % 以上を踏まえると、本研究の貢献は次のように整理される：
@@ -121,4 +123,4 @@ In contrast to the Urban group's program-synthesis line~\cite{urban-alien-coding
 which explicitly describes each sequence's generation rule, this work uses \emph{representation
 learning} to acquire shared arithmetic structure across the OEIS corpus.
 Where FACT~\cite{zurich-fact} identified the limits of a plain tokenised Transformer,
-IntSeqBERT overcomes them via Modulo-spectrum feature engineering and FiLM fusion.
+IntSeqBERT overcomes them via modulo-spectrum feature engineering and FiLM fusion.
