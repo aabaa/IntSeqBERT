@@ -24,10 +24,10 @@
 %% Title and authors
 %% -----------------------------------------------------------------------
 
-\title{IntSeqBERT: Dual-Stream Masked Modelling for Integer Sequences
-       via Magnitude and Modular Arithmetic Embeddings}
+\title{IntSeqBERT: Learning Arithmetic Structure in OEIS
+       via Modulo-Spectrum Embeddings}
 
-\titlerunning{IntSeqBERT: Dual-Stream Masked Modelling for Integer Sequences}
+\titlerunning{IntSeqBERT: Learning Arithmetic Structure in OEIS}
 
 \author{Kazuhisa Nakasho\inst{1}}
 
@@ -69,7 +69,7 @@ At the Large scale (91.5M parameters), IntSeqBERT achieves 95.85\% Magnitude acc
 Transformer baseline by $+8.9$\,pt and $+4.5$\,pt, respectively. An ablation removing the
 Modulo stream confirms it accounts for $+15.2$\,pt of the MMA gain and contributes an
 additional $+6.2$\,pt to Magnitude accuracy. A CRT-based IntegerSolver converts the model's
-predictions into concrete integers, yielding a 7.4$\times$ improvement in next-term prediction
+predictions into concrete integers, yielding a 7.4-fold improvement in next-term prediction
 (Top-1: 19.09\% vs.\ 2.59\%). Modulo spectrum analysis reveals a strong negative correlation
 between Normalised Information Gain (NIG) and Euler's totient ratio $\varphi(m)/m$
 ($r = -0.851$, $p < 10^{-28}$), providing empirical evidence that composite moduli capture
@@ -97,12 +97,11 @@ OEIS arithmetic structure more efficiently via CRT aggregation.
 
 \begin{credits}
 \subsubsection{\ackname}
-% TODO: fill in acknowledgements (or remove if none)
-% This work was supported by ...
+This work was supported by JSPS KAKENHI Grant Number JP24K14897.
 
-\subsubsection{\discintname}
-The authors have no competing interests to declare that are relevant to the content of this
-article.
+% \subsubsection{\discintname}
+% The authors have no competing interests to declare that are relevant to the content of this
+% article.
 \end{credits}
 
 %% -----------------------------------------------------------------------
