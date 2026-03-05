@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/make_arxiv.sh)"
+    ]
+  }
+}
