@@ -37,7 +37,7 @@ that the Solver receives at least 9 terms of preceding context (Section~\ref{sec
 % スケール別評価のため、u = log10(|x|) (x≠0), u=0 (x=0) に基づく 5 つの Magnitude バケットを定義：
 For scale-stratified evaluation, we define five magnitude buckets by value range:
 
-\begin{table}[t]
+\begin{table}[htbp]
 \caption{Magnitude buckets used for scale-stratified evaluation.}
 \label{tab:buckets}
 \centering
@@ -74,7 +74,7 @@ Some OEIS values reach $|x| \approx 10^{210}$, causing FP16 overflow; all comput
 therefore conducted in FP32. All results are reported by applying the model trained for the
 fixed 200 epochs to the test set.
 
-\begin{table}[t]
+\begin{table}[htbp]
 \caption{Training hyperparameters (common to all models).}
 \label{tab:hyperparams}
 \centering

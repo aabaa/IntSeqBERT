@@ -96,7 +96,7 @@ Standard sinusoidal positional encodings are added to $\mathbf{e}_i$ before the 
 
 The overall architecture is illustrated in Fig.~\ref{fig:architecture}.
 
-\begin{figure}[t]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figures/fig1_architecture}
   \caption{IntSeqBERT architecture. The Dual-Stream Embedding block projects
@@ -123,7 +123,7 @@ The fused sequence $(\mathbf{e}_1, \ldots, \mathbf{e}_L)$ is processed by a stan
 Transformer encoder~\cite{vaswani2017attention} with Pre-Layer Normalisation~\cite{xiong2020layer}.
 Three model sizes are evaluated (Table~\ref{tab:models}):
 
-\begin{table}[t]
+\begin{table}[htbp]
 \caption{Model configurations.}
 \label{tab:models}
 \centering
@@ -198,7 +198,7 @@ The Solver derives the $3\sigma$ interval $[n_{\min}, n_{\max}]$ from the Magnit
 and dynamically selects one of three modes based on the search width
 $\Delta n = |n_{\max} - n_{\min}|$ (Table~\ref{tab:solver}).
 
-\begin{table}[t]
+\begin{table}[htbp]
 \caption{Solver operating modes.}
 \label{tab:solver}
 \centering
