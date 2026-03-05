@@ -156,7 +156,9 @@ The weight~2 on $\mathcal{L}_{\text{mod}}$ is intentionally set higher to emphas
 newly introduced modulo stream; adaptive weighting was attempted but caused training instability.
 $\mathcal{L}_{\text{mag}}$ is Huber loss; $\mathcal{L}_{\text{sign}}$ is cross-entropy over
 three sign classes; $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
-\frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$ normalises for varying class counts.
+\frac{1}{\ln m}\mathcal{L}_{\text{CE}}^{(m)}$, where $\mathcal{L}_{\text{CE}}^{(m)}$ is the
+cross-entropy loss of the $m$-class classifier for modulus $m$, normalised by $\ln m$
+(the maximum entropy of a uniform distribution over $m$ classes) to compensate for varying class counts.
 All losses are computed only at masked positions.
 
 \subsection{Baselines}

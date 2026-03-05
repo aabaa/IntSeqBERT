@@ -66,7 +66,13 @@ OEIS-based studies.
 \label{sec:training-config}
 
 % 全モデルで共通のハイパーパラメータ
-All models share the following hyperparameters (Table~\ref{tab:hyperparams}).
+% OEIS の値には |x| ≈ 10^{210} に達するものが存在し、生の値は FP16 で桁あふれするため
+% 全計算に FP32 を強制する。全結果は固定 200 エポック完了時の学習済みモデルをテストデータに
+% 適用して報告する。
+All models share the hyperparameters shown in Table~\ref{tab:hyperparams}).
+Some OEIS values reach $|x| \approx 10^{210}$, causing FP16 overflow; all computation is
+therefore conducted in FP32. All results are reported by applying the model trained for the
+fixed 200 epochs to the test set.
 
 \begin{table}[t]
 \caption{Training hyperparameters (common to all models).}
@@ -88,12 +94,6 @@ GPU                   & GeForce RTX 3070 Ti (8\,GB VRAM) $\times$ 1 \\
 \end{tabular}
 \end{table}
 
-% OEIS の値には |x| ≈ 10^{210} に達するものが存在し、生の値は FP16 で桁あふれするため
-% 全計算に FP32 を強制する。全結果は固定 200 エポック完了時の学習済みモデルをテストデータに
-% 適用して報告する。
-Some OEIS values reach $|x| \approx 10^{210}$, causing FP16 overflow; all computation is
-therefore conducted in FP32. All results are reported by applying the model trained for the
-fixed 200 epochs to the test set.
 
 \subsection{Evaluation Metrics}
 \label{sec:metrics}
