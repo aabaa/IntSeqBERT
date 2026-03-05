@@ -56,7 +56,7 @@ At the Large scale (91.5M parameters), IntSeqBERT achieves 95.85\% magnitude acc
 50.38\% Mean Modulo Accuracy (MMA) on the test set, outperforming a standard tokenised
 Transformer baseline by $+8.9$\,pt and $+4.5$\,pt, respectively. An ablation removing the
 modulo stream confirms it accounts for $+15.2$\,pt of the MMA gain and contributes an
-additional $+6.2$\,pt to magnitude accuracy. A probabilistic Chinese Remainder Theorem (CRT)-based IntegerSolver converts the model's
+additional $+6.2$\,pt to magnitude accuracy. A probabilistic Chinese Remainder Theorem (CRT)-based Solver converts the model's
 predictions into concrete integers, yielding a 7.4-fold improvement in next-term prediction
 over the tokenised-Transformer baseline (Top-1: 19.09\% vs.\ 2.59\%). Modulo spectrum analysis reveals a strong negative correlation
 between Normalised Information Gain (NIG) and Euler's totient ratio $\varphi(m)/m$
