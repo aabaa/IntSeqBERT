@@ -46,12 +46,13 @@ which searches for the shortest reproducing code; QSynt~\cite{gauthier2023qsynt}
 synthesises programs for 43,516 sequences via self-learning tree search; and Learning
 Conjecturing~\cite{gauthier2025conjecturing}, which automatically proves 5,565 arithmetic problems.
 FACT~\cite{zurich-fact} (Bel\v{c}\'{a}k et al., NeurIPS 2022) constructs a comprehensive OEIS
-benchmark covering six tasks in order of difficulty---classification, similarity,
-sequence-part prediction, next-element extrapolation, continuation, and
+benchmark covering five tasks in order of difficulty---classification, similarity,
+next sequence-part prediction, continuation, and
 \emph{unmasking} (identified as the hardest).
 Our Vanilla baseline corresponds to FACT's plain Transformer; IntSeqBERT extends it with
 modulo feature engineering and FiLM fusion to overcome FACT's limitations with large integers
-and multiplicative structure.
+and multiplicative structure. The Solver-based next-term prediction evaluated in
+Section~\ref{sec:solver-eval} corresponds to FACT's continuation task.
 
 \subsection{Modulo Spectra as Arithmetic Feature Engineering}
 \label{sec:background:modulo-engineering}
