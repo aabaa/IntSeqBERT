@@ -75,7 +75,7 @@ The two streams are fused via FiLM (Feature-wise Linear Modulation)~\cite{perez2
 During training, three predictors are jointly optimised in a multi-task objective: magnitude
 regression, sign classification, and modulo prediction for 100 moduli. Concrete integer values
 are recovered from the masked-position predictions (magnitude, sign, residue distributions)
-using a probabilistic Chinese Remainder Theorem (CRT)-based \textbf{IntegerSolver} (Section~\ref{sec:solver}).
+using a probabilistic Chinese Remainder Theorem (CRT)-based \textbf{Solver} (Section~\ref{sec:solver}).
 
 % 本研究では OEIS から抽出した274,705件のデータセットに対して、3 モデルサイズ（Small: ~9M・
 % Middle: ~44M・Large: ~110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。

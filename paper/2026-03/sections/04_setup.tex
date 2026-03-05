@@ -35,22 +35,21 @@ terms (mean 42.5). After truncation, all model inputs satisfy $L \le 128$, while
 that the Solver receives at least 9 terms of preceding context (Section~\ref{sec:solver-eval}).
 
 % スケール別評価のため、u = log10(|x|) (x≠0), u=0 (x=0) に基づく 5 つの Magnitude バケットを定義：
-For scale-stratified evaluation, we define five Magnitude buckets based on $u = \log_{10}|x|$
-($u = 0$ when $x = 0$):
+For scale-stratified evaluation, we define five magnitude buckets by value range:
 
 \begin{table}[t]
 \caption{Magnitude buckets used for scale-stratified evaluation.}
 \label{tab:buckets}
 \centering
-\begin{tabular}{llll}
+\begin{tabular}{lll}
 \hline
-Bucket       & Range of $u$           & Typical value range             & Element fraction \\
+Bucket       & Value range                     & Element fraction \\
 \hline
-Small        & $u < 2$                & $|x| < 10^2$                    & 52.7\%           \\
-Medium       & $2 \leq u < 5$         & $10^2 \leq |x| < 10^5$          & 29.9\%           \\
-Large        & $5 \leq u < 20$        & $10^5 \leq |x| < 10^{20}$       & 16.2\%           \\
-Huge         & $20 \leq u < 50$       & $10^{20} \leq |x| < 10^{50}$    &  1.1\%           \\
-Astronomical & $u \geq 50$            & $|x| \geq 10^{50}$              &  0.0\%           \\
+Small        & $|x| < 10^2$                    & 52.7\%           \\
+Medium       & $10^2 \leq |x| < 10^5$          & 29.9\%           \\
+Large        & $10^5 \leq |x| < 10^{20}$       & 16.2\%           \\
+Huge         & $10^{20} \leq |x| < 10^{50}$    &  1.1\%           \\
+Astronomical & $|x| \geq 10^{50}$              &  0.0\%           \\
 \hline
 \end{tabular}
 \end{table}

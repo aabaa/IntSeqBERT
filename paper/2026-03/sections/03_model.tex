@@ -60,14 +60,14 @@ a point on the unit circle:
   \phi_m(r) = \left[\sin\!\left(\tfrac{2\pi r}{m}\right),\;\cos\!\left(\tfrac{2\pi r}{m}\right)\right] \in \mathbb{R}^2.
 \]
 Concatenating all 100 moduli gives $\mathbf{f}_i^{\text{mod}} \in \mathbb{R}^{200}$.
-This Sin/Cos embedding is equivariant to the group structure of $\mathbb{Z}/m\mathbb{Z}$ and
+This sin/cos embedding is equivariant to the group structure of $\mathbb{Z}/m\mathbb{Z}$ and
 avoids discontinuities at wrap-around boundaries.
 
 % 2 つの特徴ベクトルは独立した射影層でモデルの隠れ次元 d に写像される。
 % Magnitude 側に 2 層 MLP を用いる：
 % h_i^mag = MLP_mag(f_i^mag),  h_i^mod = W_mod f_i^mod + b_mod,  h_i^mag, h_i^mod ∈ R^d.
 The two feature vectors are projected to the model hidden dimension $d$ by independent
-projection layers (two-layer MLP for Magnitude; linear for Modulo):
+projection layers (two-layer MLP for magnitude; linear for modulo):
 \[
   \mathbf{h}_i^{\text{mag}} = \mathrm{MLP}_{\text{mag}}\!\left(\mathbf{f}_i^{\text{mag}}\right),
   \quad
@@ -82,7 +82,7 @@ projection layers (two-layer MLP for Magnitude; linear for Modulo):
 % Modulo 側の射影後に ReLU を適用し、さらに FiLM 前にドロップアウトを入れる。
 % この定式化により、算術的周期性がパラメータ効率よく連続値の Magnitude 表現を条件付けることができる。
 % エンコーダへの入力前に、e_i に標準的な Sin/Cos 位置エンコーディングを加算する。
-The two streams are fused by FiLM~\cite{perez2018film}: the Modulo embedding generates
+The two streams are fused by FiLM~\cite{perez2018film}: the modulo embedding generates
 element-wise scale $\boldsymbol{\gamma}_i$ and shift $\boldsymbol{\beta}_i$:
 \[
   \boldsymbol{\gamma}_i = W_\gamma\,\mathbf{h}_i^{\text{mod}},
@@ -108,7 +108,7 @@ The overall architecture is illustrated in Fig.~\ref{fig:architecture}.
            Three prediction heads produce
            $\hat{v},\hat{\sigma}^2\!\in\!\mathbb{R}$ (magnitude regression),
            $\hat{s}\!\in\!\{+,-,0\}$ (sign classification), and
-           $\hat{r}^{(m)}\!\in\!\{0,\ldots,m{-}1\}$ ($100\times$ Modulo classification).}
+           $\hat{r}^{(m)}\!\in\!\{0,\ldots,m{-}1\}$ ($100\times$ modulo classification).}
   \label{fig:architecture}
 \end{figure}
 
@@ -153,7 +153,7 @@ output dimension $\sum_{m=2}^{101}m = 5{,}150$.
 % L_mod = (1/100) Σ (1/log m) L_CE^(m)（log m 正規化）
 The multi-task loss is $\mathcal{L} = \mathcal{L}_{\text{mag}} + \mathcal{L}_{\text{sign}} + 2\,\mathcal{L}_{\text{mod}}$.
 The weight~2 on $\mathcal{L}_{\text{mod}}$ is intentionally set higher to emphasise the
-newly introduced Modulo stream; adaptive weighting was attempted but caused training instability.
+newly introduced modulo stream; adaptive weighting was attempted but caused training instability.
 $\mathcal{L}_{\text{mag}}$ is Huber loss; $\mathcal{L}_{\text{sign}}$ is cross-entropy over
 three sign classes; $\mathcal{L}_{\text{mod}} = \frac{1}{100}\sum_{m=2}^{101}
 \frac{1}{\log m}\mathcal{L}_{\text{CE}}^{(m)}$ normalises for varying class counts.
@@ -174,11 +174,11 @@ embeddings. The vocabulary size 20,003 was chosen so that memory consumption mat
 IntSeqBERT under the 8\,GB VRAM constraint. The prior benchmark FACT~\cite{zurich-fact}
 handles values up to several million, presupposing larger compute resources than our setting.
 
-\textbf{Ablation (Magnitude-only)} is identical to IntSeqBERT but uses only the Magnitude
+\textbf{Ablation (Magnitude-only)} is identical to IntSeqBERT but uses only the magnitude
 stream; the FiLM module is removed and $\mathbf{e}_i = \mathbf{h}_i^{\text{mag}}$. This
 isolates the contribution of the Modulo stream.
 
-\subsection{IntegerSolver}
+\subsection{Solver}
 \label{sec:solver}
 
 % Solver はまず、Magnitude 予測から 3σ 区間 [n_min, n_max] を導出し、探索範囲の広さ Δn に応じて
@@ -188,13 +188,13 @@ isolates the contribution of the Modulo stream.
 %   score(n) = -(v_n - μ_i)^2 / (2σ_i^2) + 0.3 × Σ_{m=2}^{101} log P(n mod m)
 %   係数 0.3 は法間の情報重複でスコアが過大になりやすいことを抑えるための経験的ハイパーパラメータ。
 % 上位 k 件の候補を返し、Solver Top-k として評価する。
-The pre-trained model outputs Magnitude $(\mu_i, \log \sigma_i^2)$, sign, and Modulo
-distributions at masked positions. \textbf{IntegerSolver} recovers concrete integers from these
+The pre-trained model outputs magnitude $(\mu, \log \sigma^2)$, sign, and modulo
+distributions at masked positions. \textbf{Solver} recovers concrete integers from these
 predictions.
 
 The Solver derives the $3\sigma$ interval $[n_{\min}, n_{\max}]$ from the Magnitude prediction
 and dynamically selects one of three modes based on the search width
-$\Delta n = |n_{\max} - n_{\min}|$:
+$\Delta n = |n_{\max} - n_{\min}|$.
 
 \begin{table}[t]
 \caption{Solver operating modes.}
@@ -216,7 +216,7 @@ found in the search range, the call is recorded as \texttt{none}.
 
 Each candidate $n$ is scored by $\text{score}(n) = \alpha_{\text{mag}} + 0.3\,\alpha_{\text{mod}}$,
 where $\alpha_{\text{mag}} = -(v_n-\mu_i)^2/(2\sigma_i^2)$ and
-$\alpha_{\text{mod}} = \sum_{m}\log P(n\bmod m)$.
+$\alpha_{\text{mod}} = \sum_{m}\ln P(n\bmod m)$.
 The coefficient 0.3 approximates the proportion of primes between 2 and 101
 ($26/100 = 0.26$), compensating for the information overlap among composite moduli
 that share prime factors.
