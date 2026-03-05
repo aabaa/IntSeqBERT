@@ -12,12 +12,12 @@
 % Modulo ストリームと FiLM 融合の効果を単独で定量化するため、全 3 スケールにわたって IntSeqBERT と
 % Magnitude-only のアブレーションモデルを比較する。
 % 表4 に Large 設定における差分をまとめる。
-To isolate the contribution of the Modulo stream and FiLM fusion, we compare IntSeqBERT with
-the Magnitude-only Ablation model. As seen in Table~\ref{tab:main}, the Modulo stream
-delivers the largest gains in Modulo prediction (MMA $+15.2$\,pt, parity $+13.5$\,pt at Large
-scale). Its contribution to Magnitude prediction is smaller but significant (Acc$_{0.5}$
+To isolate the contribution of the modulo stream and FiLM fusion, we compare IntSeqBERT with
+the magnitude-only Ablation model. As seen in Table~\ref{tab:main}, the modulo stream
+delivers the largest gains in modulo prediction (MMA $+15.2$\,pt, parity $+13.5$\,pt at Large
+scale). Its contribution to magnitude prediction is smaller but significant (Acc$_{0.5}$
 $+6.2$\,pt, MSE $-0.228$), consistent with the intuition that knowing $x_i \bmod m$ for
-$m \in \{2,\ldots,101\}$ substantially constrains the set of plausible Magnitude values.
+$m \in \{2,\ldots,101\}$ substantially constrains the set of plausible magnitude values.
 Solver accuracy improves by $+7.3$\,pt, primarily because more accurate residue information
 refines scoring in Dense and Sieve modes.
 
@@ -30,10 +30,10 @@ refines scoring in Dense and Sieve modes.
 % これは剰余算術がより合成的であり、表現容量の増加からより多くの恩恵を受けやすいという直観と整合する。
 % Solver Top-1 精度も Modulo 精度の傾向に追随して一貫した改善を示す（+5.0pt）。
 Table~\ref{tab:scale_trend} shows how IntSeqBERT's metrics improve with model size.
-Magnitude accuracy improves only modestly from Small to Large ($+1.1$\,pt), whereas Modulo
+Magnitude accuracy improves only modestly from Small to Large ($+1.1$\,pt), whereas modulo
 accuracy improves substantially ($+10.0$\,pt). This is consistent with the intuition that
 modular arithmetic is more compositional and thus benefits more from increased representational
-capacity. Solver Top-1 accuracy follows the Modulo trend with consistent improvement ($+5.0$\,pt).
+capacity. Solver Top-1 accuracy follows the modulo trend with consistent improvement ($+5.0$\,pt).
 
 \begin{table}[htbp]
 \caption{IntSeqBERT scaling: test-split metrics (Small / Middle / Large).}
@@ -55,7 +55,7 @@ Magnitude MSE       &  0.228 &  0.164 &  0.142 & $-0.086$\\
 % 表5 の傾向は図3 にも可視化されており、Modulo 精度と Magnitude 精度のスケーリング幅の差異が
 % 折れ線グラフで対比的に示される。
 The trends in Table~\ref{tab:scale_trend} are visualised in Fig.~\ref{fig:scaling}, which
-contrasts the differential scaling of Modulo and Magnitude accuracy across model sizes.
+contrasts the differential scaling of modulo and magnitude accuracy across model sizes.
 
 \begin{figure}[htbp]
   \centering

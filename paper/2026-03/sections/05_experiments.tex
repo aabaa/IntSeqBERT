@@ -21,8 +21,8 @@ consistently outperforms both baselines on all scales and metrics. At the Large 
 IntSeqBERT surpasses the Vanilla baseline by $+8.9$\,pt in Mag Acc and $+4.5$\,pt in MMA.
 The Ablation model shows the largest MMA drop at Large scale ($-15.2$\,pt), directly
 quantifying the contribution of the arithmetic-periodicity features. Notably, the Ablation
-maintains non-trivial Mag Acc, but the remaining gap confirms that Modulo information contributes
-meaningfully to magnitude regression as well, while being essential for Modulo prediction.
+maintains non-trivial Mag Acc, but the remaining gap confirms that modulo information contributes
+meaningfully to magnitude regression as well, while being essential for modulo prediction.
 
 \begin{table}[htbp]
 \caption{Test results. Mag Acc = Accuracy$_{0.5}$ (\%), Sign Acc (\%), MMA = Mean Modulo
@@ -80,8 +80,8 @@ set for Large models. The Vanilla model suffers catastrophic degradation in the 
 absorbed into the \texttt{UNK} token. IntSeqBERT achieves the best MSE in all buckets except
 Small, with particularly pronounced advantage at Medium and above. The Ablation degrades in the
 Medium bucket without Modulo context (MSE = 0.116 vs.\ IntSeqBERT 0.051), and collapses more
-severely in the Huge and Astronomical buckets, indicating that FiLM modulation by the Modulo
-stream acts as an arithmetic structural constraint on Magnitude estimation for large integers.
+severely in the Huge and Astronomical buckets, indicating that FiLM modulation by the modulo
+stream acts as an arithmetic structural constraint on magnitude estimation for large integers.
 
 \begin{table}[htbp]
 \caption{Scale-stratified MSE on the test set (Large models). Lower is better.}
@@ -103,7 +103,7 @@ Astronomical ($u \geq 50$)& \textbf{110.4}& 840.0   & 532.6   \\
 % 散布図（図5）に Large モデル 3 バリアントの予測 Magnitude 対真の Magnitude を示す。
 % IntSeqBERT は R^2 = 0.988 と最も高い線形一致度を達成し、Vanilla（R^2 = 0.943）と比較して
 % Large・Huge バケットでの対角線からの乖離が著しく小さい。
-Fig.~\ref{fig:scatter} shows predicted vs.\ true Magnitude scatter plots for the three Large
+Fig.~\ref{fig:scatter} shows predicted vs.\ true magnitude scatter plots for the three Large
 model variants. IntSeqBERT achieves the highest coefficient of determination ($R^2 = 0.988$),
 substantially reducing off-diagonal dispersion in the Large and Huge buckets compared to
 Vanilla ($R^2 = 0.943$), visually corroborating the MSE results of Table~\ref{tab:scale}.
@@ -111,7 +111,7 @@ Vanilla ($R^2 = 0.943$), visually corroborating the MSE results of Table~\ref{ta
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figures/fig5_magnitude_scatter}
-  \caption{Predicted vs.\ true Magnitude ($\log_{10}$ scale) for Large models. Points are
+  \caption{Predicted vs.\ true magnitude ($\log_{10}$ scale) for Large models. Points are
            coloured by bucket (Small=blue circle, Medium=green circle, Large=yellow-orange
            square, Huge=red triangle, Astronomical=purple diamond). IntSeqBERT achieves
            $R^2 = 0.988$ vs.\ Vanilla $R^2 = 0.943$; Vanilla shows pronounced scatter above
@@ -125,7 +125,7 @@ Vanilla ($R^2 = 0.943$), visually corroborating the MSE results of Table~\ref{ta
 \textbf{Calibration.} Fig.~\ref{fig:calibration} shows uncertainty calibration for Large
 models. Vanilla is severely miscalibrated (ECE = 5.36), with overconfidence at low scale and
 exploding $\sigma$ at high scale. IntSeqBERT (ECE = 0.65) matches Ablation (ECE = 0.66),
-indicating calibration is driven by continuous representation rather than the Modulo stream.
+indicating calibration is driven by continuous representation rather than the modulo stream.
 
 \begin{figure}[htbp]
   \centering
@@ -192,7 +192,7 @@ second highest), reflecting the corpus-wide ubiquity of parity in OEIS sequences
 % Modulo ストリームの除去で 13.5pt 低下。
 \textbf{Finding 2: Parity (mod 2) accuracy stratifies models.}
 Mod-2 accuracy at the Large scale is 85.65\% (IntSeq), 81.40\% (Vanilla), and 72.13\%
-(Ablation), making parity the single modulus most sensitive to the Modulo stream ($-13.5$\,pt
+(Ablation), making parity the single modulus most sensitive to the modulo stream ($-13.5$\,pt
 when removed). Table~\ref{tab:moduli} lists representative modulus accuracies.
 
 \begin{table}[htbp]
@@ -221,7 +221,7 @@ $m$ & IntSeq & Vanilla & Ablation & Interpretation \\
 % 10,000 サンプルのテストデータで完全一致精度を評価する。各サンプルは OEIS の 1 数列に対応し、
 % その系列の最後の項を予測ターゲットとする（先行する項をすべて文脈として入力）。
 % 有効率は Solver が少なくとも 1 件の候補整数を返したサンプルの割合。
-The Solver reconstructs candidate integers from the model's Magnitude, sign, and Modulo
+The Solver reconstructs candidate integers from the model's magnitude, sign, and modulo
 predictions and ranks them by likelihood. We evaluate exact-match accuracy on 10,000 test
 samples, where each sample corresponds to one OEIS sequence and the target is the \emph{last
 term} (all preceding terms are given as context). With the sequence-length distribution described
@@ -263,7 +263,7 @@ Large  & Ablation        & 11.75          & 21.79          & 98.94          & 86
 % Magnitude 別精度（Large 3モデル比較）。Solver 精度は Magnitude に強く依存する。
 % Small バケットでは IntSeqBERT Top-1 68.34%、Ablation 54.55%、Vanilla 14.11%。
 % Vanilla は Medium 以上で完全にゼロ（UNK トークン崩壊の影響）。
-\textbf{Accuracy by Magnitude bucket.} Table~\ref{tab:solver-bucket} compares Solver
+\textbf{Accuracy by magnitude bucket.} Table~\ref{tab:solver-bucket} compares Solver
 Top-1 accuracy across buckets for all three Large models. IntSeqBERT achieves 68.34\%
 Top-1 in the Small bucket, while the Ablation reaches 54.55\% and Vanilla only 14.11\%.
 Vanilla collapses to 0\% for Medium and above due to the UNK-token degradation of its
@@ -271,7 +271,7 @@ Magnitude predictions, whereas IntSeqBERT retains meaningful accuracy up to the 
 bucket (20.82\%).
 
 \begin{table}[htbp]
-\caption{Solver Top-1 / Top-10 accuracy (\%) by Magnitude bucket (Large models).
+\caption{Solver Top-1 / Top-10 accuracy (\%) by magnitude bucket (Large models).
          \textbf{Bold}: best per bucket.}
 \label{tab:solver-bucket}
 \centering
