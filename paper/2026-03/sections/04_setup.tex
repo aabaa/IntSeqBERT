@@ -105,11 +105,12 @@ GPU                   & GeForce RTX 3070 Ti (8\,GB VRAM) $\times$ 1 \\
 % Solver Top-k 精度: 真の次項が、Solver が生成した上位 k 件の候補に含まれる割合。
 % 正規化情報利得（NIG）: NIG = 1 - L_CE^(m) / ln m
 %   NIG が高いほど、そのモジュラスに対して強い周期構造が学習されていることを示す。
-\textbf{Magnitude accuracy} ($\text{Acc}_{0.5}$): fraction of masked positions with
+We evaluate using the following metrics:
+\textbf{Magnitude Accuracy} (\textbf{Mag Acc}, $\text{Acc}_{0.5}$): fraction of masked positions with
 $|\hat{v}_i - v_i| < 0.5$ ($\sqrt{10}{\approx}3.16\times$ tolerance in integer scale).
-\textbf{Sign accuracy}: fraction with correct predicted sign class.
-\textbf{MMA (Mean Modulo Accuracy)}: mean classification accuracy across all 100 moduli.
+\textbf{Sign Accuracy} (\textbf{Sign Acc}): fraction with correct predicted sign class.
+\textbf{Mean Modulo Accuracy} (\textbf{MMA}): mean classification accuracy across all 100 moduli.
 \textbf{Solver Top-$k$}: fraction of next-term instances where the true value appears in the
 Solver's top-$k$ candidates (Section~\ref{sec:solver-eval}).
-\textbf{NIG (Normalised Information Gain)}: $1 - \mathcal{L}_{\text{CE}}^{(m)} / \ln m$
+\textbf{Normalised Information Gain} (\textbf{NIG}): $1 - \mathcal{L}_{\text{CE}}^{(m)} / \ln m$
 for modulus $m$; higher NIG indicates stronger learned periodic structure.

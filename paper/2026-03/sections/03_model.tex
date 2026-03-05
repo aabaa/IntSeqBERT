@@ -67,7 +67,7 @@ avoids discontinuities at wrap-around boundaries.
 % Magnitude 側に 2 層 MLP を用いる：
 % h_i^mag = MLP_mag(f_i^mag),  h_i^mod = W_mod f_i^mod + b_mod,  h_i^mag, h_i^mod ∈ R^d.
 The two feature vectors are projected to the model hidden dimension $d$ by independent
-projection layers (two-layer MLP for magnitude; linear for modulo):
+projection layers (two-layer MLP for magnitude; affine for modulo):
 \[
   \mathbf{h}_i^{\text{mag}} = \mathrm{MLP}_{\text{mag}}\!\left(\mathbf{f}_i^{\text{mag}}\right),
   \quad
@@ -91,7 +91,7 @@ element-wise scale $\boldsymbol{\gamma}_i$ and shift $\boldsymbol{\beta}_i$:
   \quad
   \mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\text{mag}} + \boldsymbol{\beta}_i.
 \]
-A ReLU is applied after the Modulo projection, and dropout is inserted before FiLM.
+A ReLU is applied after the modulo projection, and dropout is inserted before FiLM.
 Standard sinusoidal positional encodings are added to $\mathbf{e}_i$ before the encoder.
 
 The overall architecture is illustrated in Fig.~\ref{fig:architecture}.
@@ -176,9 +176,9 @@ embeddings. The vocabulary size 20,003 was chosen so that memory consumption mat
 IntSeqBERT under the 8\,GB VRAM constraint. The prior benchmark FACT~\cite{zurich-fact}
 handles values up to several million, presupposing larger compute resources than our setting.
 
-\textbf{Ablation (Magnitude-only)} is identical to IntSeqBERT but uses only the magnitude
+\textbf{Ablation (magnitude-only)} is identical to IntSeqBERT but uses only the magnitude
 stream; the FiLM module is removed and $\mathbf{e}_i = \mathbf{h}_i^{\text{mag}}$. This
-isolates the contribution of the Modulo stream.
+isolates the contribution of the modulo stream.
 
 \subsection{Solver}
 \label{sec:solver}
@@ -194,7 +194,7 @@ The pre-trained model outputs magnitude $(\mu, \log \sigma^2)$, sign, and modulo
 distributions at masked positions. \textbf{Solver} recovers concrete integers from these
 predictions.
 
-The Solver derives the $3\sigma$ interval $[n_{\min}, n_{\max}]$ from the Magnitude prediction
+The Solver derives the $3\sigma$ interval $[n_{\min}, n_{\max}]$ from the magnitude prediction
 and dynamically selects one of three modes based on the search width
 $\Delta n = |n_{\max} - n_{\min}|$ (Table~\ref{tab:solver}).
 

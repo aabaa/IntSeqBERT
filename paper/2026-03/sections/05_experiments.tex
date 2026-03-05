@@ -25,8 +25,7 @@ maintains non-trivial Mag Acc, but the remaining gap confirms that modulo inform
 meaningfully to magnitude regression as well, while being essential for modulo prediction.
 
 \begin{table}[htbp]
-\caption{Test results. Mag Acc = Accuracy$_{0.5}$ (\%), Sign Acc (\%), MMA = Mean Modulo
-  Accuracy (\%). \textbf{Bold} indicates the best value within each size group.}
+\caption{Test results. Mag Acc (\%), Sign Acc (\%), MMA (\%). \textbf{Bold} indicates the best value within each size group.}
 \label{tab:main}
 \centering
 \begin{tabular}{llrrr}
@@ -79,7 +78,7 @@ set for Large models. The Vanilla model suffers catastrophic degradation in the 
 (MSE = 2.10, $13\times$ that of IntSeqBERT), caused by all out-of-vocabulary integers being
 absorbed into the \texttt{UNK} token. IntSeqBERT achieves the best MSE in all buckets except
 Small, with particularly pronounced advantage at Medium and above. The Ablation degrades in the
-Medium bucket without Modulo context (MSE = 0.116 vs.\ IntSeqBERT 0.051), and collapses more
+Medium bucket without modulo context (MSE = 0.116 vs.\ IntSeqBERT 0.051), and collapses more
 severely in the Huge and Astronomical buckets, indicating that FiLM modulation by the modulo
 stream acts as an arithmetic structural constraint on magnitude estimation for large integers.
 
@@ -89,13 +88,13 @@ stream acts as an arithmetic structural constraint on magnitude estimation for l
 \centering
 \begin{tabular}{lrrr}
 \hline
-Bucket                   & IntSeq         & Vanilla & Ablation \\
+Bucket        & IntSeq         & Vanilla & Ablation \\
 \hline
-Small ($u < 2$)          & 0.111          & 0.138   & \textbf{0.103} \\
-Medium ($2 \leq u < 5$)  & \textbf{0.051} & 0.071   & 0.116   \\
-Large ($5 \leq u < 20$)  & \textbf{0.162} & 2.100   & 0.381   \\
-Huge ($20 \leq u < 50$)  & \textbf{2.082} & 22.73   & 5.021   \\
-Astronomical ($u \geq 50$)& \textbf{110.4}& 840.0   & 532.6   \\
+Small         & 0.111          & 0.138   & \textbf{0.103} \\
+Medium        & \textbf{0.051} & 0.071   & 0.116   \\
+Large         & \textbf{0.162} & 2.100   & 0.381   \\
+Huge          & \textbf{2.082} & 22.73   & 5.021   \\
+Astronomical  & \textbf{110.4} & 840.0   & 532.6   \\
 \hline
 \end{tabular}
 \end{table}
@@ -267,7 +266,7 @@ Large  & Ablation        & 11.75          & 21.79          & 98.94          & 86
 Top-1 accuracy across buckets for all three Large models. IntSeqBERT achieves 68.34\%
 Top-1 in the Small bucket, while the Ablation reaches 54.55\% and Vanilla only 14.11\%.
 Vanilla collapses to 0\% for Medium and above due to the UNK-token degradation of its
-Magnitude predictions, whereas IntSeqBERT retains meaningful accuracy up to the Medium
+magnitude predictions, whereas IntSeqBERT retains meaningful accuracy up to the Medium
 bucket (20.82\%).
 
 \begin{table}[htbp]
