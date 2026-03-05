@@ -20,8 +20,11 @@ and a magnitude-only ablation across all scales and metrics.
 % 今後の課題として以下が挙げられる：
 \textbf{Future work} includes combining magnitude uncertainty estimation with approximate CRT
 to improve large-integer prediction; extending the modulo stream beyond $m = 101$;
+evaluating on the remaining FACT benchmark tasks---sequence classification, sequence
+similarity, next sequence-part prediction, and unmasking~\cite{zurich-fact}---to enable direct
+comparison against that benchmark;
 constructing family-aware dataset splits and introducing sequence-synthesis data
-augmentation~\cite{zurich-fact} to improve generalisation in sparse magnitude buckets;
+augmentation to improve generalisation in sparse magnitude buckets;
 scaling to larger models pre-trained on the full OEIS corpus;
-and exploring downstream applications such as conjecture generation and sequence classification,
+and exploring downstream applications such as conjecture generation,
 where pretrained IntSeqBERT embeddings could serve as a rich feature backbone.
