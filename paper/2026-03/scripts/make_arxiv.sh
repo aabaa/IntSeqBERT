@@ -18,6 +18,8 @@ mkdir -p "${DEST}/sections" "${DEST}/figures"
 # --- LaTeX source files ---
 cp "${PAPER_DIR}/main.tex"      "${DEST}/"
 cp "${PAPER_DIR}/references.bib" "${DEST}/"
+cp "${PAPER_DIR}/llncs.cls"     "${DEST}/"
+cp "${PAPER_DIR}/splncs04.bst"  "${DEST}/"
 cp "${PAPER_DIR}/sections/"*.tex "${DEST}/sections/"
 
 # --- Figures: only those referenced in the paper ---
@@ -45,7 +47,7 @@ done
 
 # --- Create tarball ---
 OUTPUT_TAR="${PAPER_DIR}/${OUT_NAME}.tar.gz"
-tar -czf "${OUTPUT_TAR}" -C "${TMP_DIR}" "${OUT_NAME}"
+tar -czf "${OUTPUT_TAR}" -C "${DEST}" .
 rm -rf "${TMP_DIR}"
 
 echo ""
