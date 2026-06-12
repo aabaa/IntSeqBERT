@@ -104,7 +104,7 @@ uv run python -m intseq_bert.preprocess split-dataset \
   -j data/oeis/data.jsonl \
   -f data/oeis/features \
   -o data/oeis/splits/std \
-  --exclude-tags cons,base,word,fini,dead,dumb,unkn,less
+  --exclude-tags cons,cofr,frac,base,word,fini,tabl,dead,unkn,less,dumb
 ```
 
 ### 3. Training
@@ -131,6 +131,11 @@ To prevent task collapse, we use fixed loss weights:
 ## 📈 Analysis
 
 We provide a suite of analysis tools to evaluate the model's mathematical understanding.
+
+Paper experiment summaries and lightweight cache files are published under
+`results/2026-03-02/`. Lightweight checkpoint metadata is included there, but model weight
+files and the generated OEIS feature store are not kept in Git; use external artifact
+storage for those large files.
 
 ### Modulo Spectrum Analysis (`analyze_mod_spectrum`)
 
@@ -184,6 +189,7 @@ src/intseq_bert/
     └── analyze_cases.py
 
 tests/                  # Unit tests
+results/2026-03-02/     # Paper experiment summary and lightweight cache files
 ```
 
 ## 🧪 Testing

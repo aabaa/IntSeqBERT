@@ -10,9 +10,9 @@ Large モデル 3 バリアント（IntSeqBERT / Vanilla / Ablation）の
   1. 推論を実行して per-sample (gt, pred) を CSV 保存（初回のみ）
   2. CSV から読み込んでプロット
 
-出力: experiment/cicm2026/fig5_magnitude_scatter.pdf
-      experiment/cicm2026/fig5_magnitude_scatter.png
-データキャッシュ: experiment/cicm2026/scatter_cache_{model}.csv
+出力: paper/2026-03/figures/fig5_magnitude_scatter.pdf
+      paper/2026-03/figures/fig5_magnitude_scatter.png
+データキャッシュ: results/2026-03-02/cache/scatter_cache_{model}.csv
 """
 
 from pathlib import Path
@@ -30,6 +30,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 CKPT = REPO_ROOT / "checkpoints" / "large_std"
 OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
+CACHE_DIR = REPO_ROOT / "results" / "2026-03-02" / "cache"
 
 MODELS = ["intseq", "vanilla", "ablation"]
 LABELS = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
@@ -72,7 +73,8 @@ def collect_and_cache(model_name: str) -> Path:
     モデルを推論して (gt, pred) を CSV に保存。
     既に CSV があればスキップ。
     """
-    cache_path = Path(__file__).resolve().parent.parent / "data" / f"scatter_cache_{model_name}.csv"
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = CACHE_DIR / f"scatter_cache_{model_name}.csv"
     if cache_path.exists():
         print(f"[{model_name}] Using cache: {cache_path}")
         return cache_path

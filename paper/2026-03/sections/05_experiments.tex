@@ -156,6 +156,17 @@ $m = 96$ being the largest modulus with totient ratio $1/3$ among $\{12, 24, 48,
 thus distinguishing the widest value range. The exception is $m = 2$ (prime, NIG = 0.628,
 second highest), reflecting the corpus-wide ubiquity of parity in OEIS sequences.
 
+% 経験的観察だが設計指針を与える：合成数モジュラスは複数の素因数・素数冪の制約を同時に反映でき、
+% CRT 集約効果により少ないモジュラスでより多くの数論的情報を得られる。101 超への拡張時には
+% 素数を増やすより小さな素因数を多く持つ合成数（高度合成数など）を加える方が効果的と示唆される。
+While this correlation is an empirical observation rather than a theorem, it carries a
+design implication for the modulo stream itself: composite moduli reflect constraints from
+several prime factors and prime powers at once, so the CRT aggregation effect lets a model
+extract more number-theoretic information from fewer moduli. This gives a guideline for
+choosing moduli---for example, when extending the spectrum beyond $m = 101$, adding
+composite numbers with many small prime factors (such as highly composite numbers) is
+likely to be more effective than simply adding more primes.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.72\linewidth]{figures/fig2b_nig_vs_phi}

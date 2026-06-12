@@ -66,6 +66,26 @@ contrasts the differential scaling of modulo and magnitude accuracy across model
   \label{fig:scaling}
 \end{figure}
 
+\subsection{Alternative Representations: Digit-Based Tokenisation}
+\label{sec:digit-discussion}
+
+% 桁ベーストークン化（各桁を 1 トークン）との実験的比較は本論文では行っていない。
+% 本研究が捉えたいのは十進桁のパターンではなく整数そのものの数論的構造であり、Modulo ストリームは
+% 様々な法での剰余（合同算術の情報）を直接モデルに与える。同じ情報は桁列からも原理的には読み取れる
+% が、間接的にしか得られない。桁単位の生成は自然な代替案だが、整数を単一の値として扱う本研究とは
+% 異なる問題設定（桁列の系列予測）になる。
+A natural alternative to our handcrafted features is digit-based tokenisation, treating each
+decimal digit as a separate token, possibly with digit-by-digit generation on the output
+side. We have not made an experimental comparison with digit-level representations in this
+paper. What our representation targets is not the pattern of decimal digits but the
+number-theoretic structure of the integer itself: the modulo stream supplies the residues of
+each value under 100 different moduli---information about modular arithmetic---to the model
+directly, whereas the same information is only indirectly recoverable from a digit sequence.
+Digit-by-digit generation is a reasonable alternative on the output side, but it changes the
+problem setting from predicting an integer as a single value to the sequential prediction of
+a digit string. A controlled comparison between the two settings is an interesting direction
+for future work.
+
 \subsection{Limitations}
 \label{sec:limitations}
 
@@ -81,6 +101,14 @@ primarily due to CRT failures; approximate CRT or relaxed residue constraints ar
 
 \textbf{Dataset bias.} OEIS sequences are predominantly non-negative (\texttt{nonn}).
 The high sign accuracy (98.54\%) may partially reflect this bias.
+% フィルタリング後も線形・劣線形成長の数列が多数派であり、高い Magnitude 精度はこの偏りを部分的に
+% 反映する。本研究の寄与はこの偏りの内側でも、Large 以上のバケットでの精度向上（表2・表8）と
+% Modulo スペクトル表現の有効性（5.3 節）として現れている。
+Similarly, sequences with linear or sub-linear growth remain the majority even after our
+filtering, and the high overall magnitude accuracy partially reflects this growth bias;
+the contribution of our representation shows up within this bias as the large accuracy gains
+in the Large and higher magnitude buckets (Tables~\ref{tab:scale} and~\ref{tab:solver-bucket})
+and the effectiveness of the modulo spectrum (Section~\ref{sec:modulo-spectrum}).
 Astronomical-bucket metrics are based on few samples and should be interpreted with caution.
 
 \textbf{Compute constraints.} All experiments were conducted on a single consumer GPU

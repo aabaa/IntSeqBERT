@@ -17,6 +17,19 @@ trained on 219,765 OEIS sequences. Experiments (Section~\ref{sec:experiments}) d
 that the dual-stream design substantially outperforms both a standard tokenised Transformer
 and a magnitude-only ablation across all scales and metrics.
 
+% IntSeqBERT は Magnitude・符号・剰余を分離予測し CRT Solver で統合する設計であり、ニューラル
+% ネットワークが学習しにくい厳密な数論的制約を記号処理が補う。純粋な end-to-end 学習の限界と
+% ハイブリッド設計の必要性の両方を示す事例である。
+Our results also carry a broader message. Even with number-theoretic structure built into
+the representation, the absolute success rate of next-term prediction remains modest
+(Top-1: 19.09\%), and a purely tokenised Transformer is far weaker still (2.59\%)---
+confirming that neural networks struggle with direct prediction of OEIS terms.
+IntSeqBERT itself is a neural-symbolic design: the network predicts magnitude, sign, and
+residues separately, and the symbolic CRT solver supplies the exact number-theoretic
+constraints that neural networks struggle to learn end-to-end. We therefore read our
+results both as evidence of the limits of pure end-to-end learning on this task and as
+motivation for hybrid symbolic--neural approaches to computer mathematics.
+
 % 今後の課題として以下が挙げられる：
 \textbf{Future work} includes combining magnitude uncertainty estimation with approximate CRT
 to improve large-integer prediction; extending the modulo stream beyond $m = 101$;

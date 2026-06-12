@@ -447,4 +447,4 @@ checkpoints/
 - [ ] **CRT 精度向上の施策**（Large/Huge magnitude での Solver 改善）
 - [ ] **Middle の test 分析**（Middle は小/大と比べてやや分析が少ない印象）
 - [ ] **統計的有意差検定**（bootstrap CIは取得済み。モデル間比較の t-test 等）
-- [ ] **論文用図表の整備**（result.md の表を LaTeX テーブルへ変換）
+- [ ] **論文用図表の整備**（summary.md の表を LaTeX テーブルへ変換）

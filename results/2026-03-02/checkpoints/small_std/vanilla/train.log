@@ -1,0 +1,1692 @@
+2026-02-18 14:38:31,462 - INFO - Initializing model (type=vanilla)...
+2026-02-18 14:38:32,144 - INFO - Starting training...
+2026-02-18 14:43:53,200 - INFO - Validating Epoch 1...
+2026-02-18 14:44:17,185 - INFO - Epoch 1 Results:
+2026-02-18 14:44:17,185 - INFO -   Train Loss: 6.1704
+2026-02-18 14:44:17,185 - INFO -   Val Loss:   4.7120
+2026-02-18 14:44:17,185 - INFO -   Mag Acc:    34.59% (MSE: 9.3352)
+2026-02-18 14:44:17,185 - INFO -   Sign Acc:   92.15%
+2026-02-18 14:44:17,185 - INFO -   Mod Acc:    10.34% (Mean of 100 mods)
+2026-02-18 14:44:17,185 - INFO -     mod2: 50.6%, mod3: 37.2%, mod5: 21.5%, mod7: 19.3%, mod10: 13.9%, mod100: 7.5%, mod101: 7.5%
+2026-02-18 14:44:17,552 - INFO - New best model saved! (Loss: 4.7120)
+2026-02-18 14:50:13,898 - INFO - Validating Epoch 2...
+2026-02-18 14:50:37,711 - INFO - Epoch 2 Results:
+2026-02-18 14:50:37,711 - INFO -   Train Loss: 4.4653
+2026-02-18 14:50:37,711 - INFO -   Val Loss:   4.2552
+2026-02-18 14:50:37,711 - INFO -   Mag Acc:    53.68% (MSE: 5.6849)
+2026-02-18 14:50:37,711 - INFO -   Sign Acc:   93.61%
+2026-02-18 14:50:37,711 - INFO -   Mod Acc:    12.39% (Mean of 100 mods)
+2026-02-18 14:50:37,711 - INFO -     mod2: 53.2%, mod3: 39.1%, mod5: 24.3%, mod7: 19.9%, mod10: 18.3%, mod100: 8.1%, mod101: 10.2%
+2026-02-18 14:50:38,375 - INFO - New best model saved! (Loss: 4.2552)
+2026-02-18 14:56:22,101 - INFO - Validating Epoch 3...
+2026-02-18 14:56:46,352 - INFO - Epoch 3 Results:
+2026-02-18 14:56:46,352 - INFO -   Train Loss: 4.1708
+2026-02-18 14:56:46,352 - INFO -   Val Loss:   4.0133
+2026-02-18 14:56:46,352 - INFO -   Mag Acc:    60.59% (MSE: 4.3437)
+2026-02-18 14:56:46,352 - INFO -   Sign Acc:   93.73%
+2026-02-18 14:56:46,352 - INFO -   Mod Acc:    14.20% (Mean of 100 mods)
+2026-02-18 14:56:46,352 - INFO -     mod2: 53.7%, mod3: 39.5%, mod5: 27.2%, mod7: 22.2%, mod10: 19.8%, mod100: 11.9%, mod101: 11.3%
+2026-02-18 14:56:47,052 - INFO - New best model saved! (Loss: 4.0133)
+2026-02-18 15:02:32,125 - INFO - Validating Epoch 4...
+2026-02-18 15:02:56,033 - INFO - Epoch 4 Results:
+2026-02-18 15:02:56,033 - INFO -   Train Loss: 3.9818
+2026-02-18 15:02:56,033 - INFO -   Val Loss:   3.8600
+2026-02-18 15:02:56,033 - INFO -   Mag Acc:    64.44% (MSE: 3.1485)
+2026-02-18 15:02:56,033 - INFO -   Sign Acc:   93.87%
+2026-02-18 15:02:56,033 - INFO -   Mod Acc:    14.92% (Mean of 100 mods)
+2026-02-18 15:02:56,033 - INFO -     mod2: 58.0%, mod3: 40.6%, mod5: 27.7%, mod7: 22.8%, mod10: 20.8%, mod100: 12.3%, mod101: 11.6%
+2026-02-18 15:02:56,694 - INFO - New best model saved! (Loss: 3.8600)
+2026-02-18 15:08:33,499 - INFO - Validating Epoch 5...
+2026-02-18 15:08:57,621 - INFO - Epoch 5 Results:
+2026-02-18 15:08:57,621 - INFO -   Train Loss: 3.8471
+2026-02-18 15:08:57,621 - INFO -   Val Loss:   3.7174
+2026-02-18 15:08:57,621 - INFO -   Mag Acc:    65.47% (MSE: 2.9728)
+2026-02-18 15:08:57,621 - INFO -   Sign Acc:   93.89%
+2026-02-18 15:08:57,621 - INFO -   Mod Acc:    15.88% (Mean of 100 mods)
+2026-02-18 15:08:57,621 - INFO -     mod2: 61.2%, mod3: 41.4%, mod5: 28.6%, mod7: 23.4%, mod10: 22.2%, mod100: 13.2%, mod101: 12.4%
+2026-02-18 15:08:58,257 - INFO - New best model saved! (Loss: 3.7174)
+2026-02-18 15:14:40,646 - INFO - Validating Epoch 6...
+2026-02-18 15:15:04,693 - INFO - Epoch 6 Results:
+2026-02-18 15:15:04,693 - INFO -   Train Loss: 3.7209
+2026-02-18 15:15:04,693 - INFO -   Val Loss:   3.5644
+2026-02-18 15:15:04,693 - INFO -   Mag Acc:    63.95% (MSE: 2.9169)
+2026-02-18 15:15:04,693 - INFO -   Sign Acc:   93.97%
+2026-02-18 15:15:04,693 - INFO -   Mod Acc:    16.66% (Mean of 100 mods)
+2026-02-18 15:15:04,693 - INFO -     mod2: 63.2%, mod3: 42.1%, mod5: 29.1%, mod7: 23.8%, mod10: 23.0%, mod100: 14.3%, mod101: 13.3%
+2026-02-18 15:15:05,351 - INFO - New best model saved! (Loss: 3.5644)
+2026-02-18 15:20:59,332 - INFO - Validating Epoch 7...
+2026-02-18 15:21:23,300 - INFO - Epoch 7 Results:
+2026-02-18 15:21:23,300 - INFO -   Train Loss: 3.5925
+2026-02-18 15:21:23,300 - INFO -   Val Loss:   3.4353
+2026-02-18 15:21:23,300 - INFO -   Mag Acc:    64.81% (MSE: 2.8428)
+2026-02-18 15:21:23,300 - INFO -   Sign Acc:   93.80%
+2026-02-18 15:21:23,300 - INFO -   Mod Acc:    17.49% (Mean of 100 mods)
+2026-02-18 15:21:23,300 - INFO -     mod2: 64.8%, mod3: 43.0%, mod5: 29.5%, mod7: 24.1%, mod10: 23.5%, mod100: 15.3%, mod101: 14.3%
+2026-02-18 15:21:23,954 - INFO - New best model saved! (Loss: 3.4353)
+2026-02-18 15:27:24,590 - INFO - Validating Epoch 8...
+2026-02-18 15:27:48,328 - INFO - Epoch 8 Results:
+2026-02-18 15:27:48,328 - INFO -   Train Loss: 3.4832
+2026-02-18 15:27:48,328 - INFO -   Val Loss:   3.3468
+2026-02-18 15:27:48,328 - INFO -   Mag Acc:    64.57% (MSE: 2.6711)
+2026-02-18 15:27:48,328 - INFO -   Sign Acc:   93.91%
+2026-02-18 15:27:48,328 - INFO -   Mod Acc:    18.10% (Mean of 100 mods)
+2026-02-18 15:27:48,328 - INFO -     mod2: 65.8%, mod3: 43.3%, mod5: 29.7%, mod7: 24.4%, mod10: 24.1%, mod100: 16.0%, mod101: 15.0%
+2026-02-18 15:27:48,977 - INFO - New best model saved! (Loss: 3.3468)
+2026-02-18 15:33:30,897 - INFO - Validating Epoch 9...
+2026-02-18 15:33:55,014 - INFO - Epoch 9 Results:
+2026-02-18 15:33:55,015 - INFO -   Train Loss: 3.3984
+2026-02-18 15:33:55,015 - INFO -   Val Loss:   3.2525
+2026-02-18 15:33:55,015 - INFO -   Mag Acc:    66.22% (MSE: 2.3721)
+2026-02-18 15:33:55,015 - INFO -   Sign Acc:   93.97%
+2026-02-18 15:33:55,015 - INFO -   Mod Acc:    18.83% (Mean of 100 mods)
+2026-02-18 15:33:55,015 - INFO -     mod2: 66.3%, mod3: 43.6%, mod5: 30.1%, mod7: 24.7%, mod10: 24.6%, mod100: 17.0%, mod101: 15.8%
+2026-02-18 15:33:55,672 - INFO - New best model saved! (Loss: 3.2525)
+2026-02-18 15:39:57,763 - INFO - Validating Epoch 10...
+2026-02-18 15:40:21,762 - INFO - Epoch 10 Results:
+2026-02-18 15:40:21,762 - INFO -   Train Loss: 3.3297
+2026-02-18 15:40:21,763 - INFO -   Val Loss:   3.1916
+2026-02-18 15:40:21,763 - INFO -   Mag Acc:    63.67% (MSE: 2.8607)
+2026-02-18 15:40:21,763 - INFO -   Sign Acc:   94.00%
+2026-02-18 15:40:21,763 - INFO -   Mod Acc:    19.39% (Mean of 100 mods)
+2026-02-18 15:40:21,763 - INFO -     mod2: 66.9%, mod3: 44.0%, mod5: 30.0%, mod7: 24.8%, mod10: 24.8%, mod100: 17.6%, mod101: 16.7%
+2026-02-18 15:40:22,421 - INFO - New best model saved! (Loss: 3.1916)
+2026-02-18 15:46:11,614 - INFO - Validating Epoch 11...
+2026-02-18 15:46:35,668 - INFO - Epoch 11 Results:
+2026-02-18 15:46:35,668 - INFO -   Train Loss: 3.2731
+2026-02-18 15:46:35,668 - INFO -   Val Loss:   3.1384
+2026-02-18 15:46:35,668 - INFO -   Mag Acc:    66.51% (MSE: 2.4420)
+2026-02-18 15:46:35,668 - INFO -   Sign Acc:   93.88%
+2026-02-18 15:46:35,668 - INFO -   Mod Acc:    20.04% (Mean of 100 mods)
+2026-02-18 15:46:35,668 - INFO -     mod2: 67.4%, mod3: 44.7%, mod5: 30.8%, mod7: 25.2%, mod10: 25.2%, mod100: 18.4%, mod101: 17.2%
+2026-02-18 15:46:36,302 - INFO - New best model saved! (Loss: 3.1384)
+2026-02-18 15:52:11,221 - INFO - Validating Epoch 12...
+2026-02-18 15:52:35,324 - INFO - Epoch 12 Results:
+2026-02-18 15:52:35,324 - INFO -   Train Loss: 3.2132
+2026-02-18 15:52:35,324 - INFO -   Val Loss:   3.0793
+2026-02-18 15:52:35,324 - INFO -   Mag Acc:    68.21% (MSE: 2.3956)
+2026-02-18 15:52:35,324 - INFO -   Sign Acc:   93.97%
+2026-02-18 15:52:35,324 - INFO -   Mod Acc:    20.21% (Mean of 100 mods)
+2026-02-18 15:52:35,324 - INFO -     mod2: 67.3%, mod3: 44.8%, mod5: 30.7%, mod7: 25.4%, mod10: 25.4%, mod100: 18.5%, mod101: 17.2%
+2026-02-18 15:52:35,993 - INFO - New best model saved! (Loss: 3.0793)
+2026-02-18 15:58:19,576 - INFO - Validating Epoch 13...
+2026-02-18 15:58:43,159 - INFO - Epoch 13 Results:
+2026-02-18 15:58:43,159 - INFO -   Train Loss: 3.1668
+2026-02-18 15:58:43,159 - INFO -   Val Loss:   3.0280
+2026-02-18 15:58:43,159 - INFO -   Mag Acc:    69.24% (MSE: 1.9716)
+2026-02-18 15:58:43,159 - INFO -   Sign Acc:   93.95%
+2026-02-18 15:58:43,159 - INFO -   Mod Acc:    20.66% (Mean of 100 mods)
+2026-02-18 15:58:43,159 - INFO -     mod2: 67.6%, mod3: 44.9%, mod5: 30.9%, mod7: 25.4%, mod10: 25.6%, mod100: 19.2%, mod101: 17.8%
+2026-02-18 15:58:43,806 - INFO - New best model saved! (Loss: 3.0280)
+2026-02-18 16:04:30,300 - INFO - Validating Epoch 14...
+2026-02-18 16:04:54,258 - INFO - Epoch 14 Results:
+2026-02-18 16:04:54,258 - INFO -   Train Loss: 3.1329
+2026-02-18 16:04:54,258 - INFO -   Val Loss:   2.9807
+2026-02-18 16:04:54,258 - INFO -   Mag Acc:    71.75% (MSE: 2.1444)
+2026-02-18 16:04:54,258 - INFO -   Sign Acc:   94.02%
+2026-02-18 16:04:54,258 - INFO -   Mod Acc:    21.07% (Mean of 100 mods)
+2026-02-18 16:04:54,258 - INFO -     mod2: 68.0%, mod3: 45.3%, mod5: 31.0%, mod7: 25.9%, mod10: 26.0%, mod100: 19.6%, mod101: 18.3%
+2026-02-18 16:04:54,932 - INFO - New best model saved! (Loss: 2.9807)
+2026-02-18 16:10:53,465 - INFO - Validating Epoch 15...
+2026-02-18 16:11:17,506 - INFO - Epoch 15 Results:
+2026-02-18 16:11:17,507 - INFO -   Train Loss: 3.0988
+2026-02-18 16:11:17,507 - INFO -   Val Loss:   2.9528
+2026-02-18 16:11:17,507 - INFO -   Mag Acc:    71.19% (MSE: 1.8934)
+2026-02-18 16:11:17,507 - INFO -   Sign Acc:   94.05%
+2026-02-18 16:11:17,507 - INFO -   Mod Acc:    21.33% (Mean of 100 mods)
+2026-02-18 16:11:17,507 - INFO -     mod2: 67.6%, mod3: 45.6%, mod5: 31.2%, mod7: 26.1%, mod10: 26.2%, mod100: 19.8%, mod101: 18.5%
+2026-02-18 16:11:18,140 - INFO - New best model saved! (Loss: 2.9528)
+2026-02-18 16:17:00,681 - INFO - Validating Epoch 16...
+2026-02-18 16:17:24,693 - INFO - Epoch 16 Results:
+2026-02-18 16:17:24,693 - INFO -   Train Loss: 3.0614
+2026-02-18 16:17:24,693 - INFO -   Val Loss:   2.9239
+2026-02-18 16:17:24,693 - INFO -   Mag Acc:    72.39% (MSE: 1.9800)
+2026-02-18 16:17:24,693 - INFO -   Sign Acc:   94.22%
+2026-02-18 16:17:24,693 - INFO -   Mod Acc:    21.83% (Mean of 100 mods)
+2026-02-18 16:17:24,693 - INFO -     mod2: 67.8%, mod3: 45.8%, mod5: 31.3%, mod7: 26.4%, mod10: 26.4%, mod100: 20.4%, mod101: 19.1%
+2026-02-18 16:17:25,384 - INFO - New best model saved! (Loss: 2.9239)
+2026-02-18 16:23:21,478 - INFO - Validating Epoch 17...
+2026-02-18 16:23:45,546 - INFO - Epoch 17 Results:
+2026-02-18 16:23:45,546 - INFO -   Train Loss: 3.0352
+2026-02-18 16:23:45,546 - INFO -   Val Loss:   2.9215
+2026-02-18 16:23:45,546 - INFO -   Mag Acc:    73.02% (MSE: 1.8879)
+2026-02-18 16:23:45,546 - INFO -   Sign Acc:   94.22%
+2026-02-18 16:23:45,546 - INFO -   Mod Acc:    21.90% (Mean of 100 mods)
+2026-02-18 16:23:45,546 - INFO -     mod2: 68.2%, mod3: 45.7%, mod5: 31.6%, mod7: 26.3%, mod10: 26.5%, mod100: 20.4%, mod101: 19.0%
+2026-02-18 16:23:46,197 - INFO - New best model saved! (Loss: 2.9215)
+2026-02-18 16:29:39,642 - INFO - Validating Epoch 18...
+2026-02-18 16:30:03,421 - INFO - Epoch 18 Results:
+2026-02-18 16:30:03,421 - INFO -   Train Loss: 3.0083
+2026-02-18 16:30:03,421 - INFO -   Val Loss:   2.8591
+2026-02-18 16:30:03,421 - INFO -   Mag Acc:    75.34% (MSE: 1.8170)
+2026-02-18 16:30:03,421 - INFO -   Sign Acc:   93.97%
+2026-02-18 16:30:03,421 - INFO -   Mod Acc:    22.20% (Mean of 100 mods)
+2026-02-18 16:30:03,421 - INFO -     mod2: 68.1%, mod3: 46.1%, mod5: 31.4%, mod7: 26.5%, mod10: 26.6%, mod100: 20.8%, mod101: 19.4%
+2026-02-18 16:30:04,080 - INFO - New best model saved! (Loss: 2.8591)
+2026-02-18 16:36:06,655 - INFO - Validating Epoch 19...
+2026-02-18 16:36:30,920 - INFO - Epoch 19 Results:
+2026-02-18 16:36:30,920 - INFO -   Train Loss: 2.9860
+2026-02-18 16:36:30,920 - INFO -   Val Loss:   2.8499
+2026-02-18 16:36:30,920 - INFO -   Mag Acc:    75.11% (MSE: 1.8423)
+2026-02-18 16:36:30,921 - INFO -   Sign Acc:   94.24%
+2026-02-18 16:36:30,921 - INFO -   Mod Acc:    22.31% (Mean of 100 mods)
+2026-02-18 16:36:30,921 - INFO -     mod2: 68.1%, mod3: 46.2%, mod5: 31.5%, mod7: 26.5%, mod10: 26.8%, mod100: 21.0%, mod101: 19.4%
+2026-02-18 16:36:31,575 - INFO - New best model saved! (Loss: 2.8499)
+2026-02-18 16:42:21,352 - INFO - Validating Epoch 20...
+2026-02-18 16:42:45,003 - INFO - Epoch 20 Results:
+2026-02-18 16:42:45,003 - INFO -   Train Loss: 2.9723
+2026-02-18 16:42:45,003 - INFO -   Val Loss:   2.8298
+2026-02-18 16:42:45,003 - INFO -   Mag Acc:    74.50% (MSE: 1.7967)
+2026-02-18 16:42:45,003 - INFO -   Sign Acc:   94.17%
+2026-02-18 16:42:45,003 - INFO -   Mod Acc:    22.38% (Mean of 100 mods)
+2026-02-18 16:42:45,003 - INFO -     mod2: 68.1%, mod3: 46.1%, mod5: 31.6%, mod7: 26.5%, mod10: 26.9%, mod100: 20.9%, mod101: 19.6%
+2026-02-18 16:42:45,652 - INFO - New best model saved! (Loss: 2.8298)
+2026-02-18 16:48:22,277 - INFO - Validating Epoch 21...
+2026-02-18 16:48:46,169 - INFO - Epoch 21 Results:
+2026-02-18 16:48:46,169 - INFO -   Train Loss: 2.9439
+2026-02-18 16:48:46,169 - INFO -   Val Loss:   2.8059
+2026-02-18 16:48:46,169 - INFO -   Mag Acc:    76.38% (MSE: 1.9086)
+2026-02-18 16:48:46,169 - INFO -   Sign Acc:   94.14%
+2026-02-18 16:48:46,169 - INFO -   Mod Acc:    22.79% (Mean of 100 mods)
+2026-02-18 16:48:46,169 - INFO -     mod2: 68.2%, mod3: 46.0%, mod5: 31.4%, mod7: 26.6%, mod10: 27.1%, mod100: 21.6%, mod101: 20.0%
+2026-02-18 16:48:46,828 - INFO - New best model saved! (Loss: 2.8059)
+2026-02-18 16:54:37,618 - INFO - Validating Epoch 22...
+2026-02-18 16:55:01,621 - INFO - Epoch 22 Results:
+2026-02-18 16:55:01,621 - INFO -   Train Loss: 2.9263
+2026-02-18 16:55:01,621 - INFO -   Val Loss:   2.7910
+2026-02-18 16:55:01,621 - INFO -   Mag Acc:    74.14% (MSE: 1.9549)
+2026-02-18 16:55:01,621 - INFO -   Sign Acc:   94.30%
+2026-02-18 16:55:01,621 - INFO -   Mod Acc:    23.10% (Mean of 100 mods)
+2026-02-18 16:55:01,621 - INFO -     mod2: 68.3%, mod3: 46.2%, mod5: 31.7%, mod7: 26.9%, mod10: 27.3%, mod100: 21.9%, mod101: 20.4%
+2026-02-18 16:55:02,296 - INFO - New best model saved! (Loss: 2.7910)
+2026-02-18 17:00:59,189 - INFO - Validating Epoch 23...
+2026-02-18 17:01:23,254 - INFO - Epoch 23 Results:
+2026-02-18 17:01:23,254 - INFO -   Train Loss: 2.9069
+2026-02-18 17:01:23,254 - INFO -   Val Loss:   2.7537
+2026-02-18 17:01:23,254 - INFO -   Mag Acc:    76.33% (MSE: 1.7166)
+2026-02-18 17:01:23,254 - INFO -   Sign Acc:   94.43%
+2026-02-18 17:01:23,254 - INFO -   Mod Acc:    23.55% (Mean of 100 mods)
+2026-02-18 17:01:23,255 - INFO -     mod2: 68.5%, mod3: 46.4%, mod5: 31.8%, mod7: 26.9%, mod10: 27.6%, mod100: 22.4%, mod101: 20.9%
+2026-02-18 17:01:23,887 - INFO - New best model saved! (Loss: 2.7537)
+2026-02-18 17:06:59,825 - INFO - Validating Epoch 24...
+2026-02-18 17:07:23,785 - INFO - Epoch 24 Results:
+2026-02-18 17:07:23,785 - INFO -   Train Loss: 2.8874
+2026-02-18 17:07:23,785 - INFO -   Val Loss:   2.7314
+2026-02-18 17:07:23,785 - INFO -   Mag Acc:    76.29% (MSE: 1.7035)
+2026-02-18 17:07:23,785 - INFO -   Sign Acc:   94.74%
+2026-02-18 17:07:23,785 - INFO -   Mod Acc:    23.70% (Mean of 100 mods)
+2026-02-18 17:07:23,785 - INFO -     mod2: 68.7%, mod3: 46.3%, mod5: 31.9%, mod7: 27.0%, mod10: 27.6%, mod100: 22.7%, mod101: 21.1%
+2026-02-18 17:07:24,452 - INFO - New best model saved! (Loss: 2.7314)
+2026-02-18 17:13:32,040 - INFO - Validating Epoch 25...
+2026-02-18 17:13:55,655 - INFO - Epoch 25 Results:
+2026-02-18 17:13:55,655 - INFO -   Train Loss: 2.8698
+2026-02-18 17:13:55,655 - INFO -   Val Loss:   2.7383
+2026-02-18 17:13:55,655 - INFO -   Mag Acc:    77.66% (MSE: 1.7319)
+2026-02-18 17:13:55,655 - INFO -   Sign Acc:   94.80%
+2026-02-18 17:13:55,655 - INFO -   Mod Acc:    24.04% (Mean of 100 mods)
+2026-02-18 17:13:55,656 - INFO -     mod2: 69.1%, mod3: 46.7%, mod5: 31.9%, mod7: 27.2%, mod10: 28.0%, mod100: 22.9%, mod101: 21.4%
+2026-02-18 17:19:41,998 - INFO - Validating Epoch 26...
+2026-02-18 17:20:05,741 - INFO - Epoch 26 Results:
+2026-02-18 17:20:05,741 - INFO -   Train Loss: 2.8530
+2026-02-18 17:20:05,741 - INFO -   Val Loss:   2.7063
+2026-02-18 17:20:05,741 - INFO -   Mag Acc:    77.48% (MSE: 1.7418)
+2026-02-18 17:20:05,741 - INFO -   Sign Acc:   94.98%
+2026-02-18 17:20:05,741 - INFO -   Mod Acc:    24.63% (Mean of 100 mods)
+2026-02-18 17:20:05,741 - INFO -     mod2: 69.4%, mod3: 47.0%, mod5: 32.5%, mod7: 27.5%, mod10: 28.4%, mod100: 23.6%, mod101: 22.0%
+2026-02-18 17:20:06,400 - INFO - New best model saved! (Loss: 2.7063)
+2026-02-18 17:25:44,164 - INFO - Validating Epoch 27...
+2026-02-18 17:26:08,242 - INFO - Epoch 27 Results:
+2026-02-18 17:26:08,243 - INFO -   Train Loss: 2.8327
+2026-02-18 17:26:08,243 - INFO -   Val Loss:   2.6761
+2026-02-18 17:26:08,243 - INFO -   Mag Acc:    77.32% (MSE: 1.6872)
+2026-02-18 17:26:08,243 - INFO -   Sign Acc:   94.94%
+2026-02-18 17:26:08,243 - INFO -   Mod Acc:    24.99% (Mean of 100 mods)
+2026-02-18 17:26:08,243 - INFO -     mod2: 70.0%, mod3: 47.1%, mod5: 32.7%, mod7: 27.9%, mod10: 28.8%, mod100: 24.2%, mod101: 22.5%
+2026-02-18 17:26:08,897 - INFO - New best model saved! (Loss: 2.6761)
+2026-02-18 17:32:19,605 - INFO - Validating Epoch 28...
+2026-02-18 17:32:43,445 - INFO - Epoch 28 Results:
+2026-02-18 17:32:43,445 - INFO -   Train Loss: 2.8141
+2026-02-18 17:32:43,445 - INFO -   Val Loss:   2.6724
+2026-02-18 17:32:43,445 - INFO -   Mag Acc:    77.67% (MSE: 1.5340)
+2026-02-18 17:32:43,445 - INFO -   Sign Acc:   95.16%
+2026-02-18 17:32:43,445 - INFO -   Mod Acc:    25.26% (Mean of 100 mods)
+2026-02-18 17:32:43,445 - INFO -     mod2: 70.4%, mod3: 47.0%, mod5: 32.8%, mod7: 28.1%, mod10: 29.1%, mod100: 24.4%, mod101: 22.7%
+2026-02-18 17:32:44,115 - INFO - New best model saved! (Loss: 2.6724)
+2026-02-18 17:38:31,004 - INFO - Validating Epoch 29...
+2026-02-18 17:38:55,096 - INFO - Epoch 29 Results:
+2026-02-18 17:38:55,096 - INFO -   Train Loss: 2.8018
+2026-02-18 17:38:55,096 - INFO -   Val Loss:   2.6602
+2026-02-18 17:38:55,096 - INFO -   Mag Acc:    78.37% (MSE: 1.6565)
+2026-02-18 17:38:55,096 - INFO -   Sign Acc:   95.20%
+2026-02-18 17:38:55,096 - INFO -   Mod Acc:    25.48% (Mean of 100 mods)
+2026-02-18 17:38:55,096 - INFO -     mod2: 70.4%, mod3: 47.3%, mod5: 32.9%, mod7: 28.1%, mod10: 29.1%, mod100: 24.7%, mod101: 22.9%
+2026-02-18 17:38:55,750 - INFO - New best model saved! (Loss: 2.6602)
+2026-02-18 17:44:42,324 - INFO - Validating Epoch 30...
+2026-02-18 17:45:06,595 - INFO - Epoch 30 Results:
+2026-02-18 17:45:06,596 - INFO -   Train Loss: 2.7975
+2026-02-18 17:45:06,596 - INFO -   Val Loss:   2.6300
+2026-02-18 17:45:06,596 - INFO -   Mag Acc:    78.20% (MSE: 1.6245)
+2026-02-18 17:45:06,596 - INFO -   Sign Acc:   95.34%
+2026-02-18 17:45:06,596 - INFO -   Mod Acc:    25.76% (Mean of 100 mods)
+2026-02-18 17:45:06,596 - INFO -     mod2: 70.7%, mod3: 47.3%, mod5: 32.8%, mod7: 27.9%, mod10: 29.3%, mod100: 25.0%, mod101: 23.2%
+2026-02-18 17:45:07,262 - INFO - New best model saved! (Loss: 2.6300)
+2026-02-18 17:50:52,816 - INFO - Validating Epoch 31...
+2026-02-18 17:51:17,007 - INFO - Epoch 31 Results:
+2026-02-18 17:51:17,007 - INFO -   Train Loss: 2.7885
+2026-02-18 17:51:17,007 - INFO -   Val Loss:   2.6380
+2026-02-18 17:51:17,007 - INFO -   Mag Acc:    77.36% (MSE: 1.9141)
+2026-02-18 17:51:17,008 - INFO -   Sign Acc:   95.51%
+2026-02-18 17:51:17,008 - INFO -   Mod Acc:    26.13% (Mean of 100 mods)
+2026-02-18 17:51:17,008 - INFO -     mod2: 70.7%, mod3: 47.8%, mod5: 32.9%, mod7: 28.1%, mod10: 29.4%, mod100: 25.5%, mod101: 23.8%
+2026-02-18 17:56:48,919 - INFO - Validating Epoch 32...
+2026-02-18 17:57:13,158 - INFO - Epoch 32 Results:
+2026-02-18 17:57:13,158 - INFO -   Train Loss: 2.7781
+2026-02-18 17:57:13,158 - INFO -   Val Loss:   2.6210
+2026-02-18 17:57:13,158 - INFO -   Mag Acc:    77.92% (MSE: 1.5027)
+2026-02-18 17:57:13,158 - INFO -   Sign Acc:   95.38%
+2026-02-18 17:57:13,158 - INFO -   Mod Acc:    26.24% (Mean of 100 mods)
+2026-02-18 17:57:13,158 - INFO -     mod2: 70.8%, mod3: 47.6%, mod5: 33.0%, mod7: 28.3%, mod10: 29.6%, mod100: 25.6%, mod101: 23.7%
+2026-02-18 17:57:13,818 - INFO - New best model saved! (Loss: 2.6210)
+2026-02-18 18:02:55,191 - INFO - Validating Epoch 33...
+2026-02-18 18:03:19,265 - INFO - Epoch 33 Results:
+2026-02-18 18:03:19,265 - INFO -   Train Loss: 2.7708
+2026-02-18 18:03:19,265 - INFO -   Val Loss:   2.6111
+2026-02-18 18:03:19,265 - INFO -   Mag Acc:    79.82% (MSE: 1.5192)
+2026-02-18 18:03:19,265 - INFO -   Sign Acc:   95.48%
+2026-02-18 18:03:19,265 - INFO -   Mod Acc:    26.38% (Mean of 100 mods)
+2026-02-18 18:03:19,265 - INFO -     mod2: 71.1%, mod3: 47.8%, mod5: 33.2%, mod7: 28.4%, mod10: 30.1%, mod100: 25.7%, mod101: 24.1%
+2026-02-18 18:03:19,912 - INFO - New best model saved! (Loss: 2.6111)
+2026-02-18 18:08:59,477 - INFO - Validating Epoch 34...
+2026-02-18 18:09:23,552 - INFO - Epoch 34 Results:
+2026-02-18 18:09:23,553 - INFO -   Train Loss: 2.7587
+2026-02-18 18:09:23,553 - INFO -   Val Loss:   2.6017
+2026-02-18 18:09:23,553 - INFO -   Mag Acc:    78.49% (MSE: 1.6510)
+2026-02-18 18:09:23,553 - INFO -   Sign Acc:   95.54%
+2026-02-18 18:09:23,553 - INFO -   Mod Acc:    26.77% (Mean of 100 mods)
+2026-02-18 18:09:23,553 - INFO -     mod2: 71.1%, mod3: 48.1%, mod5: 33.6%, mod7: 28.7%, mod10: 30.3%, mod100: 26.2%, mod101: 24.4%
+2026-02-18 18:09:24,191 - INFO - New best model saved! (Loss: 2.6017)
+2026-02-18 18:15:07,189 - INFO - Validating Epoch 35...
+2026-02-18 18:15:31,192 - INFO - Epoch 35 Results:
+2026-02-18 18:15:31,192 - INFO -   Train Loss: 2.7504
+2026-02-18 18:15:31,192 - INFO -   Val Loss:   2.5827
+2026-02-18 18:15:31,192 - INFO -   Mag Acc:    79.40% (MSE: 1.5266)
+2026-02-18 18:15:31,192 - INFO -   Sign Acc:   95.69%
+2026-02-18 18:15:31,192 - INFO -   Mod Acc:    27.04% (Mean of 100 mods)
+2026-02-18 18:15:31,192 - INFO -     mod2: 71.8%, mod3: 48.4%, mod5: 33.6%, mod7: 28.8%, mod10: 30.6%, mod100: 26.5%, mod101: 24.7%
+2026-02-18 18:15:31,843 - INFO - New best model saved! (Loss: 2.5827)
+2026-02-18 18:21:12,420 - INFO - Validating Epoch 36...
+2026-02-18 18:21:36,410 - INFO - Epoch 36 Results:
+2026-02-18 18:21:36,410 - INFO -   Train Loss: 2.7445
+2026-02-18 18:21:36,410 - INFO -   Val Loss:   2.5623
+2026-02-18 18:21:36,410 - INFO -   Mag Acc:    78.26% (MSE: 1.6123)
+2026-02-18 18:21:36,410 - INFO -   Sign Acc:   95.51%
+2026-02-18 18:21:36,410 - INFO -   Mod Acc:    27.39% (Mean of 100 mods)
+2026-02-18 18:21:36,410 - INFO -     mod2: 72.6%, mod3: 48.5%, mod5: 33.7%, mod7: 29.1%, mod10: 31.2%, mod100: 26.8%, mod101: 24.9%
+2026-02-18 18:21:37,077 - INFO - New best model saved! (Loss: 2.5623)
+2026-02-18 18:27:19,694 - INFO - Validating Epoch 37...
+2026-02-18 18:27:43,608 - INFO - Epoch 37 Results:
+2026-02-18 18:27:43,608 - INFO -   Train Loss: 2.7314
+2026-02-18 18:27:43,608 - INFO -   Val Loss:   2.5625
+2026-02-18 18:27:43,608 - INFO -   Mag Acc:    80.34% (MSE: 1.5424)
+2026-02-18 18:27:43,608 - INFO -   Sign Acc:   95.57%
+2026-02-18 18:27:43,608 - INFO -   Mod Acc:    27.66% (Mean of 100 mods)
+2026-02-18 18:27:43,608 - INFO -     mod2: 73.0%, mod3: 48.6%, mod5: 33.8%, mod7: 29.0%, mod10: 31.4%, mod100: 27.2%, mod101: 25.4%
+2026-02-18 18:33:53,119 - INFO - Validating Epoch 38...
+2026-02-18 18:34:17,150 - INFO - Epoch 38 Results:
+2026-02-18 18:34:17,150 - INFO -   Train Loss: 2.7154
+2026-02-18 18:34:17,150 - INFO -   Val Loss:   2.5467
+2026-02-18 18:34:17,150 - INFO -   Mag Acc:    79.73% (MSE: 1.5046)
+2026-02-18 18:34:17,150 - INFO -   Sign Acc:   95.73%
+2026-02-18 18:34:17,150 - INFO -   Mod Acc:    27.88% (Mean of 100 mods)
+2026-02-18 18:34:17,150 - INFO -     mod2: 73.3%, mod3: 48.8%, mod5: 34.0%, mod7: 29.3%, mod10: 31.5%, mod100: 27.4%, mod101: 25.6%
+2026-02-18 18:34:17,809 - INFO - New best model saved! (Loss: 2.5467)
+2026-02-18 18:40:12,256 - INFO - Validating Epoch 39...
+2026-02-18 18:40:36,316 - INFO - Epoch 39 Results:
+2026-02-18 18:40:36,316 - INFO -   Train Loss: 2.7069
+2026-02-18 18:40:36,316 - INFO -   Val Loss:   2.5338
+2026-02-18 18:40:36,316 - INFO -   Mag Acc:    79.60% (MSE: 1.5514)
+2026-02-18 18:40:36,316 - INFO -   Sign Acc:   95.74%
+2026-02-18 18:40:36,316 - INFO -   Mod Acc:    28.06% (Mean of 100 mods)
+2026-02-18 18:40:36,316 - INFO -     mod2: 73.7%, mod3: 48.9%, mod5: 33.8%, mod7: 29.3%, mod10: 31.5%, mod100: 27.7%, mod101: 25.8%
+2026-02-18 18:40:36,987 - INFO - New best model saved! (Loss: 2.5338)
+2026-02-18 18:46:09,716 - INFO - Validating Epoch 40...
+2026-02-18 18:46:33,780 - INFO - Epoch 40 Results:
+2026-02-18 18:46:33,780 - INFO -   Train Loss: 2.6998
+2026-02-18 18:46:33,780 - INFO -   Val Loss:   2.5244
+2026-02-18 18:46:33,780 - INFO -   Mag Acc:    81.51% (MSE: 1.4380)
+2026-02-18 18:46:33,780 - INFO -   Sign Acc:   95.84%
+2026-02-18 18:46:33,780 - INFO -   Mod Acc:    28.50% (Mean of 100 mods)
+2026-02-18 18:46:33,780 - INFO -     mod2: 73.8%, mod3: 49.3%, mod5: 34.3%, mod7: 29.6%, mod10: 32.1%, mod100: 28.1%, mod101: 26.3%
+2026-02-18 18:46:34,445 - INFO - New best model saved! (Loss: 2.5244)
+2026-02-18 18:52:13,298 - INFO - Validating Epoch 41...
+2026-02-18 18:52:37,281 - INFO - Epoch 41 Results:
+2026-02-18 18:52:37,281 - INFO -   Train Loss: 2.6876
+2026-02-18 18:52:37,281 - INFO -   Val Loss:   2.5186
+2026-02-18 18:52:37,281 - INFO -   Mag Acc:    81.92% (MSE: 1.8100)
+2026-02-18 18:52:37,281 - INFO -   Sign Acc:   95.88%
+2026-02-18 18:52:37,281 - INFO -   Mod Acc:    28.51% (Mean of 100 mods)
+2026-02-18 18:52:37,281 - INFO -     mod2: 73.9%, mod3: 49.6%, mod5: 34.3%, mod7: 29.5%, mod10: 32.3%, mod100: 28.2%, mod101: 26.3%
+2026-02-18 18:52:37,939 - INFO - New best model saved! (Loss: 2.5186)
+2026-02-18 18:58:27,911 - INFO - Validating Epoch 42...
+2026-02-18 18:58:52,021 - INFO - Epoch 42 Results:
+2026-02-18 18:58:52,021 - INFO -   Train Loss: 2.6772
+2026-02-18 18:58:52,021 - INFO -   Val Loss:   2.5155
+2026-02-18 18:58:52,021 - INFO -   Mag Acc:    81.81% (MSE: 1.4217)
+2026-02-18 18:58:52,021 - INFO -   Sign Acc:   95.94%
+2026-02-18 18:58:52,021 - INFO -   Mod Acc:    28.82% (Mean of 100 mods)
+2026-02-18 18:58:52,021 - INFO -     mod2: 74.1%, mod3: 49.5%, mod5: 34.5%, mod7: 30.0%, mod10: 32.5%, mod100: 28.6%, mod101: 26.5%
+2026-02-18 18:58:52,663 - INFO - New best model saved! (Loss: 2.5155)
+2026-02-18 19:04:43,023 - INFO - Validating Epoch 43...
+2026-02-18 19:05:06,686 - INFO - Epoch 43 Results:
+2026-02-18 19:05:06,686 - INFO -   Train Loss: 2.6690
+2026-02-18 19:05:06,686 - INFO -   Val Loss:   2.5052
+2026-02-18 19:05:06,686 - INFO -   Mag Acc:    79.96% (MSE: 1.6254)
+2026-02-18 19:05:06,686 - INFO -   Sign Acc:   96.01%
+2026-02-18 19:05:06,686 - INFO -   Mod Acc:    28.88% (Mean of 100 mods)
+2026-02-18 19:05:06,686 - INFO -     mod2: 74.1%, mod3: 49.9%, mod5: 34.5%, mod7: 30.0%, mod10: 32.6%, mod100: 28.5%, mod101: 26.4%
+2026-02-18 19:05:07,334 - INFO - New best model saved! (Loss: 2.5052)
+2026-02-18 19:10:55,808 - INFO - Validating Epoch 44...
+2026-02-18 19:11:19,718 - INFO - Epoch 44 Results:
+2026-02-18 19:11:19,718 - INFO -   Train Loss: 2.6586
+2026-02-18 19:11:19,718 - INFO -   Val Loss:   2.4960
+2026-02-18 19:11:19,718 - INFO -   Mag Acc:    81.90% (MSE: 1.3788)
+2026-02-18 19:11:19,718 - INFO -   Sign Acc:   96.03%
+2026-02-18 19:11:19,718 - INFO -   Mod Acc:    29.14% (Mean of 100 mods)
+2026-02-18 19:11:19,718 - INFO -     mod2: 74.1%, mod3: 50.0%, mod5: 34.4%, mod7: 30.2%, mod10: 32.7%, mod100: 28.9%, mod101: 26.8%
+2026-02-18 19:11:20,373 - INFO - New best model saved! (Loss: 2.4960)
+2026-02-18 19:17:16,445 - INFO - Validating Epoch 45...
+2026-02-18 19:17:40,514 - INFO - Epoch 45 Results:
+2026-02-18 19:17:40,514 - INFO -   Train Loss: 2.6474
+2026-02-18 19:17:40,514 - INFO -   Val Loss:   2.4728
+2026-02-18 19:17:40,514 - INFO -   Mag Acc:    81.82% (MSE: 1.4795)
+2026-02-18 19:17:40,514 - INFO -   Sign Acc:   96.06%
+2026-02-18 19:17:40,514 - INFO -   Mod Acc:    29.33% (Mean of 100 mods)
+2026-02-18 19:17:40,514 - INFO -     mod2: 74.2%, mod3: 50.3%, mod5: 34.9%, mod7: 30.2%, mod10: 33.0%, mod100: 29.1%, mod101: 27.1%
+2026-02-18 19:17:41,189 - INFO - New best model saved! (Loss: 2.4728)
+2026-02-18 19:23:27,533 - INFO - Validating Epoch 46...
+2026-02-18 19:23:51,851 - INFO - Epoch 46 Results:
+2026-02-18 19:23:51,851 - INFO -   Train Loss: 2.6427
+2026-02-18 19:23:51,851 - INFO -   Val Loss:   2.4693
+2026-02-18 19:23:51,851 - INFO -   Mag Acc:    81.85% (MSE: 1.3618)
+2026-02-18 19:23:51,851 - INFO -   Sign Acc:   96.08%
+2026-02-18 19:23:51,851 - INFO -   Mod Acc:    29.47% (Mean of 100 mods)
+2026-02-18 19:23:51,851 - INFO -     mod2: 74.2%, mod3: 50.5%, mod5: 35.0%, mod7: 30.6%, mod10: 33.1%, mod100: 29.1%, mod101: 27.2%
+2026-02-18 19:23:52,519 - INFO - New best model saved! (Loss: 2.4693)
+2026-02-18 19:29:48,972 - INFO - Validating Epoch 47...
+2026-02-18 19:30:13,023 - INFO - Epoch 47 Results:
+2026-02-18 19:30:13,024 - INFO -   Train Loss: 2.6405
+2026-02-18 19:30:13,024 - INFO -   Val Loss:   2.4788
+2026-02-18 19:30:13,024 - INFO -   Mag Acc:    82.28% (MSE: 1.4546)
+2026-02-18 19:30:13,024 - INFO -   Sign Acc:   96.04%
+2026-02-18 19:30:13,024 - INFO -   Mod Acc:    29.45% (Mean of 100 mods)
+2026-02-18 19:30:13,024 - INFO -     mod2: 74.3%, mod3: 50.4%, mod5: 34.9%, mod7: 30.4%, mod10: 33.2%, mod100: 29.1%, mod101: 27.0%
+2026-02-18 19:36:00,394 - INFO - Validating Epoch 48...
+2026-02-18 19:36:24,325 - INFO - Epoch 48 Results:
+2026-02-18 19:36:24,325 - INFO -   Train Loss: 2.6262
+2026-02-18 19:36:24,325 - INFO -   Val Loss:   2.4506
+2026-02-18 19:36:24,325 - INFO -   Mag Acc:    82.65% (MSE: 1.5872)
+2026-02-18 19:36:24,325 - INFO -   Sign Acc:   96.26%
+2026-02-18 19:36:24,325 - INFO -   Mod Acc:    29.74% (Mean of 100 mods)
+2026-02-18 19:36:24,325 - INFO -     mod2: 74.6%, mod3: 50.8%, mod5: 35.1%, mod7: 30.5%, mod10: 33.4%, mod100: 29.5%, mod101: 27.4%
+2026-02-18 19:36:24,978 - INFO - New best model saved! (Loss: 2.4506)
+2026-02-18 19:42:14,386 - INFO - Validating Epoch 49...
+2026-02-18 19:42:38,403 - INFO - Epoch 49 Results:
+2026-02-18 19:42:38,403 - INFO -   Train Loss: 2.6256
+2026-02-18 19:42:38,403 - INFO -   Val Loss:   2.4455
+2026-02-18 19:42:38,403 - INFO -   Mag Acc:    82.33% (MSE: 1.5442)
+2026-02-18 19:42:38,403 - INFO -   Sign Acc:   96.21%
+2026-02-18 19:42:38,404 - INFO -   Mod Acc:    30.09% (Mean of 100 mods)
+2026-02-18 19:42:38,404 - INFO -     mod2: 74.6%, mod3: 51.1%, mod5: 35.4%, mod7: 31.0%, mod10: 33.6%, mod100: 29.7%, mod101: 27.7%
+2026-02-18 19:42:39,054 - INFO - New best model saved! (Loss: 2.4455)
+2026-02-18 19:48:29,587 - INFO - Validating Epoch 50...
+2026-02-18 19:48:53,596 - INFO - Epoch 50 Results:
+2026-02-18 19:48:53,597 - INFO -   Train Loss: 2.6150
+2026-02-18 19:48:53,597 - INFO -   Val Loss:   2.4374
+2026-02-18 19:48:53,597 - INFO -   Mag Acc:    82.67% (MSE: 1.3776)
+2026-02-18 19:48:53,597 - INFO -   Sign Acc:   96.23%
+2026-02-18 19:48:53,597 - INFO -   Mod Acc:    30.25% (Mean of 100 mods)
+2026-02-18 19:48:53,597 - INFO -     mod2: 74.8%, mod3: 51.1%, mod5: 35.4%, mod7: 30.9%, mod10: 33.8%, mod100: 30.0%, mod101: 27.9%
+2026-02-18 19:48:54,267 - INFO - New best model saved! (Loss: 2.4374)
+2026-02-18 19:54:25,065 - INFO - Validating Epoch 51...
+2026-02-18 19:54:49,188 - INFO - Epoch 51 Results:
+2026-02-18 19:54:49,189 - INFO -   Train Loss: 2.6083
+2026-02-18 19:54:49,189 - INFO -   Val Loss:   2.4328
+2026-02-18 19:54:49,189 - INFO -   Mag Acc:    82.79% (MSE: 1.4185)
+2026-02-18 19:54:49,189 - INFO -   Sign Acc:   96.22%
+2026-02-18 19:54:49,189 - INFO -   Mod Acc:    30.26% (Mean of 100 mods)
+2026-02-18 19:54:49,189 - INFO -     mod2: 74.6%, mod3: 51.2%, mod5: 35.3%, mod7: 31.0%, mod10: 33.7%, mod100: 30.0%, mod101: 28.0%
+2026-02-18 19:54:49,852 - INFO - New best model saved! (Loss: 2.4328)
+2026-02-18 20:00:33,771 - INFO - Validating Epoch 52...
+2026-02-18 20:00:57,574 - INFO - Epoch 52 Results:
+2026-02-18 20:00:57,574 - INFO -   Train Loss: 2.5978
+2026-02-18 20:00:57,574 - INFO -   Val Loss:   2.4361
+2026-02-18 20:00:57,574 - INFO -   Mag Acc:    82.74% (MSE: 1.4418)
+2026-02-18 20:00:57,574 - INFO -   Sign Acc:   96.34%
+2026-02-18 20:00:57,574 - INFO -   Mod Acc:    30.34% (Mean of 100 mods)
+2026-02-18 20:00:57,574 - INFO -     mod2: 74.8%, mod3: 51.1%, mod5: 35.7%, mod7: 31.3%, mod10: 34.0%, mod100: 30.0%, mod101: 28.0%
+2026-02-18 20:06:45,234 - INFO - Validating Epoch 53...
+2026-02-18 20:07:09,314 - INFO - Epoch 53 Results:
+2026-02-18 20:07:09,314 - INFO -   Train Loss: 2.5927
+2026-02-18 20:07:09,314 - INFO -   Val Loss:   2.4299
+2026-02-18 20:07:09,314 - INFO -   Mag Acc:    82.77% (MSE: 1.4113)
+2026-02-18 20:07:09,314 - INFO -   Sign Acc:   96.36%
+2026-02-18 20:07:09,314 - INFO -   Mod Acc:    30.56% (Mean of 100 mods)
+2026-02-18 20:07:09,314 - INFO -     mod2: 75.0%, mod3: 51.5%, mod5: 35.9%, mod7: 31.1%, mod10: 34.3%, mod100: 30.2%, mod101: 28.1%
+2026-02-18 20:07:09,985 - INFO - New best model saved! (Loss: 2.4299)
+2026-02-18 20:13:03,291 - INFO - Validating Epoch 54...
+2026-02-18 20:13:26,959 - INFO - Epoch 54 Results:
+2026-02-18 20:13:26,959 - INFO -   Train Loss: 2.5907
+2026-02-18 20:13:26,959 - INFO -   Val Loss:   2.4007
+2026-02-18 20:13:26,959 - INFO -   Mag Acc:    81.85% (MSE: 1.2907)
+2026-02-18 20:13:26,959 - INFO -   Sign Acc:   96.38%
+2026-02-18 20:13:26,959 - INFO -   Mod Acc:    30.80% (Mean of 100 mods)
+2026-02-18 20:13:26,960 - INFO -     mod2: 74.8%, mod3: 51.6%, mod5: 35.9%, mod7: 31.3%, mod10: 34.3%, mod100: 30.6%, mod101: 28.5%
+2026-02-18 20:13:27,613 - INFO - New best model saved! (Loss: 2.4007)
+2026-02-18 20:19:11,391 - INFO - Validating Epoch 55...
+2026-02-18 20:19:35,213 - INFO - Epoch 55 Results:
+2026-02-18 20:19:35,213 - INFO -   Train Loss: 2.5862
+2026-02-18 20:19:35,213 - INFO -   Val Loss:   2.3977
+2026-02-18 20:19:35,213 - INFO -   Mag Acc:    82.78% (MSE: 1.4240)
+2026-02-18 20:19:35,213 - INFO -   Sign Acc:   96.41%
+2026-02-18 20:19:35,213 - INFO -   Mod Acc:    30.91% (Mean of 100 mods)
+2026-02-18 20:19:35,213 - INFO -     mod2: 75.2%, mod3: 51.9%, mod5: 35.9%, mod7: 31.2%, mod10: 34.3%, mod100: 30.7%, mod101: 28.5%
+2026-02-18 20:19:35,866 - INFO - New best model saved! (Loss: 2.3977)
+2026-02-18 20:25:14,200 - INFO - Validating Epoch 56...
+2026-02-18 20:25:37,985 - INFO - Epoch 56 Results:
+2026-02-18 20:25:37,986 - INFO -   Train Loss: 2.5729
+2026-02-18 20:25:37,986 - INFO -   Val Loss:   2.3944
+2026-02-18 20:25:37,986 - INFO -   Mag Acc:    82.91% (MSE: 1.3119)
+2026-02-18 20:25:37,986 - INFO -   Sign Acc:   96.42%
+2026-02-18 20:25:37,986 - INFO -   Mod Acc:    31.22% (Mean of 100 mods)
+2026-02-18 20:25:37,986 - INFO -     mod2: 75.3%, mod3: 52.2%, mod5: 36.0%, mod7: 31.7%, mod10: 34.5%, mod100: 31.0%, mod101: 28.8%
+2026-02-18 20:25:38,637 - INFO - New best model saved! (Loss: 2.3944)
+2026-02-18 20:31:32,861 - INFO - Validating Epoch 57...
+2026-02-18 20:31:56,651 - INFO - Epoch 57 Results:
+2026-02-18 20:31:56,651 - INFO -   Train Loss: 2.5685
+2026-02-18 20:31:56,651 - INFO -   Val Loss:   2.3757
+2026-02-18 20:31:56,651 - INFO -   Mag Acc:    82.94% (MSE: 1.3543)
+2026-02-18 20:31:56,651 - INFO -   Sign Acc:   96.43%
+2026-02-18 20:31:56,651 - INFO -   Mod Acc:    31.34% (Mean of 100 mods)
+2026-02-18 20:31:56,651 - INFO -     mod2: 75.1%, mod3: 52.4%, mod5: 36.2%, mod7: 31.8%, mod10: 34.7%, mod100: 31.2%, mod101: 29.0%
+2026-02-18 20:31:57,300 - INFO - New best model saved! (Loss: 2.3757)
+2026-02-18 20:38:00,589 - INFO - Validating Epoch 58...
+2026-02-18 20:38:24,669 - INFO - Epoch 58 Results:
+2026-02-18 20:38:24,669 - INFO -   Train Loss: 2.5549
+2026-02-18 20:38:24,669 - INFO -   Val Loss:   2.3804
+2026-02-18 20:38:24,669 - INFO -   Mag Acc:    82.31% (MSE: 1.2834)
+2026-02-18 20:38:24,670 - INFO -   Sign Acc:   96.40%
+2026-02-18 20:38:24,670 - INFO -   Mod Acc:    31.47% (Mean of 100 mods)
+2026-02-18 20:38:24,670 - INFO -     mod2: 75.6%, mod3: 52.3%, mod5: 36.2%, mod7: 31.5%, mod10: 34.8%, mod100: 31.3%, mod101: 29.1%
+2026-02-18 20:44:00,502 - INFO - Validating Epoch 59...
+2026-02-18 20:44:24,297 - INFO - Epoch 59 Results:
+2026-02-18 20:44:24,297 - INFO -   Train Loss: 2.5567
+2026-02-18 20:44:24,297 - INFO -   Val Loss:   2.3736
+2026-02-18 20:44:24,297 - INFO -   Mag Acc:    82.52% (MSE: 1.3886)
+2026-02-18 20:44:24,297 - INFO -   Sign Acc:   96.55%
+2026-02-18 20:44:24,297 - INFO -   Mod Acc:    31.55% (Mean of 100 mods)
+2026-02-18 20:44:24,298 - INFO -     mod2: 75.6%, mod3: 52.7%, mod5: 36.4%, mod7: 31.8%, mod10: 35.1%, mod100: 31.3%, mod101: 29.1%
+2026-02-18 20:44:24,967 - INFO - New best model saved! (Loss: 2.3736)
+2026-02-18 20:50:07,931 - INFO - Validating Epoch 60...
+2026-02-18 20:50:31,783 - INFO - Epoch 60 Results:
+2026-02-18 20:50:31,784 - INFO -   Train Loss: 2.5519
+2026-02-18 20:50:31,784 - INFO -   Val Loss:   2.3495
+2026-02-18 20:50:31,784 - INFO -   Mag Acc:    83.46% (MSE: 1.3012)
+2026-02-18 20:50:31,784 - INFO -   Sign Acc:   96.60%
+2026-02-18 20:50:31,784 - INFO -   Mod Acc:    31.63% (Mean of 100 mods)
+2026-02-18 20:50:31,784 - INFO -     mod2: 75.5%, mod3: 52.6%, mod5: 36.3%, mod7: 31.7%, mod10: 35.1%, mod100: 31.4%, mod101: 29.3%
+2026-02-18 20:50:32,441 - INFO - New best model saved! (Loss: 2.3495)
+2026-02-18 20:56:23,940 - INFO - Validating Epoch 61...
+2026-02-18 20:56:47,749 - INFO - Epoch 61 Results:
+2026-02-18 20:56:47,749 - INFO -   Train Loss: 2.5440
+2026-02-18 20:56:47,749 - INFO -   Val Loss:   2.3713
+2026-02-18 20:56:47,749 - INFO -   Mag Acc:    83.09% (MSE: 1.4720)
+2026-02-18 20:56:47,749 - INFO -   Sign Acc:   96.55%
+2026-02-18 20:56:47,749 - INFO -   Mod Acc:    31.77% (Mean of 100 mods)
+2026-02-18 20:56:47,749 - INFO -     mod2: 75.8%, mod3: 53.0%, mod5: 36.3%, mod7: 31.8%, mod10: 35.0%, mod100: 31.6%, mod101: 29.4%
+2026-02-18 21:02:33,496 - INFO - Validating Epoch 62...
+2026-02-18 21:02:57,363 - INFO - Epoch 62 Results:
+2026-02-18 21:02:57,363 - INFO -   Train Loss: 2.5383
+2026-02-18 21:02:57,363 - INFO -   Val Loss:   2.3571
+2026-02-18 21:02:57,363 - INFO -   Mag Acc:    81.55% (MSE: 1.4296)
+2026-02-18 21:02:57,363 - INFO -   Sign Acc:   96.58%
+2026-02-18 21:02:57,363 - INFO -   Mod Acc:    32.14% (Mean of 100 mods)
+2026-02-18 21:02:57,363 - INFO -     mod2: 75.7%, mod3: 52.9%, mod5: 36.5%, mod7: 32.2%, mod10: 35.4%, mod100: 31.9%, mod101: 29.8%
+2026-02-18 21:09:00,052 - INFO - Validating Epoch 63...
+2026-02-18 21:09:23,844 - INFO - Epoch 63 Results:
+2026-02-18 21:09:23,844 - INFO -   Train Loss: 2.5353
+2026-02-18 21:09:23,844 - INFO -   Val Loss:   2.3568
+2026-02-18 21:09:23,844 - INFO -   Mag Acc:    82.42% (MSE: 1.1733)
+2026-02-18 21:09:23,844 - INFO -   Sign Acc:   96.63%
+2026-02-18 21:09:23,844 - INFO -   Mod Acc:    32.00% (Mean of 100 mods)
+2026-02-18 21:09:23,845 - INFO -     mod2: 75.8%, mod3: 53.0%, mod5: 36.6%, mod7: 31.8%, mod10: 35.3%, mod100: 31.8%, mod101: 29.7%
+2026-02-18 21:15:22,675 - INFO - Validating Epoch 64...
+2026-02-18 21:15:46,709 - INFO - Epoch 64 Results:
+2026-02-18 21:15:46,709 - INFO -   Train Loss: 2.5280
+2026-02-18 21:15:46,709 - INFO -   Val Loss:   2.3494
+2026-02-18 21:15:46,709 - INFO -   Mag Acc:    83.65% (MSE: 1.4644)
+2026-02-18 21:15:46,709 - INFO -   Sign Acc:   96.71%
+2026-02-18 21:15:46,709 - INFO -   Mod Acc:    32.12% (Mean of 100 mods)
+2026-02-18 21:15:46,709 - INFO -     mod2: 75.8%, mod3: 52.8%, mod5: 36.5%, mod7: 32.0%, mod10: 35.6%, mod100: 31.9%, mod101: 29.7%
+2026-02-18 21:15:47,365 - INFO - New best model saved! (Loss: 2.3494)
+2026-02-18 21:21:25,518 - INFO - Validating Epoch 65...
+2026-02-18 21:21:49,388 - INFO - Epoch 65 Results:
+2026-02-18 21:21:49,388 - INFO -   Train Loss: 2.5237
+2026-02-18 21:21:49,388 - INFO -   Val Loss:   2.3398
+2026-02-18 21:21:49,388 - INFO -   Mag Acc:    82.69% (MSE: 1.4269)
+2026-02-18 21:21:49,388 - INFO -   Sign Acc:   96.54%
+2026-02-18 21:21:49,388 - INFO -   Mod Acc:    32.37% (Mean of 100 mods)
+2026-02-18 21:21:49,388 - INFO -     mod2: 76.1%, mod3: 53.4%, mod5: 36.7%, mod7: 32.0%, mod10: 35.5%, mod100: 32.3%, mod101: 30.0%
+2026-02-18 21:21:50,038 - INFO - New best model saved! (Loss: 2.3398)
+2026-02-18 21:27:48,249 - INFO - Validating Epoch 66...
+2026-02-18 21:28:12,254 - INFO - Epoch 66 Results:
+2026-02-18 21:28:12,254 - INFO -   Train Loss: 2.5184
+2026-02-18 21:28:12,254 - INFO -   Val Loss:   2.3452
+2026-02-18 21:28:12,254 - INFO -   Mag Acc:    82.69% (MSE: 1.3540)
+2026-02-18 21:28:12,254 - INFO -   Sign Acc:   96.59%
+2026-02-18 21:28:12,254 - INFO -   Mod Acc:    32.24% (Mean of 100 mods)
+2026-02-18 21:28:12,254 - INFO -     mod2: 76.0%, mod3: 53.4%, mod5: 36.5%, mod7: 31.9%, mod10: 35.5%, mod100: 32.1%, mod101: 29.9%
+2026-02-18 21:33:54,797 - INFO - Validating Epoch 67...
+2026-02-18 21:34:18,471 - INFO - Epoch 67 Results:
+2026-02-18 21:34:18,471 - INFO -   Train Loss: 2.5130
+2026-02-18 21:34:18,471 - INFO -   Val Loss:   2.3355
+2026-02-18 21:34:18,471 - INFO -   Mag Acc:    83.52% (MSE: 1.3060)
+2026-02-18 21:34:18,471 - INFO -   Sign Acc:   96.69%
+2026-02-18 21:34:18,471 - INFO -   Mod Acc:    32.35% (Mean of 100 mods)
+2026-02-18 21:34:18,471 - INFO -     mod2: 76.0%, mod3: 53.6%, mod5: 36.9%, mod7: 32.3%, mod10: 35.8%, mod100: 32.1%, mod101: 30.0%
+2026-02-18 21:34:19,137 - INFO - New best model saved! (Loss: 2.3355)
+2026-02-18 21:40:05,231 - INFO - Validating Epoch 68...
+2026-02-18 21:40:29,384 - INFO - Epoch 68 Results:
+2026-02-18 21:40:29,384 - INFO -   Train Loss: 2.5091
+2026-02-18 21:40:29,384 - INFO -   Val Loss:   2.3405
+2026-02-18 21:40:29,384 - INFO -   Mag Acc:    83.39% (MSE: 1.5114)
+2026-02-18 21:40:29,384 - INFO -   Sign Acc:   96.60%
+2026-02-18 21:40:29,384 - INFO -   Mod Acc:    32.44% (Mean of 100 mods)
+2026-02-18 21:40:29,384 - INFO -     mod2: 76.1%, mod3: 53.6%, mod5: 36.6%, mod7: 31.9%, mod10: 35.7%, mod100: 32.3%, mod101: 30.1%
+2026-02-18 21:46:10,233 - INFO - Validating Epoch 69...
+2026-02-18 21:46:33,793 - INFO - Epoch 69 Results:
+2026-02-18 21:46:33,793 - INFO -   Train Loss: 2.5073
+2026-02-18 21:46:33,793 - INFO -   Val Loss:   2.3259
+2026-02-18 21:46:33,793 - INFO -   Mag Acc:    82.59% (MSE: 1.5106)
+2026-02-18 21:46:33,793 - INFO -   Sign Acc:   96.66%
+2026-02-18 21:46:33,794 - INFO -   Mod Acc:    32.71% (Mean of 100 mods)
+2026-02-18 21:46:33,794 - INFO -     mod2: 76.3%, mod3: 53.9%, mod5: 37.0%, mod7: 32.1%, mod10: 36.0%, mod100: 32.6%, mod101: 30.3%
+2026-02-18 21:46:34,454 - INFO - New best model saved! (Loss: 2.3259)
+2026-02-18 21:52:28,069 - INFO - Validating Epoch 70...
+2026-02-18 21:52:51,730 - INFO - Epoch 70 Results:
+2026-02-18 21:52:51,730 - INFO -   Train Loss: 2.4984
+2026-02-18 21:52:51,730 - INFO -   Val Loss:   2.3304
+2026-02-18 21:52:51,730 - INFO -   Mag Acc:    84.37% (MSE: 1.2668)
+2026-02-18 21:52:51,730 - INFO -   Sign Acc:   96.75%
+2026-02-18 21:52:51,730 - INFO -   Mod Acc:    32.76% (Mean of 100 mods)
+2026-02-18 21:52:51,730 - INFO -     mod2: 76.3%, mod3: 53.8%, mod5: 37.1%, mod7: 32.1%, mod10: 36.1%, mod100: 32.7%, mod101: 30.4%
+2026-02-18 21:58:38,965 - INFO - Validating Epoch 71...
+2026-02-18 21:59:02,741 - INFO - Epoch 71 Results:
+2026-02-18 21:59:02,741 - INFO -   Train Loss: 2.4956
+2026-02-18 21:59:02,741 - INFO -   Val Loss:   2.3135
+2026-02-18 21:59:02,741 - INFO -   Mag Acc:    83.83% (MSE: 1.4919)
+2026-02-18 21:59:02,741 - INFO -   Sign Acc:   96.75%
+2026-02-18 21:59:02,741 - INFO -   Mod Acc:    32.98% (Mean of 100 mods)
+2026-02-18 21:59:02,741 - INFO -     mod2: 76.4%, mod3: 53.9%, mod5: 37.3%, mod7: 32.7%, mod10: 36.4%, mod100: 32.9%, mod101: 30.5%
+2026-02-18 21:59:03,403 - INFO - New best model saved! (Loss: 2.3135)
+2026-02-18 22:05:11,620 - INFO - Validating Epoch 72...
+2026-02-18 22:05:35,290 - INFO - Epoch 72 Results:
+2026-02-18 22:05:35,290 - INFO -   Train Loss: 2.4952
+2026-02-18 22:05:35,290 - INFO -   Val Loss:   2.3117
+2026-02-18 22:05:35,290 - INFO -   Mag Acc:    84.14% (MSE: 1.2401)
+2026-02-18 22:05:35,290 - INFO -   Sign Acc:   96.73%
+2026-02-18 22:05:35,290 - INFO -   Mod Acc:    32.87% (Mean of 100 mods)
+2026-02-18 22:05:35,290 - INFO -     mod2: 76.3%, mod3: 54.1%, mod5: 37.1%, mod7: 32.7%, mod10: 36.3%, mod100: 32.7%, mod101: 30.5%
+2026-02-18 22:05:35,937 - INFO - New best model saved! (Loss: 2.3117)
+2026-02-18 22:11:19,981 - INFO - Validating Epoch 73...
+2026-02-18 22:11:43,812 - INFO - Epoch 73 Results:
+2026-02-18 22:11:43,812 - INFO -   Train Loss: 2.4939
+2026-02-18 22:11:43,812 - INFO -   Val Loss:   2.3109
+2026-02-18 22:11:43,812 - INFO -   Mag Acc:    82.97% (MSE: 1.2827)
+2026-02-18 22:11:43,812 - INFO -   Sign Acc:   96.80%
+2026-02-18 22:11:43,812 - INFO -   Mod Acc:    33.05% (Mean of 100 mods)
+2026-02-18 22:11:43,812 - INFO -     mod2: 76.4%, mod3: 54.2%, mod5: 37.2%, mod7: 32.6%, mod10: 36.4%, mod100: 32.9%, mod101: 30.7%
+2026-02-18 22:11:44,481 - INFO - New best model saved! (Loss: 2.3109)
+2026-02-18 22:16:55,394 - INFO - Validating Epoch 74...
+2026-02-18 22:17:19,479 - INFO - Epoch 74 Results:
+2026-02-18 22:17:19,479 - INFO -   Train Loss: 2.4882
+2026-02-18 22:17:19,479 - INFO -   Val Loss:   2.3091
+2026-02-18 22:17:19,479 - INFO -   Mag Acc:    83.19% (MSE: 1.2986)
+2026-02-18 22:17:19,479 - INFO -   Sign Acc:   96.66%
+2026-02-18 22:17:19,479 - INFO -   Mod Acc:    33.06% (Mean of 100 mods)
+2026-02-18 22:17:19,479 - INFO -     mod2: 76.4%, mod3: 54.2%, mod5: 37.0%, mod7: 32.9%, mod10: 36.4%, mod100: 33.0%, mod101: 30.6%
+2026-02-18 22:17:20,146 - INFO - New best model saved! (Loss: 2.3091)
+2026-02-18 22:23:05,100 - INFO - Validating Epoch 75...
+2026-02-18 22:23:29,106 - INFO - Epoch 75 Results:
+2026-02-18 22:23:29,106 - INFO -   Train Loss: 2.4832
+2026-02-18 22:23:29,106 - INFO -   Val Loss:   2.3027
+2026-02-18 22:23:29,106 - INFO -   Mag Acc:    83.47% (MSE: 1.5179)
+2026-02-18 22:23:29,106 - INFO -   Sign Acc:   96.73%
+2026-02-18 22:23:29,106 - INFO -   Mod Acc:    33.09% (Mean of 100 mods)
+2026-02-18 22:23:29,106 - INFO -     mod2: 76.7%, mod3: 53.9%, mod5: 37.1%, mod7: 32.6%, mod10: 36.7%, mod100: 33.0%, mod101: 30.8%
+2026-02-18 22:23:29,757 - INFO - New best model saved! (Loss: 2.3027)
+2026-02-18 22:28:58,886 - INFO - Validating Epoch 76...
+2026-02-18 22:29:23,028 - INFO - Epoch 76 Results:
+2026-02-18 22:29:23,028 - INFO -   Train Loss: 2.4828
+2026-02-18 22:29:23,028 - INFO -   Val Loss:   2.3001
+2026-02-18 22:29:23,028 - INFO -   Mag Acc:    83.85% (MSE: 1.2805)
+2026-02-18 22:29:23,028 - INFO -   Sign Acc:   96.69%
+2026-02-18 22:29:23,028 - INFO -   Mod Acc:    33.29% (Mean of 100 mods)
+2026-02-18 22:29:23,028 - INFO -     mod2: 76.5%, mod3: 54.6%, mod5: 37.3%, mod7: 32.7%, mod10: 36.6%, mod100: 33.1%, mod101: 30.9%
+2026-02-18 22:29:23,692 - INFO - New best model saved! (Loss: 2.3001)
+2026-02-18 22:35:02,706 - INFO - Validating Epoch 77...
+2026-02-18 22:35:26,865 - INFO - Epoch 77 Results:
+2026-02-18 22:35:26,865 - INFO -   Train Loss: 2.4734
+2026-02-18 22:35:26,865 - INFO -   Val Loss:   2.3004
+2026-02-18 22:35:26,865 - INFO -   Mag Acc:    84.59% (MSE: 1.2752)
+2026-02-18 22:35:26,865 - INFO -   Sign Acc:   96.76%
+2026-02-18 22:35:26,865 - INFO -   Mod Acc:    33.26% (Mean of 100 mods)
+2026-02-18 22:35:26,865 - INFO -     mod2: 76.4%, mod3: 54.6%, mod5: 37.4%, mod7: 32.7%, mod10: 36.8%, mod100: 33.0%, mod101: 30.8%
+2026-02-18 22:41:36,001 - INFO - Validating Epoch 78...
+2026-02-18 22:41:59,808 - INFO - Epoch 78 Results:
+2026-02-18 22:41:59,808 - INFO -   Train Loss: 2.4742
+2026-02-18 22:41:59,808 - INFO -   Val Loss:   2.2936
+2026-02-18 22:41:59,808 - INFO -   Mag Acc:    84.02% (MSE: 1.4368)
+2026-02-18 22:41:59,808 - INFO -   Sign Acc:   96.79%
+2026-02-18 22:41:59,808 - INFO -   Mod Acc:    33.46% (Mean of 100 mods)
+2026-02-18 22:41:59,808 - INFO -     mod2: 76.7%, mod3: 54.6%, mod5: 37.1%, mod7: 32.7%, mod10: 36.7%, mod100: 33.2%, mod101: 31.0%
+2026-02-18 22:42:00,469 - INFO - New best model saved! (Loss: 2.2936)
+2026-02-18 22:47:47,733 - INFO - Validating Epoch 79...
+2026-02-18 22:48:11,579 - INFO - Epoch 79 Results:
+2026-02-18 22:48:11,579 - INFO -   Train Loss: 2.4734
+2026-02-18 22:48:11,579 - INFO -   Val Loss:   2.2849
+2026-02-18 22:48:11,579 - INFO -   Mag Acc:    84.41% (MSE: 1.4377)
+2026-02-18 22:48:11,579 - INFO -   Sign Acc:   96.83%
+2026-02-18 22:48:11,579 - INFO -   Mod Acc:    33.52% (Mean of 100 mods)
+2026-02-18 22:48:11,579 - INFO -     mod2: 77.0%, mod3: 54.8%, mod5: 37.6%, mod7: 32.8%, mod10: 36.8%, mod100: 33.4%, mod101: 31.1%
+2026-02-18 22:48:12,238 - INFO - New best model saved! (Loss: 2.2849)
+2026-02-18 22:53:50,246 - INFO - Validating Epoch 80...
+2026-02-18 22:54:14,154 - INFO - Epoch 80 Results:
+2026-02-18 22:54:14,155 - INFO -   Train Loss: 2.4649
+2026-02-18 22:54:14,155 - INFO -   Val Loss:   2.2967
+2026-02-18 22:54:14,155 - INFO -   Mag Acc:    84.37% (MSE: 1.4331)
+2026-02-18 22:54:14,155 - INFO -   Sign Acc:   96.91%
+2026-02-18 22:54:14,155 - INFO -   Mod Acc:    33.44% (Mean of 100 mods)
+2026-02-18 22:54:14,155 - INFO -     mod2: 76.8%, mod3: 54.8%, mod5: 37.5%, mod7: 32.7%, mod10: 36.8%, mod100: 33.3%, mod101: 31.0%
+2026-02-18 22:59:59,139 - INFO - Validating Epoch 81...
+2026-02-18 23:00:22,972 - INFO - Epoch 81 Results:
+2026-02-18 23:00:22,973 - INFO -   Train Loss: 2.4662
+2026-02-18 23:00:22,973 - INFO -   Val Loss:   2.2793
+2026-02-18 23:00:22,973 - INFO -   Mag Acc:    83.94% (MSE: 1.2648)
+2026-02-18 23:00:22,973 - INFO -   Sign Acc:   96.71%
+2026-02-18 23:00:22,973 - INFO -   Mod Acc:    33.72% (Mean of 100 mods)
+2026-02-18 23:00:22,973 - INFO -     mod2: 76.8%, mod3: 54.8%, mod5: 37.6%, mod7: 32.9%, mod10: 37.1%, mod100: 33.5%, mod101: 31.3%
+2026-02-18 23:00:23,625 - INFO - New best model saved! (Loss: 2.2793)
+2026-02-18 23:06:00,424 - INFO - Validating Epoch 82...
+2026-02-18 23:06:24,434 - INFO - Epoch 82 Results:
+2026-02-18 23:06:24,434 - INFO -   Train Loss: 2.4607
+2026-02-18 23:06:24,434 - INFO -   Val Loss:   2.2827
+2026-02-18 23:06:24,434 - INFO -   Mag Acc:    84.28% (MSE: 1.3747)
+2026-02-18 23:06:24,434 - INFO -   Sign Acc:   96.77%
+2026-02-18 23:06:24,434 - INFO -   Mod Acc:    33.80% (Mean of 100 mods)
+2026-02-18 23:06:24,434 - INFO -     mod2: 76.8%, mod3: 54.9%, mod5: 37.9%, mod7: 33.0%, mod10: 37.2%, mod100: 33.6%, mod101: 31.4%
+2026-02-18 23:12:18,575 - INFO - Validating Epoch 83...
+2026-02-18 23:12:42,849 - INFO - Epoch 83 Results:
+2026-02-18 23:12:42,849 - INFO -   Train Loss: 2.4602
+2026-02-18 23:12:42,849 - INFO -   Val Loss:   2.2916
+2026-02-18 23:12:42,849 - INFO -   Mag Acc:    83.98% (MSE: 1.2594)
+2026-02-18 23:12:42,849 - INFO -   Sign Acc:   96.84%
+2026-02-18 23:12:42,849 - INFO -   Mod Acc:    33.72% (Mean of 100 mods)
+2026-02-18 23:12:42,849 - INFO -     mod2: 77.0%, mod3: 54.9%, mod5: 37.6%, mod7: 33.2%, mod10: 37.3%, mod100: 33.6%, mod101: 31.4%
+2026-02-18 23:18:15,488 - INFO - Validating Epoch 84...
+2026-02-18 23:18:39,732 - INFO - Epoch 84 Results:
+2026-02-18 23:18:39,732 - INFO -   Train Loss: 2.4576
+2026-02-18 23:18:39,732 - INFO -   Val Loss:   2.2852
+2026-02-18 23:18:39,732 - INFO -   Mag Acc:    84.57% (MSE: 1.2173)
+2026-02-18 23:18:39,732 - INFO -   Sign Acc:   96.82%
+2026-02-18 23:18:39,732 - INFO -   Mod Acc:    33.76% (Mean of 100 mods)
+2026-02-18 23:18:39,733 - INFO -     mod2: 77.0%, mod3: 54.9%, mod5: 37.6%, mod7: 32.9%, mod10: 37.2%, mod100: 33.6%, mod101: 31.4%
+2026-02-18 23:24:31,580 - INFO - Validating Epoch 85...
+2026-02-18 23:24:55,722 - INFO - Epoch 85 Results:
+2026-02-18 23:24:55,722 - INFO -   Train Loss: 2.4540
+2026-02-18 23:24:55,722 - INFO -   Val Loss:   2.2738
+2026-02-18 23:24:55,722 - INFO -   Mag Acc:    84.67% (MSE: 1.2150)
+2026-02-18 23:24:55,722 - INFO -   Sign Acc:   96.79%
+2026-02-18 23:24:55,722 - INFO -   Mod Acc:    33.91% (Mean of 100 mods)
+2026-02-18 23:24:55,722 - INFO -     mod2: 77.0%, mod3: 55.1%, mod5: 37.7%, mod7: 33.1%, mod10: 37.3%, mod100: 33.7%, mod101: 31.5%
+2026-02-18 23:24:56,376 - INFO - New best model saved! (Loss: 2.2738)
+2026-02-18 23:30:49,396 - INFO - Validating Epoch 86...
+2026-02-18 23:31:13,258 - INFO - Epoch 86 Results:
+2026-02-18 23:31:13,258 - INFO -   Train Loss: 2.4539
+2026-02-18 23:31:13,258 - INFO -   Val Loss:   2.2789
+2026-02-18 23:31:13,258 - INFO -   Mag Acc:    84.43% (MSE: 1.3265)
+2026-02-18 23:31:13,258 - INFO -   Sign Acc:   96.76%
+2026-02-18 23:31:13,258 - INFO -   Mod Acc:    33.89% (Mean of 100 mods)
+2026-02-18 23:31:13,258 - INFO -     mod2: 77.1%, mod3: 55.0%, mod5: 37.8%, mod7: 33.0%, mod10: 37.4%, mod100: 33.8%, mod101: 31.5%
+2026-02-18 23:36:58,931 - INFO - Validating Epoch 87...
+2026-02-18 23:37:23,081 - INFO - Epoch 87 Results:
+2026-02-18 23:37:23,082 - INFO -   Train Loss: 2.4455
+2026-02-18 23:37:23,082 - INFO -   Val Loss:   2.2728
+2026-02-18 23:37:23,082 - INFO -   Mag Acc:    84.21% (MSE: 1.3454)
+2026-02-18 23:37:23,082 - INFO -   Sign Acc:   96.84%
+2026-02-18 23:37:23,082 - INFO -   Mod Acc:    34.11% (Mean of 100 mods)
+2026-02-18 23:37:23,082 - INFO -     mod2: 76.9%, mod3: 55.2%, mod5: 38.0%, mod7: 33.3%, mod10: 37.5%, mod100: 34.0%, mod101: 31.7%
+2026-02-18 23:37:23,745 - INFO - New best model saved! (Loss: 2.2728)
+2026-02-18 23:43:08,265 - INFO - Validating Epoch 88...
+2026-02-18 23:43:32,063 - INFO - Epoch 88 Results:
+2026-02-18 23:43:32,063 - INFO -   Train Loss: 2.4455
+2026-02-18 23:43:32,063 - INFO -   Val Loss:   2.2629
+2026-02-18 23:43:32,063 - INFO -   Mag Acc:    84.55% (MSE: 1.2876)
+2026-02-18 23:43:32,063 - INFO -   Sign Acc:   96.74%
+2026-02-18 23:43:32,063 - INFO -   Mod Acc:    34.14% (Mean of 100 mods)
+2026-02-18 23:43:32,063 - INFO -     mod2: 77.2%, mod3: 55.4%, mod5: 37.9%, mod7: 33.3%, mod10: 37.5%, mod100: 34.0%, mod101: 31.8%
+2026-02-18 23:43:32,719 - INFO - New best model saved! (Loss: 2.2629)
+2026-02-18 23:49:17,642 - INFO - Validating Epoch 89...
+2026-02-18 23:49:41,419 - INFO - Epoch 89 Results:
+2026-02-18 23:49:41,419 - INFO -   Train Loss: 2.4401
+2026-02-18 23:49:41,419 - INFO -   Val Loss:   2.2569
+2026-02-18 23:49:41,419 - INFO -   Mag Acc:    84.47% (MSE: 1.2349)
+2026-02-18 23:49:41,419 - INFO -   Sign Acc:   96.76%
+2026-02-18 23:49:41,419 - INFO -   Mod Acc:    33.97% (Mean of 100 mods)
+2026-02-18 23:49:41,419 - INFO -     mod2: 77.0%, mod3: 55.3%, mod5: 38.0%, mod7: 33.3%, mod10: 37.6%, mod100: 33.8%, mod101: 31.6%
+2026-02-18 23:49:42,079 - INFO - New best model saved! (Loss: 2.2569)
+2026-02-18 23:55:14,503 - INFO - Validating Epoch 90...
+2026-02-18 23:55:38,614 - INFO - Epoch 90 Results:
+2026-02-18 23:55:38,614 - INFO -   Train Loss: 2.4408
+2026-02-18 23:55:38,614 - INFO -   Val Loss:   2.2666
+2026-02-18 23:55:38,614 - INFO -   Mag Acc:    84.42% (MSE: 1.3584)
+2026-02-18 23:55:38,614 - INFO -   Sign Acc:   96.88%
+2026-02-18 23:55:38,614 - INFO -   Mod Acc:    34.04% (Mean of 100 mods)
+2026-02-18 23:55:38,614 - INFO -     mod2: 77.0%, mod3: 55.3%, mod5: 38.0%, mod7: 33.0%, mod10: 37.6%, mod100: 33.9%, mod101: 31.7%
+2026-02-19 00:01:24,100 - INFO - Validating Epoch 91...
+2026-02-19 00:01:47,727 - INFO - Epoch 91 Results:
+2026-02-19 00:01:47,727 - INFO -   Train Loss: 2.4407
+2026-02-19 00:01:47,727 - INFO -   Val Loss:   2.2621
+2026-02-19 00:01:47,727 - INFO -   Mag Acc:    84.81% (MSE: 1.2968)
+2026-02-19 00:01:47,727 - INFO -   Sign Acc:   96.93%
+2026-02-19 00:01:47,727 - INFO -   Mod Acc:    34.18% (Mean of 100 mods)
+2026-02-19 00:01:47,727 - INFO -     mod2: 77.1%, mod3: 55.3%, mod5: 37.8%, mod7: 33.2%, mod10: 37.6%, mod100: 34.1%, mod101: 31.9%
+2026-02-19 00:07:41,198 - INFO - Validating Epoch 92...
+2026-02-19 00:08:04,769 - INFO - Epoch 92 Results:
+2026-02-19 00:08:04,769 - INFO -   Train Loss: 2.4401
+2026-02-19 00:08:04,769 - INFO -   Val Loss:   2.2717
+2026-02-19 00:08:04,769 - INFO -   Mag Acc:    84.94% (MSE: 1.1656)
+2026-02-19 00:08:04,769 - INFO -   Sign Acc:   96.88%
+2026-02-19 00:08:04,769 - INFO -   Mod Acc:    34.23% (Mean of 100 mods)
+2026-02-19 00:08:04,769 - INFO -     mod2: 77.3%, mod3: 55.5%, mod5: 38.0%, mod7: 33.6%, mod10: 37.6%, mod100: 34.0%, mod101: 31.9%
+2026-02-19 00:14:10,248 - INFO - Validating Epoch 93...
+2026-02-19 00:14:34,125 - INFO - Epoch 93 Results:
+2026-02-19 00:14:34,125 - INFO -   Train Loss: 2.4392
+2026-02-19 00:14:34,125 - INFO -   Val Loss:   2.2533
+2026-02-19 00:14:34,125 - INFO -   Mag Acc:    84.23% (MSE: 1.4823)
+2026-02-19 00:14:34,125 - INFO -   Sign Acc:   96.81%
+2026-02-19 00:14:34,125 - INFO -   Mod Acc:    34.20% (Mean of 100 mods)
+2026-02-19 00:14:34,125 - INFO -     mod2: 77.4%, mod3: 55.7%, mod5: 38.0%, mod7: 33.3%, mod10: 37.6%, mod100: 34.1%, mod101: 31.7%
+2026-02-19 00:14:34,788 - INFO - New best model saved! (Loss: 2.2533)
+2026-02-19 00:20:12,209 - INFO - Validating Epoch 94...
+2026-02-19 00:20:36,204 - INFO - Epoch 94 Results:
+2026-02-19 00:20:36,204 - INFO -   Train Loss: 2.4343
+2026-02-19 00:20:36,204 - INFO -   Val Loss:   2.2600
+2026-02-19 00:20:36,204 - INFO -   Mag Acc:    84.77% (MSE: 1.3272)
+2026-02-19 00:20:36,204 - INFO -   Sign Acc:   96.90%
+2026-02-19 00:20:36,204 - INFO -   Mod Acc:    34.30% (Mean of 100 mods)
+2026-02-19 00:20:36,204 - INFO -     mod2: 77.2%, mod3: 55.6%, mod5: 38.1%, mod7: 33.7%, mod10: 37.9%, mod100: 34.0%, mod101: 31.9%
+2026-02-19 00:26:26,696 - INFO - Validating Epoch 95...
+2026-02-19 00:26:50,639 - INFO - Epoch 95 Results:
+2026-02-19 00:26:50,639 - INFO -   Train Loss: 2.4320
+2026-02-19 00:26:50,639 - INFO -   Val Loss:   2.2612
+2026-02-19 00:26:50,639 - INFO -   Mag Acc:    84.58% (MSE: 1.2572)
+2026-02-19 00:26:50,639 - INFO -   Sign Acc:   96.78%
+2026-02-19 00:26:50,639 - INFO -   Mod Acc:    34.19% (Mean of 100 mods)
+2026-02-19 00:26:50,639 - INFO -     mod2: 77.0%, mod3: 55.4%, mod5: 38.0%, mod7: 33.2%, mod10: 37.8%, mod100: 33.9%, mod101: 31.8%
+2026-02-19 00:32:35,737 - INFO - Validating Epoch 96...
+2026-02-19 00:32:59,370 - INFO - Epoch 96 Results:
+2026-02-19 00:32:59,370 - INFO -   Train Loss: 2.4299
+2026-02-19 00:32:59,370 - INFO -   Val Loss:   2.2621
+2026-02-19 00:32:59,370 - INFO -   Mag Acc:    84.24% (MSE: 1.3975)
+2026-02-19 00:32:59,370 - INFO -   Sign Acc:   96.84%
+2026-02-19 00:32:59,370 - INFO -   Mod Acc:    34.43% (Mean of 100 mods)
+2026-02-19 00:32:59,371 - INFO -     mod2: 77.4%, mod3: 55.5%, mod5: 38.3%, mod7: 33.3%, mod10: 38.1%, mod100: 34.2%, mod101: 32.0%
+2026-02-19 00:38:52,818 - INFO - Validating Epoch 97...
+2026-02-19 00:39:17,146 - INFO - Epoch 97 Results:
+2026-02-19 00:39:17,146 - INFO -   Train Loss: 2.4345
+2026-02-19 00:39:17,146 - INFO -   Val Loss:   2.2561
+2026-02-19 00:39:17,146 - INFO -   Mag Acc:    84.59% (MSE: 1.5078)
+2026-02-19 00:39:17,146 - INFO -   Sign Acc:   96.88%
+2026-02-19 00:39:17,146 - INFO -   Mod Acc:    34.36% (Mean of 100 mods)
+2026-02-19 00:39:17,146 - INFO -     mod2: 77.4%, mod3: 55.6%, mod5: 38.0%, mod7: 33.3%, mod10: 37.9%, mod100: 34.2%, mod101: 32.0%
+2026-02-19 00:44:57,043 - INFO - Validating Epoch 98...
+2026-02-19 00:45:21,233 - INFO - Epoch 98 Results:
+2026-02-19 00:45:21,233 - INFO -   Train Loss: 2.4277
+2026-02-19 00:45:21,233 - INFO -   Val Loss:   2.2426
+2026-02-19 00:45:21,233 - INFO -   Mag Acc:    84.95% (MSE: 1.2988)
+2026-02-19 00:45:21,233 - INFO -   Sign Acc:   96.86%
+2026-02-19 00:45:21,233 - INFO -   Mod Acc:    34.58% (Mean of 100 mods)
+2026-02-19 00:45:21,233 - INFO -     mod2: 77.4%, mod3: 55.8%, mod5: 38.2%, mod7: 33.6%, mod10: 38.0%, mod100: 34.4%, mod101: 32.2%
+2026-02-19 00:45:21,901 - INFO - New best model saved! (Loss: 2.2426)
+2026-02-19 00:50:58,371 - INFO - Validating Epoch 99...
+2026-02-19 00:51:22,280 - INFO - Epoch 99 Results:
+2026-02-19 00:51:22,280 - INFO -   Train Loss: 2.4241
+2026-02-19 00:51:22,280 - INFO -   Val Loss:   2.2366
+2026-02-19 00:51:22,280 - INFO -   Mag Acc:    83.70% (MSE: 1.4481)
+2026-02-19 00:51:22,280 - INFO -   Sign Acc:   96.81%
+2026-02-19 00:51:22,280 - INFO -   Mod Acc:    34.54% (Mean of 100 mods)
+2026-02-19 00:51:22,280 - INFO -     mod2: 77.4%, mod3: 55.8%, mod5: 38.4%, mod7: 33.5%, mod10: 38.0%, mod100: 34.4%, mod101: 32.2%
+2026-02-19 00:51:22,943 - INFO - New best model saved! (Loss: 2.2366)
+2026-02-19 00:57:11,651 - INFO - Validating Epoch 100...
+2026-02-19 00:57:35,705 - INFO - Epoch 100 Results:
+2026-02-19 00:57:35,706 - INFO -   Train Loss: 2.4216
+2026-02-19 00:57:35,706 - INFO -   Val Loss:   2.2417
+2026-02-19 00:57:35,706 - INFO -   Mag Acc:    84.42% (MSE: 1.1714)
+2026-02-19 00:57:35,706 - INFO -   Sign Acc:   96.83%
+2026-02-19 00:57:35,706 - INFO -   Mod Acc:    34.60% (Mean of 100 mods)
+2026-02-19 00:57:35,706 - INFO -     mod2: 77.4%, mod3: 55.7%, mod5: 38.1%, mod7: 33.4%, mod10: 37.9%, mod100: 34.4%, mod101: 32.3%
+2026-02-19 01:03:19,806 - INFO - Validating Epoch 101...
+2026-02-19 01:03:43,541 - INFO - Epoch 101 Results:
+2026-02-19 01:03:43,541 - INFO -   Train Loss: 2.4214
+2026-02-19 01:03:43,541 - INFO -   Val Loss:   2.2344
+2026-02-19 01:03:43,541 - INFO -   Mag Acc:    83.50% (MSE: 1.1538)
+2026-02-19 01:03:43,541 - INFO -   Sign Acc:   96.90%
+2026-02-19 01:03:43,541 - INFO -   Mod Acc:    34.65% (Mean of 100 mods)
+2026-02-19 01:03:43,541 - INFO -     mod2: 77.4%, mod3: 55.7%, mod5: 38.2%, mod7: 33.5%, mod10: 38.3%, mod100: 34.5%, mod101: 32.2%
+2026-02-19 01:03:44,215 - INFO - New best model saved! (Loss: 2.2344)
+2026-02-19 01:09:41,582 - INFO - Validating Epoch 102...
+2026-02-19 01:10:05,592 - INFO - Epoch 102 Results:
+2026-02-19 01:10:05,592 - INFO -   Train Loss: 2.4254
+2026-02-19 01:10:05,592 - INFO -   Val Loss:   2.2345
+2026-02-19 01:10:05,592 - INFO -   Mag Acc:    83.88% (MSE: 1.1608)
+2026-02-19 01:10:05,592 - INFO -   Sign Acc:   96.84%
+2026-02-19 01:10:05,592 - INFO -   Mod Acc:    34.73% (Mean of 100 mods)
+2026-02-19 01:10:05,592 - INFO -     mod2: 77.3%, mod3: 56.0%, mod5: 38.4%, mod7: 33.4%, mod10: 38.1%, mod100: 34.6%, mod101: 32.5%
+2026-02-19 01:16:01,795 - INFO - Validating Epoch 103...
+2026-02-19 01:16:25,559 - INFO - Epoch 103 Results:
+2026-02-19 01:16:25,559 - INFO -   Train Loss: 2.4204
+2026-02-19 01:16:25,559 - INFO -   Val Loss:   2.2400
+2026-02-19 01:16:25,559 - INFO -   Mag Acc:    84.86% (MSE: 1.2166)
+2026-02-19 01:16:25,559 - INFO -   Sign Acc:   96.83%
+2026-02-19 01:16:25,559 - INFO -   Mod Acc:    34.74% (Mean of 100 mods)
+2026-02-19 01:16:25,559 - INFO -     mod2: 77.4%, mod3: 55.9%, mod5: 38.1%, mod7: 33.5%, mod10: 38.2%, mod100: 34.7%, mod101: 32.3%
+2026-02-19 01:22:16,287 - INFO - Validating Epoch 104...
+2026-02-19 01:22:40,314 - INFO - Epoch 104 Results:
+2026-02-19 01:22:40,314 - INFO -   Train Loss: 2.4161
+2026-02-19 01:22:40,314 - INFO -   Val Loss:   2.2283
+2026-02-19 01:22:40,314 - INFO -   Mag Acc:    84.25% (MSE: 1.3706)
+2026-02-19 01:22:40,314 - INFO -   Sign Acc:   96.94%
+2026-02-19 01:22:40,314 - INFO -   Mod Acc:    34.84% (Mean of 100 mods)
+2026-02-19 01:22:40,314 - INFO -     mod2: 77.4%, mod3: 55.9%, mod5: 38.3%, mod7: 33.8%, mod10: 38.2%, mod100: 34.6%, mod101: 32.4%
+2026-02-19 01:22:40,966 - INFO - New best model saved! (Loss: 2.2283)
+2026-02-19 01:28:34,785 - INFO - Validating Epoch 105...
+2026-02-19 01:28:58,956 - INFO - Epoch 105 Results:
+2026-02-19 01:28:58,956 - INFO -   Train Loss: 2.4180
+2026-02-19 01:28:58,956 - INFO -   Val Loss:   2.2286
+2026-02-19 01:28:58,956 - INFO -   Mag Acc:    85.14% (MSE: 1.2820)
+2026-02-19 01:28:58,956 - INFO -   Sign Acc:   96.89%
+2026-02-19 01:28:58,956 - INFO -   Mod Acc:    34.82% (Mean of 100 mods)
+2026-02-19 01:28:58,956 - INFO -     mod2: 77.6%, mod3: 56.0%, mod5: 38.3%, mod7: 33.6%, mod10: 38.4%, mod100: 34.7%, mod101: 32.4%
+2026-02-19 01:34:54,329 - INFO - Validating Epoch 106...
+2026-02-19 01:35:18,267 - INFO - Epoch 106 Results:
+2026-02-19 01:35:18,268 - INFO -   Train Loss: 2.4160
+2026-02-19 01:35:18,268 - INFO -   Val Loss:   2.2529
+2026-02-19 01:35:18,268 - INFO -   Mag Acc:    84.34% (MSE: 1.2537)
+2026-02-19 01:35:18,268 - INFO -   Sign Acc:   96.90%
+2026-02-19 01:35:18,268 - INFO -   Mod Acc:    34.66% (Mean of 100 mods)
+2026-02-19 01:35:18,268 - INFO -     mod2: 77.6%, mod3: 55.9%, mod5: 38.1%, mod7: 33.5%, mod10: 38.1%, mod100: 34.6%, mod101: 32.3%
+2026-02-19 01:40:49,211 - INFO - Validating Epoch 107...
+2026-02-19 01:41:12,856 - INFO - Epoch 107 Results:
+2026-02-19 01:41:12,856 - INFO -   Train Loss: 2.4098
+2026-02-19 01:41:12,856 - INFO -   Val Loss:   2.2299
+2026-02-19 01:41:12,856 - INFO -   Mag Acc:    84.49% (MSE: 1.2988)
+2026-02-19 01:41:12,856 - INFO -   Sign Acc:   96.88%
+2026-02-19 01:41:12,856 - INFO -   Mod Acc:    34.77% (Mean of 100 mods)
+2026-02-19 01:41:12,856 - INFO -     mod2: 77.4%, mod3: 55.9%, mod5: 38.3%, mod7: 33.5%, mod10: 38.4%, mod100: 34.7%, mod101: 32.4%
+2026-02-19 01:46:54,647 - INFO - Validating Epoch 108...
+2026-02-19 01:47:18,745 - INFO - Epoch 108 Results:
+2026-02-19 01:47:18,746 - INFO -   Train Loss: 2.4102
+2026-02-19 01:47:18,746 - INFO -   Val Loss:   2.2420
+2026-02-19 01:47:18,746 - INFO -   Mag Acc:    84.67% (MSE: 1.2756)
+2026-02-19 01:47:18,746 - INFO -   Sign Acc:   96.93%
+2026-02-19 01:47:18,746 - INFO -   Mod Acc:    34.82% (Mean of 100 mods)
+2026-02-19 01:47:18,746 - INFO -     mod2: 77.5%, mod3: 56.2%, mod5: 38.6%, mod7: 33.8%, mod10: 38.4%, mod100: 34.7%, mod101: 32.5%
+2026-02-19 01:52:57,611 - INFO - Validating Epoch 109...
+2026-02-19 01:53:21,640 - INFO - Epoch 109 Results:
+2026-02-19 01:53:21,640 - INFO -   Train Loss: 2.4116
+2026-02-19 01:53:21,640 - INFO -   Val Loss:   2.2352
+2026-02-19 01:53:21,640 - INFO -   Mag Acc:    85.17% (MSE: 1.1871)
+2026-02-19 01:53:21,640 - INFO -   Sign Acc:   96.90%
+2026-02-19 01:53:21,640 - INFO -   Mod Acc:    34.98% (Mean of 100 mods)
+2026-02-19 01:53:21,640 - INFO -     mod2: 77.6%, mod3: 56.1%, mod5: 38.4%, mod7: 33.6%, mod10: 38.3%, mod100: 34.9%, mod101: 32.7%
+2026-02-19 01:59:12,861 - INFO - Validating Epoch 110...
+2026-02-19 01:59:37,065 - INFO - Epoch 110 Results:
+2026-02-19 01:59:37,065 - INFO -   Train Loss: 2.4068
+2026-02-19 01:59:37,065 - INFO -   Val Loss:   2.2339
+2026-02-19 01:59:37,065 - INFO -   Mag Acc:    84.99% (MSE: 1.3492)
+2026-02-19 01:59:37,065 - INFO -   Sign Acc:   96.92%
+2026-02-19 01:59:37,065 - INFO -   Mod Acc:    34.97% (Mean of 100 mods)
+2026-02-19 01:59:37,065 - INFO -     mod2: 77.6%, mod3: 56.1%, mod5: 38.4%, mod7: 33.6%, mod10: 38.5%, mod100: 34.8%, mod101: 32.7%
+2026-02-19 02:05:11,459 - INFO - Validating Epoch 111...
+2026-02-19 02:05:35,593 - INFO - Epoch 111 Results:
+2026-02-19 02:05:35,593 - INFO -   Train Loss: 2.4038
+2026-02-19 02:05:35,593 - INFO -   Val Loss:   2.2395
+2026-02-19 02:05:35,593 - INFO -   Mag Acc:    85.11% (MSE: 1.2814)
+2026-02-19 02:05:35,593 - INFO -   Sign Acc:   96.83%
+2026-02-19 02:05:35,593 - INFO -   Mod Acc:    34.86% (Mean of 100 mods)
+2026-02-19 02:05:35,593 - INFO -     mod2: 77.5%, mod3: 55.8%, mod5: 38.3%, mod7: 33.6%, mod10: 38.3%, mod100: 34.8%, mod101: 32.5%
+2026-02-19 02:11:07,511 - INFO - Validating Epoch 112...
+2026-02-19 02:11:31,433 - INFO - Epoch 112 Results:
+2026-02-19 02:11:31,433 - INFO -   Train Loss: 2.4069
+2026-02-19 02:11:31,433 - INFO -   Val Loss:   2.2204
+2026-02-19 02:11:31,433 - INFO -   Mag Acc:    84.80% (MSE: 1.2713)
+2026-02-19 02:11:31,433 - INFO -   Sign Acc:   96.92%
+2026-02-19 02:11:31,433 - INFO -   Mod Acc:    34.92% (Mean of 100 mods)
+2026-02-19 02:11:31,433 - INFO -     mod2: 77.5%, mod3: 56.1%, mod5: 38.3%, mod7: 33.6%, mod10: 38.3%, mod100: 34.9%, mod101: 32.5%
+2026-02-19 02:11:32,091 - INFO - New best model saved! (Loss: 2.2204)
+2026-02-19 02:17:21,227 - INFO - Validating Epoch 113...
+2026-02-19 02:17:45,030 - INFO - Epoch 113 Results:
+2026-02-19 02:17:45,031 - INFO -   Train Loss: 2.4039
+2026-02-19 02:17:45,031 - INFO -   Val Loss:   2.2124
+2026-02-19 02:17:45,031 - INFO -   Mag Acc:    84.94% (MSE: 1.3155)
+2026-02-19 02:17:45,031 - INFO -   Sign Acc:   96.94%
+2026-02-19 02:17:45,031 - INFO -   Mod Acc:    34.95% (Mean of 100 mods)
+2026-02-19 02:17:45,031 - INFO -     mod2: 77.7%, mod3: 56.1%, mod5: 38.6%, mod7: 33.6%, mod10: 38.5%, mod100: 34.7%, mod101: 32.5%
+2026-02-19 02:17:45,703 - INFO - New best model saved! (Loss: 2.2124)
+2026-02-19 02:23:27,076 - INFO - Validating Epoch 114...
+2026-02-19 02:23:50,843 - INFO - Epoch 114 Results:
+2026-02-19 02:23:50,843 - INFO -   Train Loss: 2.4064
+2026-02-19 02:23:50,843 - INFO -   Val Loss:   2.2184
+2026-02-19 02:23:50,843 - INFO -   Mag Acc:    84.82% (MSE: 1.2042)
+2026-02-19 02:23:50,843 - INFO -   Sign Acc:   96.94%
+2026-02-19 02:23:50,843 - INFO -   Mod Acc:    35.08% (Mean of 100 mods)
+2026-02-19 02:23:50,843 - INFO -     mod2: 77.7%, mod3: 56.4%, mod5: 38.8%, mod7: 33.9%, mod10: 38.6%, mod100: 35.0%, mod101: 32.8%
+2026-02-19 02:29:36,490 - INFO - Validating Epoch 115...
+2026-02-19 02:30:00,428 - INFO - Epoch 115 Results:
+2026-02-19 02:30:00,428 - INFO -   Train Loss: 2.4030
+2026-02-19 02:30:00,428 - INFO -   Val Loss:   2.2337
+2026-02-19 02:30:00,428 - INFO -   Mag Acc:    84.16% (MSE: 1.2360)
+2026-02-19 02:30:00,428 - INFO -   Sign Acc:   96.87%
+2026-02-19 02:30:00,428 - INFO -   Mod Acc:    35.08% (Mean of 100 mods)
+2026-02-19 02:30:00,428 - INFO -     mod2: 77.6%, mod3: 56.1%, mod5: 38.7%, mod7: 33.7%, mod10: 38.4%, mod100: 34.9%, mod101: 32.8%
+2026-02-19 02:35:42,988 - INFO - Validating Epoch 116...
+2026-02-19 02:36:06,847 - INFO - Epoch 116 Results:
+2026-02-19 02:36:06,847 - INFO -   Train Loss: 2.4029
+2026-02-19 02:36:06,847 - INFO -   Val Loss:   2.2156
+2026-02-19 02:36:06,847 - INFO -   Mag Acc:    85.16% (MSE: 1.4036)
+2026-02-19 02:36:06,847 - INFO -   Sign Acc:   96.83%
+2026-02-19 02:36:06,847 - INFO -   Mod Acc:    34.93% (Mean of 100 mods)
+2026-02-19 02:36:06,847 - INFO -     mod2: 77.6%, mod3: 56.2%, mod5: 38.4%, mod7: 33.3%, mod10: 38.6%, mod100: 34.9%, mod101: 32.6%
+2026-02-19 02:41:52,041 - INFO - Validating Epoch 117...
+2026-02-19 02:42:15,915 - INFO - Epoch 117 Results:
+2026-02-19 02:42:15,915 - INFO -   Train Loss: 2.4010
+2026-02-19 02:42:15,915 - INFO -   Val Loss:   2.2198
+2026-02-19 02:42:15,915 - INFO -   Mag Acc:    85.32% (MSE: 1.1318)
+2026-02-19 02:42:15,915 - INFO -   Sign Acc:   96.84%
+2026-02-19 02:42:15,915 - INFO -   Mod Acc:    35.12% (Mean of 100 mods)
+2026-02-19 02:42:15,915 - INFO -     mod2: 77.8%, mod3: 56.3%, mod5: 38.7%, mod7: 33.7%, mod10: 38.6%, mod100: 35.0%, mod101: 32.7%
+2026-02-19 02:48:10,856 - INFO - Validating Epoch 118...
+2026-02-19 02:48:34,869 - INFO - Epoch 118 Results:
+2026-02-19 02:48:34,869 - INFO -   Train Loss: 2.4010
+2026-02-19 02:48:34,869 - INFO -   Val Loss:   2.2152
+2026-02-19 02:48:34,869 - INFO -   Mag Acc:    85.25% (MSE: 1.2155)
+2026-02-19 02:48:34,869 - INFO -   Sign Acc:   96.92%
+2026-02-19 02:48:34,869 - INFO -   Mod Acc:    35.27% (Mean of 100 mods)
+2026-02-19 02:48:34,869 - INFO -     mod2: 77.6%, mod3: 56.4%, mod5: 38.6%, mod7: 33.8%, mod10: 38.7%, mod100: 35.2%, mod101: 32.9%
+2026-02-19 02:54:21,349 - INFO - Validating Epoch 119...
+2026-02-19 02:54:45,230 - INFO - Epoch 119 Results:
+2026-02-19 02:54:45,231 - INFO -   Train Loss: 2.4019
+2026-02-19 02:54:45,231 - INFO -   Val Loss:   2.2120
+2026-02-19 02:54:45,231 - INFO -   Mag Acc:    85.19% (MSE: 1.1615)
+2026-02-19 02:54:45,231 - INFO -   Sign Acc:   96.95%
+2026-02-19 02:54:45,231 - INFO -   Mod Acc:    35.21% (Mean of 100 mods)
+2026-02-19 02:54:45,231 - INFO -     mod2: 77.7%, mod3: 56.5%, mod5: 38.6%, mod7: 33.7%, mod10: 38.7%, mod100: 35.1%, mod101: 32.7%
+2026-02-19 02:54:45,878 - INFO - New best model saved! (Loss: 2.2120)
+2026-02-19 03:00:42,911 - INFO - Validating Epoch 120...
+2026-02-19 03:01:06,876 - INFO - Epoch 120 Results:
+2026-02-19 03:01:06,876 - INFO -   Train Loss: 2.4001
+2026-02-19 03:01:06,876 - INFO -   Val Loss:   2.2307
+2026-02-19 03:01:06,876 - INFO -   Mag Acc:    84.64% (MSE: 1.2135)
+2026-02-19 03:01:06,876 - INFO -   Sign Acc:   96.89%
+2026-02-19 03:01:06,876 - INFO -   Mod Acc:    35.04% (Mean of 100 mods)
+2026-02-19 03:01:06,876 - INFO -     mod2: 78.0%, mod3: 56.3%, mod5: 38.6%, mod7: 33.8%, mod10: 38.6%, mod100: 34.9%, mod101: 32.7%
+2026-02-19 03:06:41,299 - INFO - Validating Epoch 121...
+2026-02-19 03:07:05,417 - INFO - Epoch 121 Results:
+2026-02-19 03:07:05,417 - INFO -   Train Loss: 2.3952
+2026-02-19 03:07:05,417 - INFO -   Val Loss:   2.2122
+2026-02-19 03:07:05,417 - INFO -   Mag Acc:    85.22% (MSE: 1.3062)
+2026-02-19 03:07:05,417 - INFO -   Sign Acc:   97.00%
+2026-02-19 03:07:05,417 - INFO -   Mod Acc:    35.15% (Mean of 100 mods)
+2026-02-19 03:07:05,418 - INFO -     mod2: 77.7%, mod3: 56.3%, mod5: 38.6%, mod7: 33.7%, mod10: 38.6%, mod100: 35.1%, mod101: 32.8%
+2026-02-19 03:12:52,225 - INFO - Validating Epoch 122...
+2026-02-19 03:13:16,187 - INFO - Epoch 122 Results:
+2026-02-19 03:13:16,188 - INFO -   Train Loss: 2.3957
+2026-02-19 03:13:16,188 - INFO -   Val Loss:   2.2260
+2026-02-19 03:13:16,188 - INFO -   Mag Acc:    84.74% (MSE: 1.1857)
+2026-02-19 03:13:16,188 - INFO -   Sign Acc:   96.96%
+2026-02-19 03:13:16,188 - INFO -   Mod Acc:    35.27% (Mean of 100 mods)
+2026-02-19 03:13:16,188 - INFO -     mod2: 77.8%, mod3: 56.3%, mod5: 38.8%, mod7: 33.8%, mod10: 38.8%, mod100: 35.2%, mod101: 32.9%
+2026-02-19 03:18:54,411 - INFO - Validating Epoch 123...
+2026-02-19 03:19:18,589 - INFO - Epoch 123 Results:
+2026-02-19 03:19:18,589 - INFO -   Train Loss: 2.3937
+2026-02-19 03:19:18,589 - INFO -   Val Loss:   2.1984
+2026-02-19 03:19:18,589 - INFO -   Mag Acc:    84.72% (MSE: 1.3639)
+2026-02-19 03:19:18,589 - INFO -   Sign Acc:   96.92%
+2026-02-19 03:19:18,589 - INFO -   Mod Acc:    35.25% (Mean of 100 mods)
+2026-02-19 03:19:18,589 - INFO -     mod2: 77.9%, mod3: 56.3%, mod5: 38.7%, mod7: 33.9%, mod10: 38.6%, mod100: 35.1%, mod101: 32.9%
+2026-02-19 03:19:19,249 - INFO - New best model saved! (Loss: 2.1984)
+2026-02-19 03:25:01,402 - INFO - Validating Epoch 124...
+2026-02-19 03:25:25,484 - INFO - Epoch 124 Results:
+2026-02-19 03:25:25,485 - INFO -   Train Loss: 2.3959
+2026-02-19 03:25:25,485 - INFO -   Val Loss:   2.2145
+2026-02-19 03:25:25,485 - INFO -   Mag Acc:    85.30% (MSE: 1.3187)
+2026-02-19 03:25:25,485 - INFO -   Sign Acc:   96.95%
+2026-02-19 03:25:25,485 - INFO -   Mod Acc:    35.37% (Mean of 100 mods)
+2026-02-19 03:25:25,485 - INFO -     mod2: 77.9%, mod3: 56.4%, mod5: 38.8%, mod7: 33.9%, mod10: 38.9%, mod100: 35.3%, mod101: 33.0%
+2026-02-19 03:31:14,679 - INFO - Validating Epoch 125...
+2026-02-19 03:31:38,775 - INFO - Epoch 125 Results:
+2026-02-19 03:31:38,775 - INFO -   Train Loss: 2.3891
+2026-02-19 03:31:38,775 - INFO -   Val Loss:   2.2227
+2026-02-19 03:31:38,775 - INFO -   Mag Acc:    85.26% (MSE: 1.1902)
+2026-02-19 03:31:38,775 - INFO -   Sign Acc:   96.96%
+2026-02-19 03:31:38,775 - INFO -   Mod Acc:    35.11% (Mean of 100 mods)
+2026-02-19 03:31:38,775 - INFO -     mod2: 77.7%, mod3: 56.5%, mod5: 38.8%, mod7: 33.7%, mod10: 38.6%, mod100: 34.9%, mod101: 32.7%
+2026-02-19 03:37:17,341 - INFO - Validating Epoch 126...
+2026-02-19 03:37:41,012 - INFO - Epoch 126 Results:
+2026-02-19 03:37:41,012 - INFO -   Train Loss: 2.3942
+2026-02-19 03:37:41,012 - INFO -   Val Loss:   2.2093
+2026-02-19 03:37:41,012 - INFO -   Mag Acc:    84.19% (MSE: 1.4403)
+2026-02-19 03:37:41,012 - INFO -   Sign Acc:   96.90%
+2026-02-19 03:37:41,012 - INFO -   Mod Acc:    35.33% (Mean of 100 mods)
+2026-02-19 03:37:41,012 - INFO -     mod2: 77.9%, mod3: 56.3%, mod5: 38.4%, mod7: 33.7%, mod10: 38.7%, mod100: 35.2%, mod101: 33.1%
+2026-02-19 03:43:24,218 - INFO - Validating Epoch 127...
+2026-02-19 03:43:48,116 - INFO - Epoch 127 Results:
+2026-02-19 03:43:48,116 - INFO -   Train Loss: 2.3890
+2026-02-19 03:43:48,116 - INFO -   Val Loss:   2.2011
+2026-02-19 03:43:48,116 - INFO -   Mag Acc:    85.20% (MSE: 1.3076)
+2026-02-19 03:43:48,116 - INFO -   Sign Acc:   96.91%
+2026-02-19 03:43:48,116 - INFO -   Mod Acc:    35.41% (Mean of 100 mods)
+2026-02-19 03:43:48,116 - INFO -     mod2: 77.7%, mod3: 56.5%, mod5: 38.9%, mod7: 33.9%, mod10: 38.8%, mod100: 35.3%, mod101: 33.1%
+2026-02-19 03:49:34,881 - INFO - Validating Epoch 128...
+2026-02-19 03:49:58,724 - INFO - Epoch 128 Results:
+2026-02-19 03:49:58,724 - INFO -   Train Loss: 2.3916
+2026-02-19 03:49:58,724 - INFO -   Val Loss:   2.2106
+2026-02-19 03:49:58,724 - INFO -   Mag Acc:    85.17% (MSE: 1.2317)
+2026-02-19 03:49:58,724 - INFO -   Sign Acc:   96.95%
+2026-02-19 03:49:58,724 - INFO -   Mod Acc:    35.50% (Mean of 100 mods)
+2026-02-19 03:49:58,725 - INFO -     mod2: 78.0%, mod3: 56.5%, mod5: 38.9%, mod7: 34.0%, mod10: 39.0%, mod100: 35.3%, mod101: 33.1%
+2026-02-19 03:55:31,904 - INFO - Validating Epoch 129...
+2026-02-19 03:55:56,001 - INFO - Epoch 129 Results:
+2026-02-19 03:55:56,002 - INFO -   Train Loss: 2.3891
+2026-02-19 03:55:56,002 - INFO -   Val Loss:   2.2020
+2026-02-19 03:55:56,002 - INFO -   Mag Acc:    84.82% (MSE: 1.2079)
+2026-02-19 03:55:56,002 - INFO -   Sign Acc:   96.84%
+2026-02-19 03:55:56,002 - INFO -   Mod Acc:    35.52% (Mean of 100 mods)
+2026-02-19 03:55:56,002 - INFO -     mod2: 77.8%, mod3: 56.4%, mod5: 38.8%, mod7: 34.1%, mod10: 39.0%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 04:01:41,690 - INFO - Validating Epoch 130...
+2026-02-19 04:02:05,358 - INFO - Epoch 130 Results:
+2026-02-19 04:02:05,358 - INFO -   Train Loss: 2.3890
+2026-02-19 04:02:05,358 - INFO -   Val Loss:   2.1970
+2026-02-19 04:02:05,358 - INFO -   Mag Acc:    84.53% (MSE: 1.3860)
+2026-02-19 04:02:05,358 - INFO -   Sign Acc:   96.91%
+2026-02-19 04:02:05,359 - INFO -   Mod Acc:    35.38% (Mean of 100 mods)
+2026-02-19 04:02:05,359 - INFO -     mod2: 77.7%, mod3: 56.6%, mod5: 38.6%, mod7: 33.7%, mod10: 38.6%, mod100: 35.3%, mod101: 33.0%
+2026-02-19 04:02:06,020 - INFO - New best model saved! (Loss: 2.1970)
+2026-02-19 04:07:39,558 - INFO - Validating Epoch 131...
+2026-02-19 04:08:03,478 - INFO - Epoch 131 Results:
+2026-02-19 04:08:03,478 - INFO -   Train Loss: 2.3865
+2026-02-19 04:08:03,478 - INFO -   Val Loss:   2.2097
+2026-02-19 04:08:03,478 - INFO -   Mag Acc:    85.14% (MSE: 1.5045)
+2026-02-19 04:08:03,478 - INFO -   Sign Acc:   96.97%
+2026-02-19 04:08:03,478 - INFO -   Mod Acc:    35.21% (Mean of 100 mods)
+2026-02-19 04:08:03,478 - INFO -     mod2: 77.8%, mod3: 56.3%, mod5: 38.9%, mod7: 33.8%, mod10: 38.8%, mod100: 35.2%, mod101: 32.9%
+2026-02-19 04:13:41,996 - INFO - Validating Epoch 132...
+2026-02-19 04:14:05,807 - INFO - Epoch 132 Results:
+2026-02-19 04:14:05,807 - INFO -   Train Loss: 2.3887
+2026-02-19 04:14:05,807 - INFO -   Val Loss:   2.2024
+2026-02-19 04:14:05,807 - INFO -   Mag Acc:    85.26% (MSE: 1.2394)
+2026-02-19 04:14:05,808 - INFO -   Sign Acc:   96.94%
+2026-02-19 04:14:05,808 - INFO -   Mod Acc:    35.45% (Mean of 100 mods)
+2026-02-19 04:14:05,808 - INFO -     mod2: 78.0%, mod3: 56.4%, mod5: 39.0%, mod7: 33.9%, mod10: 39.0%, mod100: 35.4%, mod101: 33.1%
+2026-02-19 04:19:58,113 - INFO - Validating Epoch 133...
+2026-02-19 04:20:21,972 - INFO - Epoch 133 Results:
+2026-02-19 04:20:21,972 - INFO -   Train Loss: 2.3884
+2026-02-19 04:20:21,972 - INFO -   Val Loss:   2.2005
+2026-02-19 04:20:21,972 - INFO -   Mag Acc:    85.07% (MSE: 1.2234)
+2026-02-19 04:20:21,972 - INFO -   Sign Acc:   96.95%
+2026-02-19 04:20:21,972 - INFO -   Mod Acc:    35.49% (Mean of 100 mods)
+2026-02-19 04:20:21,972 - INFO -     mod2: 77.7%, mod3: 56.4%, mod5: 38.8%, mod7: 34.0%, mod10: 39.0%, mod100: 35.4%, mod101: 33.1%
+2026-02-19 04:26:11,612 - INFO - Validating Epoch 134...
+2026-02-19 04:26:36,222 - INFO - Epoch 134 Results:
+2026-02-19 04:26:36,222 - INFO -   Train Loss: 2.3852
+2026-02-19 04:26:36,222 - INFO -   Val Loss:   2.2083
+2026-02-19 04:26:36,222 - INFO -   Mag Acc:    85.27% (MSE: 1.2451)
+2026-02-19 04:26:36,222 - INFO -   Sign Acc:   96.91%
+2026-02-19 04:26:36,222 - INFO -   Mod Acc:    35.46% (Mean of 100 mods)
+2026-02-19 04:26:36,222 - INFO -     mod2: 77.8%, mod3: 56.5%, mod5: 38.9%, mod7: 34.1%, mod10: 39.0%, mod100: 35.4%, mod101: 33.1%
+2026-02-19 04:32:17,323 - INFO - Validating Epoch 135...
+2026-02-19 04:32:40,755 - INFO - Epoch 135 Results:
+2026-02-19 04:32:40,756 - INFO -   Train Loss: 2.3858
+2026-02-19 04:32:40,756 - INFO -   Val Loss:   2.2024
+2026-02-19 04:32:40,756 - INFO -   Mag Acc:    85.46% (MSE: 1.2897)
+2026-02-19 04:32:40,756 - INFO -   Sign Acc:   96.87%
+2026-02-19 04:32:40,756 - INFO -   Mod Acc:    35.66% (Mean of 100 mods)
+2026-02-19 04:32:40,756 - INFO -     mod2: 77.9%, mod3: 56.4%, mod5: 39.1%, mod7: 34.1%, mod10: 39.0%, mod100: 35.6%, mod101: 33.3%
+2026-02-19 04:38:43,809 - INFO - Validating Epoch 136...
+2026-02-19 04:39:07,782 - INFO - Epoch 136 Results:
+2026-02-19 04:39:07,782 - INFO -   Train Loss: 2.3837
+2026-02-19 04:39:07,782 - INFO -   Val Loss:   2.1954
+2026-02-19 04:39:07,782 - INFO -   Mag Acc:    85.35% (MSE: 1.3969)
+2026-02-19 04:39:07,782 - INFO -   Sign Acc:   96.98%
+2026-02-19 04:39:07,782 - INFO -   Mod Acc:    35.53% (Mean of 100 mods)
+2026-02-19 04:39:07,782 - INFO -     mod2: 77.9%, mod3: 56.5%, mod5: 38.7%, mod7: 33.9%, mod10: 39.0%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 04:39:08,436 - INFO - New best model saved! (Loss: 2.1954)
+2026-02-19 04:44:45,595 - INFO - Validating Epoch 137...
+2026-02-19 04:45:09,399 - INFO - Epoch 137 Results:
+2026-02-19 04:45:09,400 - INFO -   Train Loss: 2.3816
+2026-02-19 04:45:09,400 - INFO -   Val Loss:   2.1888
+2026-02-19 04:45:09,400 - INFO -   Mag Acc:    85.07% (MSE: 1.2692)
+2026-02-19 04:45:09,400 - INFO -   Sign Acc:   96.97%
+2026-02-19 04:45:09,400 - INFO -   Mod Acc:    35.54% (Mean of 100 mods)
+2026-02-19 04:45:09,400 - INFO -     mod2: 77.9%, mod3: 56.6%, mod5: 39.1%, mod7: 34.0%, mod10: 39.0%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 04:45:10,060 - INFO - New best model saved! (Loss: 2.1888)
+2026-02-19 04:51:20,878 - INFO - Validating Epoch 138...
+2026-02-19 04:51:44,927 - INFO - Epoch 138 Results:
+2026-02-19 04:51:44,927 - INFO -   Train Loss: 2.3810
+2026-02-19 04:51:44,927 - INFO -   Val Loss:   2.1859
+2026-02-19 04:51:44,927 - INFO -   Mag Acc:    85.42% (MSE: 1.2418)
+2026-02-19 04:51:44,927 - INFO -   Sign Acc:   96.96%
+2026-02-19 04:51:44,927 - INFO -   Mod Acc:    35.56% (Mean of 100 mods)
+2026-02-19 04:51:44,927 - INFO -     mod2: 77.9%, mod3: 56.6%, mod5: 39.0%, mod7: 34.1%, mod10: 38.9%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 04:51:45,588 - INFO - New best model saved! (Loss: 2.1859)
+2026-02-19 04:57:27,293 - INFO - Validating Epoch 139...
+2026-02-19 04:57:50,854 - INFO - Epoch 139 Results:
+2026-02-19 04:57:50,854 - INFO -   Train Loss: 2.3852
+2026-02-19 04:57:50,854 - INFO -   Val Loss:   2.1938
+2026-02-19 04:57:50,854 - INFO -   Mag Acc:    84.99% (MSE: 1.2336)
+2026-02-19 04:57:50,854 - INFO -   Sign Acc:   96.90%
+2026-02-19 04:57:50,854 - INFO -   Mod Acc:    35.55% (Mean of 100 mods)
+2026-02-19 04:57:50,855 - INFO -     mod2: 77.9%, mod3: 56.7%, mod5: 39.0%, mod7: 34.2%, mod10: 39.0%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 05:03:25,472 - INFO - Validating Epoch 140...
+2026-02-19 05:03:49,280 - INFO - Epoch 140 Results:
+2026-02-19 05:03:49,280 - INFO -   Train Loss: 2.3835
+2026-02-19 05:03:49,280 - INFO -   Val Loss:   2.2017
+2026-02-19 05:03:49,280 - INFO -   Mag Acc:    85.12% (MSE: 1.2099)
+2026-02-19 05:03:49,280 - INFO -   Sign Acc:   96.90%
+2026-02-19 05:03:49,280 - INFO -   Mod Acc:    35.56% (Mean of 100 mods)
+2026-02-19 05:03:49,280 - INFO -     mod2: 77.9%, mod3: 56.4%, mod5: 38.8%, mod7: 34.2%, mod10: 39.0%, mod100: 35.6%, mod101: 33.2%
+2026-02-19 05:09:23,185 - INFO - Validating Epoch 141...
+2026-02-19 05:09:47,078 - INFO - Epoch 141 Results:
+2026-02-19 05:09:47,078 - INFO -   Train Loss: 2.3831
+2026-02-19 05:09:47,078 - INFO -   Val Loss:   2.2101
+2026-02-19 05:09:47,079 - INFO -   Mag Acc:    85.01% (MSE: 1.2097)
+2026-02-19 05:09:47,079 - INFO -   Sign Acc:   97.01%
+2026-02-19 05:09:47,079 - INFO -   Mod Acc:    35.54% (Mean of 100 mods)
+2026-02-19 05:09:47,079 - INFO -     mod2: 78.1%, mod3: 56.5%, mod5: 38.9%, mod7: 34.0%, mod10: 39.0%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 05:15:31,628 - INFO - Validating Epoch 142...
+2026-02-19 05:15:55,535 - INFO - Epoch 142 Results:
+2026-02-19 05:15:55,535 - INFO -   Train Loss: 2.3796
+2026-02-19 05:15:55,535 - INFO -   Val Loss:   2.1956
+2026-02-19 05:15:55,535 - INFO -   Mag Acc:    85.66% (MSE: 1.2851)
+2026-02-19 05:15:55,535 - INFO -   Sign Acc:   97.01%
+2026-02-19 05:15:55,535 - INFO -   Mod Acc:    35.47% (Mean of 100 mods)
+2026-02-19 05:15:55,535 - INFO -     mod2: 77.8%, mod3: 56.5%, mod5: 39.0%, mod7: 34.0%, mod10: 38.9%, mod100: 35.4%, mod101: 33.1%
+2026-02-19 05:21:30,811 - INFO - Validating Epoch 143...
+2026-02-19 05:21:54,734 - INFO - Epoch 143 Results:
+2026-02-19 05:21:54,734 - INFO -   Train Loss: 2.3781
+2026-02-19 05:21:54,734 - INFO -   Val Loss:   2.1993
+2026-02-19 05:21:54,734 - INFO -   Mag Acc:    85.11% (MSE: 1.2641)
+2026-02-19 05:21:54,735 - INFO -   Sign Acc:   97.08%
+2026-02-19 05:21:54,735 - INFO -   Mod Acc:    35.51% (Mean of 100 mods)
+2026-02-19 05:21:54,735 - INFO -     mod2: 77.8%, mod3: 56.6%, mod5: 38.8%, mod7: 33.9%, mod10: 38.8%, mod100: 35.5%, mod101: 33.2%
+2026-02-19 05:27:30,695 - INFO - Validating Epoch 144...
+2026-02-19 05:27:54,280 - INFO - Epoch 144 Results:
+2026-02-19 05:27:54,280 - INFO -   Train Loss: 2.3810
+2026-02-19 05:27:54,280 - INFO -   Val Loss:   2.1890
+2026-02-19 05:27:54,280 - INFO -   Mag Acc:    85.53% (MSE: 1.2905)
+2026-02-19 05:27:54,280 - INFO -   Sign Acc:   97.03%
+2026-02-19 05:27:54,280 - INFO -   Mod Acc:    35.75% (Mean of 100 mods)
+2026-02-19 05:27:54,280 - INFO -     mod2: 77.9%, mod3: 56.8%, mod5: 39.2%, mod7: 34.0%, mod10: 39.2%, mod100: 35.6%, mod101: 33.4%
+2026-02-19 05:33:39,340 - INFO - Validating Epoch 145...
+2026-02-19 05:34:03,031 - INFO - Epoch 145 Results:
+2026-02-19 05:34:03,031 - INFO -   Train Loss: 2.3790
+2026-02-19 05:34:03,031 - INFO -   Val Loss:   2.1924
+2026-02-19 05:34:03,032 - INFO -   Mag Acc:    85.50% (MSE: 1.1602)
+2026-02-19 05:34:03,032 - INFO -   Sign Acc:   96.90%
+2026-02-19 05:34:03,032 - INFO -   Mod Acc:    35.74% (Mean of 100 mods)
+2026-02-19 05:34:03,032 - INFO -     mod2: 78.0%, mod3: 56.6%, mod5: 38.9%, mod7: 34.1%, mod10: 39.1%, mod100: 35.7%, mod101: 33.4%
+2026-02-19 05:39:44,597 - INFO - Validating Epoch 146...
+2026-02-19 05:40:08,238 - INFO - Epoch 146 Results:
+2026-02-19 05:40:08,239 - INFO -   Train Loss: 2.3827
+2026-02-19 05:40:08,239 - INFO -   Val Loss:   2.1905
+2026-02-19 05:40:08,239 - INFO -   Mag Acc:    85.45% (MSE: 1.3638)
+2026-02-19 05:40:08,239 - INFO -   Sign Acc:   96.99%
+2026-02-19 05:40:08,239 - INFO -   Mod Acc:    35.81% (Mean of 100 mods)
+2026-02-19 05:40:08,239 - INFO -     mod2: 78.2%, mod3: 56.6%, mod5: 38.9%, mod7: 34.1%, mod10: 39.1%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 05:45:52,551 - INFO - Validating Epoch 147...
+2026-02-19 05:46:16,505 - INFO - Epoch 147 Results:
+2026-02-19 05:46:16,505 - INFO -   Train Loss: 2.3803
+2026-02-19 05:46:16,505 - INFO -   Val Loss:   2.1929
+2026-02-19 05:46:16,505 - INFO -   Mag Acc:    85.35% (MSE: 1.4226)
+2026-02-19 05:46:16,505 - INFO -   Sign Acc:   96.94%
+2026-02-19 05:46:16,505 - INFO -   Mod Acc:    35.64% (Mean of 100 mods)
+2026-02-19 05:46:16,505 - INFO -     mod2: 78.1%, mod3: 56.7%, mod5: 38.9%, mod7: 33.9%, mod10: 39.1%, mod100: 35.6%, mod101: 33.4%
+2026-02-19 05:52:15,851 - INFO - Validating Epoch 148...
+2026-02-19 05:52:39,912 - INFO - Epoch 148 Results:
+2026-02-19 05:52:39,912 - INFO -   Train Loss: 2.3775
+2026-02-19 05:52:39,912 - INFO -   Val Loss:   2.1978
+2026-02-19 05:52:39,912 - INFO -   Mag Acc:    85.58% (MSE: 1.2457)
+2026-02-19 05:52:39,912 - INFO -   Sign Acc:   96.98%
+2026-02-19 05:52:39,912 - INFO -   Mod Acc:    35.62% (Mean of 100 mods)
+2026-02-19 05:52:39,912 - INFO -     mod2: 78.0%, mod3: 56.6%, mod5: 39.0%, mod7: 34.0%, mod10: 39.2%, mod100: 35.6%, mod101: 33.2%
+2026-02-19 05:58:08,898 - INFO - Validating Epoch 149...
+2026-02-19 05:58:32,530 - INFO - Epoch 149 Results:
+2026-02-19 05:58:32,530 - INFO -   Train Loss: 2.3804
+2026-02-19 05:58:32,530 - INFO -   Val Loss:   2.1847
+2026-02-19 05:58:32,530 - INFO -   Mag Acc:    85.43% (MSE: 1.3005)
+2026-02-19 05:58:32,530 - INFO -   Sign Acc:   97.02%
+2026-02-19 05:58:32,530 - INFO -   Mod Acc:    35.77% (Mean of 100 mods)
+2026-02-19 05:58:32,530 - INFO -     mod2: 78.1%, mod3: 56.6%, mod5: 38.9%, mod7: 34.0%, mod10: 39.0%, mod100: 35.7%, mod101: 33.5%
+2026-02-19 05:58:33,188 - INFO - New best model saved! (Loss: 2.1847)
+2026-02-19 06:04:03,876 - INFO - Validating Epoch 150...
+2026-02-19 06:04:27,952 - INFO - Epoch 150 Results:
+2026-02-19 06:04:27,952 - INFO -   Train Loss: 2.3766
+2026-02-19 06:04:27,952 - INFO -   Val Loss:   2.1864
+2026-02-19 06:04:27,952 - INFO -   Mag Acc:    85.45% (MSE: 1.2119)
+2026-02-19 06:04:27,952 - INFO -   Sign Acc:   96.89%
+2026-02-19 06:04:27,952 - INFO -   Mod Acc:    35.78% (Mean of 100 mods)
+2026-02-19 06:04:27,952 - INFO -     mod2: 78.2%, mod3: 56.6%, mod5: 39.1%, mod7: 34.2%, mod10: 39.2%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 06:10:23,429 - INFO - Validating Epoch 151...
+2026-02-19 06:10:47,123 - INFO - Epoch 151 Results:
+2026-02-19 06:10:47,124 - INFO -   Train Loss: 2.3757
+2026-02-19 06:10:47,124 - INFO -   Val Loss:   2.1878
+2026-02-19 06:10:47,124 - INFO -   Mag Acc:    85.17% (MSE: 1.3379)
+2026-02-19 06:10:47,124 - INFO -   Sign Acc:   97.05%
+2026-02-19 06:10:47,124 - INFO -   Mod Acc:    35.75% (Mean of 100 mods)
+2026-02-19 06:10:47,124 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.2%, mod7: 34.2%, mod10: 39.2%, mod100: 35.7%, mod101: 33.4%
+2026-02-19 06:16:47,427 - INFO - Validating Epoch 152...
+2026-02-19 06:17:11,225 - INFO - Epoch 152 Results:
+2026-02-19 06:17:11,225 - INFO -   Train Loss: 2.3783
+2026-02-19 06:17:11,225 - INFO -   Val Loss:   2.1880
+2026-02-19 06:17:11,225 - INFO -   Mag Acc:    85.75% (MSE: 1.2275)
+2026-02-19 06:17:11,225 - INFO -   Sign Acc:   97.01%
+2026-02-19 06:17:11,225 - INFO -   Mod Acc:    35.83% (Mean of 100 mods)
+2026-02-19 06:17:11,225 - INFO -     mod2: 77.9%, mod3: 56.9%, mod5: 39.2%, mod7: 34.2%, mod10: 39.4%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 06:23:07,220 - INFO - Validating Epoch 153...
+2026-02-19 06:23:30,973 - INFO - Epoch 153 Results:
+2026-02-19 06:23:30,973 - INFO -   Train Loss: 2.3769
+2026-02-19 06:23:30,973 - INFO -   Val Loss:   2.1913
+2026-02-19 06:23:30,973 - INFO -   Mag Acc:    85.46% (MSE: 1.3378)
+2026-02-19 06:23:30,973 - INFO -   Sign Acc:   97.03%
+2026-02-19 06:23:30,973 - INFO -   Mod Acc:    35.74% (Mean of 100 mods)
+2026-02-19 06:23:30,973 - INFO -     mod2: 77.9%, mod3: 56.7%, mod5: 39.0%, mod7: 34.3%, mod10: 39.0%, mod100: 35.7%, mod101: 33.4%
+2026-02-19 06:29:01,438 - INFO - Validating Epoch 154...
+2026-02-19 06:29:25,055 - INFO - Epoch 154 Results:
+2026-02-19 06:29:25,055 - INFO -   Train Loss: 2.3765
+2026-02-19 06:29:25,055 - INFO -   Val Loss:   2.1956
+2026-02-19 06:29:25,055 - INFO -   Mag Acc:    85.53% (MSE: 1.1654)
+2026-02-19 06:29:25,055 - INFO -   Sign Acc:   97.06%
+2026-02-19 06:29:25,055 - INFO -   Mod Acc:    35.76% (Mean of 100 mods)
+2026-02-19 06:29:25,055 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.0%, mod7: 34.0%, mod10: 39.1%, mod100: 35.7%, mod101: 33.5%
+2026-02-19 06:35:25,677 - INFO - Validating Epoch 155...
+2026-02-19 06:35:49,242 - INFO - Epoch 155 Results:
+2026-02-19 06:35:49,242 - INFO -   Train Loss: 2.3787
+2026-02-19 06:35:49,242 - INFO -   Val Loss:   2.1937
+2026-02-19 06:35:49,242 - INFO -   Mag Acc:    85.12% (MSE: 1.1849)
+2026-02-19 06:35:49,242 - INFO -   Sign Acc:   96.98%
+2026-02-19 06:35:49,242 - INFO -   Mod Acc:    35.76% (Mean of 100 mods)
+2026-02-19 06:35:49,242 - INFO -     mod2: 77.9%, mod3: 56.5%, mod5: 39.0%, mod7: 34.2%, mod10: 39.3%, mod100: 35.7%, mod101: 33.5%
+2026-02-19 06:41:32,874 - INFO - Validating Epoch 156...
+2026-02-19 06:41:57,073 - INFO - Epoch 156 Results:
+2026-02-19 06:41:57,073 - INFO -   Train Loss: 2.3779
+2026-02-19 06:41:57,073 - INFO -   Val Loss:   2.1941
+2026-02-19 06:41:57,073 - INFO -   Mag Acc:    85.73% (MSE: 1.1739)
+2026-02-19 06:41:57,073 - INFO -   Sign Acc:   96.97%
+2026-02-19 06:41:57,073 - INFO -   Mod Acc:    35.76% (Mean of 100 mods)
+2026-02-19 06:41:57,073 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.3%, mod7: 34.3%, mod10: 39.3%, mod100: 35.7%, mod101: 33.4%
+2026-02-19 06:47:45,783 - INFO - Validating Epoch 157...
+2026-02-19 06:48:09,735 - INFO - Epoch 157 Results:
+2026-02-19 06:48:09,735 - INFO -   Train Loss: 2.3737
+2026-02-19 06:48:09,735 - INFO -   Val Loss:   2.2055
+2026-02-19 06:48:09,735 - INFO -   Mag Acc:    85.58% (MSE: 1.2331)
+2026-02-19 06:48:09,735 - INFO -   Sign Acc:   97.02%
+2026-02-19 06:48:09,735 - INFO -   Mod Acc:    35.72% (Mean of 100 mods)
+2026-02-19 06:48:09,735 - INFO -     mod2: 78.1%, mod3: 56.7%, mod5: 39.1%, mod7: 34.2%, mod10: 39.3%, mod100: 35.7%, mod101: 33.4%
+2026-02-19 06:53:55,984 - INFO - Validating Epoch 158...
+2026-02-19 06:54:19,737 - INFO - Epoch 158 Results:
+2026-02-19 06:54:19,737 - INFO -   Train Loss: 2.3766
+2026-02-19 06:54:19,737 - INFO -   Val Loss:   2.1957
+2026-02-19 06:54:19,737 - INFO -   Mag Acc:    85.39% (MSE: 1.1619)
+2026-02-19 06:54:19,737 - INFO -   Sign Acc:   97.01%
+2026-02-19 06:54:19,737 - INFO -   Mod Acc:    35.64% (Mean of 100 mods)
+2026-02-19 06:54:19,738 - INFO -     mod2: 77.9%, mod3: 56.7%, mod5: 39.1%, mod7: 34.1%, mod10: 39.1%, mod100: 35.6%, mod101: 33.4%
+2026-02-19 06:59:37,814 - INFO - Validating Epoch 159...
+2026-02-19 07:00:01,641 - INFO - Epoch 159 Results:
+2026-02-19 07:00:01,641 - INFO -   Train Loss: 2.3741
+2026-02-19 07:00:01,641 - INFO -   Val Loss:   2.1888
+2026-02-19 07:00:01,641 - INFO -   Mag Acc:    85.36% (MSE: 1.3177)
+2026-02-19 07:00:01,641 - INFO -   Sign Acc:   96.98%
+2026-02-19 07:00:01,641 - INFO -   Mod Acc:    35.69% (Mean of 100 mods)
+2026-02-19 07:00:01,641 - INFO -     mod2: 77.9%, mod3: 56.6%, mod5: 39.1%, mod7: 34.1%, mod10: 39.0%, mod100: 35.6%, mod101: 33.4%
+2026-02-19 07:06:04,232 - INFO - Validating Epoch 160...
+2026-02-19 07:06:27,913 - INFO - Epoch 160 Results:
+2026-02-19 07:06:27,913 - INFO -   Train Loss: 2.3767
+2026-02-19 07:06:27,913 - INFO -   Val Loss:   2.1920
+2026-02-19 07:06:27,913 - INFO -   Mag Acc:    85.30% (MSE: 1.3138)
+2026-02-19 07:06:27,913 - INFO -   Sign Acc:   96.96%
+2026-02-19 07:06:27,913 - INFO -   Mod Acc:    35.65% (Mean of 100 mods)
+2026-02-19 07:06:27,913 - INFO -     mod2: 78.1%, mod3: 56.6%, mod5: 38.9%, mod7: 34.1%, mod10: 39.1%, mod100: 35.6%, mod101: 33.3%
+2026-02-19 07:12:14,746 - INFO - Validating Epoch 161...
+2026-02-19 07:12:38,601 - INFO - Epoch 161 Results:
+2026-02-19 07:12:38,602 - INFO -   Train Loss: 2.3699
+2026-02-19 07:12:38,602 - INFO -   Val Loss:   2.1941
+2026-02-19 07:12:38,602 - INFO -   Mag Acc:    85.81% (MSE: 1.0932)
+2026-02-19 07:12:38,602 - INFO -   Sign Acc:   97.07%
+2026-02-19 07:12:38,602 - INFO -   Mod Acc:    35.94% (Mean of 100 mods)
+2026-02-19 07:12:38,602 - INFO -     mod2: 78.1%, mod3: 56.8%, mod5: 39.2%, mod7: 34.4%, mod10: 39.4%, mod100: 36.0%, mod101: 33.6%
+2026-02-19 07:18:31,593 - INFO - Validating Epoch 162...
+2026-02-19 07:18:55,473 - INFO - Epoch 162 Results:
+2026-02-19 07:18:55,473 - INFO -   Train Loss: 2.3750
+2026-02-19 07:18:55,473 - INFO -   Val Loss:   2.1828
+2026-02-19 07:18:55,473 - INFO -   Mag Acc:    85.46% (MSE: 1.3160)
+2026-02-19 07:18:55,473 - INFO -   Sign Acc:   96.98%
+2026-02-19 07:18:55,473 - INFO -   Mod Acc:    35.75% (Mean of 100 mods)
+2026-02-19 07:18:55,473 - INFO -     mod2: 78.0%, mod3: 56.9%, mod5: 39.1%, mod7: 34.1%, mod10: 39.1%, mod100: 35.8%, mod101: 33.4%
+2026-02-19 07:18:56,185 - INFO - New best model saved! (Loss: 2.1828)
+2026-02-19 07:24:45,111 - INFO - Validating Epoch 163...
+2026-02-19 07:25:09,022 - INFO - Epoch 163 Results:
+2026-02-19 07:25:09,022 - INFO -   Train Loss: 2.3713
+2026-02-19 07:25:09,023 - INFO -   Val Loss:   2.1900
+2026-02-19 07:25:09,023 - INFO -   Mag Acc:    85.55% (MSE: 1.3323)
+2026-02-19 07:25:09,023 - INFO -   Sign Acc:   96.98%
+2026-02-19 07:25:09,023 - INFO -   Mod Acc:    35.70% (Mean of 100 mods)
+2026-02-19 07:25:09,023 - INFO -     mod2: 78.0%, mod3: 56.8%, mod5: 39.1%, mod7: 34.2%, mod10: 39.2%, mod100: 35.6%, mod101: 33.4%
+2026-02-19 07:31:00,910 - INFO - Validating Epoch 164...
+2026-02-19 07:31:24,860 - INFO - Epoch 164 Results:
+2026-02-19 07:31:24,860 - INFO -   Train Loss: 2.3745
+2026-02-19 07:31:24,860 - INFO -   Val Loss:   2.1858
+2026-02-19 07:31:24,860 - INFO -   Mag Acc:    85.45% (MSE: 1.3288)
+2026-02-19 07:31:24,860 - INFO -   Sign Acc:   96.96%
+2026-02-19 07:31:24,860 - INFO -   Mod Acc:    35.84% (Mean of 100 mods)
+2026-02-19 07:31:24,860 - INFO -     mod2: 78.1%, mod3: 57.0%, mod5: 39.1%, mod7: 34.3%, mod10: 39.1%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 07:37:13,203 - INFO - Validating Epoch 165...
+2026-02-19 07:37:37,209 - INFO - Epoch 165 Results:
+2026-02-19 07:37:37,210 - INFO -   Train Loss: 2.3685
+2026-02-19 07:37:37,210 - INFO -   Val Loss:   2.1800
+2026-02-19 07:37:37,210 - INFO -   Mag Acc:    85.30% (MSE: 1.2692)
+2026-02-19 07:37:37,210 - INFO -   Sign Acc:   97.03%
+2026-02-19 07:37:37,210 - INFO -   Mod Acc:    35.82% (Mean of 100 mods)
+2026-02-19 07:37:37,210 - INFO -     mod2: 77.9%, mod3: 56.7%, mod5: 39.2%, mod7: 34.3%, mod10: 39.1%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 07:37:37,859 - INFO - New best model saved! (Loss: 2.1800)
+2026-02-19 07:43:26,808 - INFO - Validating Epoch 166...
+2026-02-19 07:43:50,931 - INFO - Epoch 166 Results:
+2026-02-19 07:43:50,931 - INFO -   Train Loss: 2.3744
+2026-02-19 07:43:50,931 - INFO -   Val Loss:   2.2002
+2026-02-19 07:43:50,931 - INFO -   Mag Acc:    85.70% (MSE: 1.2694)
+2026-02-19 07:43:50,931 - INFO -   Sign Acc:   97.03%
+2026-02-19 07:43:50,931 - INFO -   Mod Acc:    35.83% (Mean of 100 mods)
+2026-02-19 07:43:50,931 - INFO -     mod2: 78.1%, mod3: 56.8%, mod5: 39.1%, mod7: 34.3%, mod10: 39.3%, mod100: 35.9%, mod101: 33.5%
+2026-02-19 07:49:23,519 - INFO - Validating Epoch 167...
+2026-02-19 07:49:47,657 - INFO - Epoch 167 Results:
+2026-02-19 07:49:47,657 - INFO -   Train Loss: 2.3752
+2026-02-19 07:49:47,657 - INFO -   Val Loss:   2.1823
+2026-02-19 07:49:47,657 - INFO -   Mag Acc:    85.49% (MSE: 1.3578)
+2026-02-19 07:49:47,657 - INFO -   Sign Acc:   97.04%
+2026-02-19 07:49:47,657 - INFO -   Mod Acc:    35.85% (Mean of 100 mods)
+2026-02-19 07:49:47,657 - INFO -     mod2: 78.2%, mod3: 57.0%, mod5: 39.3%, mod7: 34.1%, mod10: 39.3%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 07:55:44,131 - INFO - Validating Epoch 168...
+2026-02-19 07:56:07,993 - INFO - Epoch 168 Results:
+2026-02-19 07:56:07,993 - INFO -   Train Loss: 2.3758
+2026-02-19 07:56:07,993 - INFO -   Val Loss:   2.1958
+2026-02-19 07:56:07,993 - INFO -   Mag Acc:    85.53% (MSE: 1.3676)
+2026-02-19 07:56:07,993 - INFO -   Sign Acc:   97.08%
+2026-02-19 07:56:07,993 - INFO -   Mod Acc:    35.79% (Mean of 100 mods)
+2026-02-19 07:56:07,993 - INFO -     mod2: 78.2%, mod3: 56.8%, mod5: 39.0%, mod7: 34.2%, mod10: 39.2%, mod100: 35.9%, mod101: 33.5%
+2026-02-19 08:01:38,052 - INFO - Validating Epoch 169...
+2026-02-19 08:02:01,947 - INFO - Epoch 169 Results:
+2026-02-19 08:02:01,947 - INFO -   Train Loss: 2.3776
+2026-02-19 08:02:01,947 - INFO -   Val Loss:   2.1845
+2026-02-19 08:02:01,947 - INFO -   Mag Acc:    85.52% (MSE: 1.3020)
+2026-02-19 08:02:01,947 - INFO -   Sign Acc:   97.03%
+2026-02-19 08:02:01,947 - INFO -   Mod Acc:    35.76% (Mean of 100 mods)
+2026-02-19 08:02:01,947 - INFO -     mod2: 78.1%, mod3: 56.7%, mod5: 39.1%, mod7: 34.1%, mod10: 39.2%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 08:08:05,450 - INFO - Validating Epoch 170...
+2026-02-19 08:08:29,363 - INFO - Epoch 170 Results:
+2026-02-19 08:08:29,363 - INFO -   Train Loss: 2.3751
+2026-02-19 08:08:29,363 - INFO -   Val Loss:   2.1939
+2026-02-19 08:08:29,363 - INFO -   Mag Acc:    85.63% (MSE: 1.1798)
+2026-02-19 08:08:29,363 - INFO -   Sign Acc:   96.97%
+2026-02-19 08:08:29,363 - INFO -   Mod Acc:    35.87% (Mean of 100 mods)
+2026-02-19 08:08:29,363 - INFO -     mod2: 78.1%, mod3: 56.9%, mod5: 39.0%, mod7: 34.1%, mod10: 39.2%, mod100: 35.8%, mod101: 33.5%
+2026-02-19 08:14:22,615 - INFO - Validating Epoch 171...
+2026-02-19 08:14:46,757 - INFO - Epoch 171 Results:
+2026-02-19 08:14:46,757 - INFO -   Train Loss: 2.3740
+2026-02-19 08:14:46,757 - INFO -   Val Loss:   2.1858
+2026-02-19 08:14:46,757 - INFO -   Mag Acc:    85.45% (MSE: 1.1625)
+2026-02-19 08:14:46,757 - INFO -   Sign Acc:   96.99%
+2026-02-19 08:14:46,758 - INFO -   Mod Acc:    35.84% (Mean of 100 mods)
+2026-02-19 08:14:46,758 - INFO -     mod2: 78.1%, mod3: 56.9%, mod5: 39.1%, mod7: 34.1%, mod10: 39.1%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 08:20:32,615 - INFO - Validating Epoch 172...
+2026-02-19 08:20:56,503 - INFO - Epoch 172 Results:
+2026-02-19 08:20:56,503 - INFO -   Train Loss: 2.3763
+2026-02-19 08:20:56,503 - INFO -   Val Loss:   2.1933
+2026-02-19 08:20:56,503 - INFO -   Mag Acc:    85.56% (MSE: 1.0871)
+2026-02-19 08:20:56,503 - INFO -   Sign Acc:   96.96%
+2026-02-19 08:20:56,503 - INFO -   Mod Acc:    35.79% (Mean of 100 mods)
+2026-02-19 08:20:56,503 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.2%, mod7: 34.1%, mod10: 39.2%, mod100: 35.7%, mod101: 33.5%
+2026-02-19 08:26:41,836 - INFO - Validating Epoch 173...
+2026-02-19 08:27:05,532 - INFO - Epoch 173 Results:
+2026-02-19 08:27:05,532 - INFO -   Train Loss: 2.3779
+2026-02-19 08:27:05,532 - INFO -   Val Loss:   2.1782
+2026-02-19 08:27:05,532 - INFO -   Mag Acc:    85.44% (MSE: 1.3538)
+2026-02-19 08:27:05,532 - INFO -   Sign Acc:   97.06%
+2026-02-19 08:27:05,532 - INFO -   Mod Acc:    35.96% (Mean of 100 mods)
+2026-02-19 08:27:05,532 - INFO -     mod2: 78.0%, mod3: 56.8%, mod5: 39.5%, mod7: 34.2%, mod10: 39.4%, mod100: 36.0%, mod101: 33.8%
+2026-02-19 08:27:06,187 - INFO - New best model saved! (Loss: 2.1782)
+2026-02-19 08:33:07,554 - INFO - Validating Epoch 174...
+2026-02-19 08:33:31,372 - INFO - Epoch 174 Results:
+2026-02-19 08:33:31,373 - INFO -   Train Loss: 2.3792
+2026-02-19 08:33:31,373 - INFO -   Val Loss:   2.1881
+2026-02-19 08:33:31,373 - INFO -   Mag Acc:    85.64% (MSE: 1.1246)
+2026-02-19 08:33:31,373 - INFO -   Sign Acc:   96.99%
+2026-02-19 08:33:31,373 - INFO -   Mod Acc:    35.86% (Mean of 100 mods)
+2026-02-19 08:33:31,373 - INFO -     mod2: 78.1%, mod3: 56.8%, mod5: 39.1%, mod7: 34.3%, mod10: 39.1%, mod100: 35.7%, mod101: 33.6%
+2026-02-19 08:39:26,546 - INFO - Validating Epoch 175...
+2026-02-19 08:39:50,467 - INFO - Epoch 175 Results:
+2026-02-19 08:39:50,467 - INFO -   Train Loss: 2.3773
+2026-02-19 08:39:50,467 - INFO -   Val Loss:   2.1886
+2026-02-19 08:39:50,467 - INFO -   Mag Acc:    85.59% (MSE: 1.1550)
+2026-02-19 08:39:50,467 - INFO -   Sign Acc:   97.02%
+2026-02-19 08:39:50,467 - INFO -   Mod Acc:    35.91% (Mean of 100 mods)
+2026-02-19 08:39:50,467 - INFO -     mod2: 78.1%, mod3: 56.8%, mod5: 39.1%, mod7: 34.1%, mod10: 39.3%, mod100: 35.9%, mod101: 33.7%
+2026-02-19 08:45:20,500 - INFO - Validating Epoch 176...
+2026-02-19 08:45:44,474 - INFO - Epoch 176 Results:
+2026-02-19 08:45:44,474 - INFO -   Train Loss: 2.3759
+2026-02-19 08:45:44,474 - INFO -   Val Loss:   2.1940
+2026-02-19 08:45:44,474 - INFO -   Mag Acc:    85.63% (MSE: 1.2841)
+2026-02-19 08:45:44,474 - INFO -   Sign Acc:   97.03%
+2026-02-19 08:45:44,474 - INFO -   Mod Acc:    35.94% (Mean of 100 mods)
+2026-02-19 08:45:44,474 - INFO -     mod2: 78.2%, mod3: 56.9%, mod5: 39.3%, mod7: 34.4%, mod10: 39.5%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 08:51:24,275 - INFO - Validating Epoch 177...
+2026-02-19 08:51:48,145 - INFO - Epoch 177 Results:
+2026-02-19 08:51:48,146 - INFO -   Train Loss: 2.3759
+2026-02-19 08:51:48,146 - INFO -   Val Loss:   2.1715
+2026-02-19 08:51:48,146 - INFO -   Mag Acc:    85.58% (MSE: 1.2731)
+2026-02-19 08:51:48,146 - INFO -   Sign Acc:   97.03%
+2026-02-19 08:51:48,146 - INFO -   Mod Acc:    36.05% (Mean of 100 mods)
+2026-02-19 08:51:48,146 - INFO -     mod2: 78.2%, mod3: 57.1%, mod5: 39.3%, mod7: 34.3%, mod10: 39.5%, mod100: 36.1%, mod101: 33.9%
+2026-02-19 08:51:48,815 - INFO - New best model saved! (Loss: 2.1715)
+2026-02-19 08:57:51,408 - INFO - Validating Epoch 178...
+2026-02-19 08:58:14,772 - INFO - Epoch 178 Results:
+2026-02-19 08:58:14,772 - INFO -   Train Loss: 2.3745
+2026-02-19 08:58:14,772 - INFO -   Val Loss:   2.1809
+2026-02-19 08:58:14,772 - INFO -   Mag Acc:    85.77% (MSE: 1.2500)
+2026-02-19 08:58:14,772 - INFO -   Sign Acc:   97.02%
+2026-02-19 08:58:14,772 - INFO -   Mod Acc:    36.04% (Mean of 100 mods)
+2026-02-19 08:58:14,772 - INFO -     mod2: 78.1%, mod3: 57.0%, mod5: 39.2%, mod7: 34.3%, mod10: 39.3%, mod100: 36.1%, mod101: 33.8%
+2026-02-19 09:03:55,425 - INFO - Validating Epoch 179...
+2026-02-19 09:04:19,369 - INFO - Epoch 179 Results:
+2026-02-19 09:04:19,369 - INFO -   Train Loss: 2.3748
+2026-02-19 09:04:19,369 - INFO -   Val Loss:   2.2016
+2026-02-19 09:04:19,369 - INFO -   Mag Acc:    85.60% (MSE: 1.1843)
+2026-02-19 09:04:19,369 - INFO -   Sign Acc:   97.05%
+2026-02-19 09:04:19,369 - INFO -   Mod Acc:    35.89% (Mean of 100 mods)
+2026-02-19 09:04:19,369 - INFO -     mod2: 78.1%, mod3: 56.9%, mod5: 39.3%, mod7: 34.2%, mod10: 39.3%, mod100: 35.9%, mod101: 33.5%
+2026-02-19 09:09:55,658 - INFO - Validating Epoch 180...
+2026-02-19 09:10:19,443 - INFO - Epoch 180 Results:
+2026-02-19 09:10:19,443 - INFO -   Train Loss: 2.3752
+2026-02-19 09:10:19,443 - INFO -   Val Loss:   2.2047
+2026-02-19 09:10:19,443 - INFO -   Mag Acc:    85.62% (MSE: 1.1340)
+2026-02-19 09:10:19,443 - INFO -   Sign Acc:   97.02%
+2026-02-19 09:10:19,443 - INFO -   Mod Acc:    35.81% (Mean of 100 mods)
+2026-02-19 09:10:19,443 - INFO -     mod2: 78.0%, mod3: 56.8%, mod5: 39.0%, mod7: 34.2%, mod10: 39.1%, mod100: 35.8%, mod101: 33.6%
+2026-02-19 09:16:13,849 - INFO - Validating Epoch 181...
+2026-02-19 09:16:37,772 - INFO - Epoch 181 Results:
+2026-02-19 09:16:37,773 - INFO -   Train Loss: 2.3765
+2026-02-19 09:16:37,773 - INFO -   Val Loss:   2.1875
+2026-02-19 09:16:37,773 - INFO -   Mag Acc:    85.65% (MSE: 1.2203)
+2026-02-19 09:16:37,773 - INFO -   Sign Acc:   96.99%
+2026-02-19 09:16:37,773 - INFO -   Mod Acc:    36.06% (Mean of 100 mods)
+2026-02-19 09:16:37,773 - INFO -     mod2: 78.2%, mod3: 56.9%, mod5: 39.5%, mod7: 34.5%, mod10: 39.6%, mod100: 36.1%, mod101: 33.8%
+2026-02-19 09:22:10,777 - INFO - Validating Epoch 182...
+2026-02-19 09:22:34,785 - INFO - Epoch 182 Results:
+2026-02-19 09:22:34,785 - INFO -   Train Loss: 2.3730
+2026-02-19 09:22:34,785 - INFO -   Val Loss:   2.1928
+2026-02-19 09:22:34,785 - INFO -   Mag Acc:    85.60% (MSE: 1.2757)
+2026-02-19 09:22:34,785 - INFO -   Sign Acc:   96.94%
+2026-02-19 09:22:34,785 - INFO -   Mod Acc:    35.99% (Mean of 100 mods)
+2026-02-19 09:22:34,785 - INFO -     mod2: 78.1%, mod3: 56.9%, mod5: 39.3%, mod7: 34.4%, mod10: 39.4%, mod100: 36.0%, mod101: 33.8%
+2026-02-19 09:28:41,847 - INFO - Validating Epoch 183...
+2026-02-19 09:29:06,058 - INFO - Epoch 183 Results:
+2026-02-19 09:29:06,058 - INFO -   Train Loss: 2.3774
+2026-02-19 09:29:06,058 - INFO -   Val Loss:   2.1949
+2026-02-19 09:29:06,058 - INFO -   Mag Acc:    85.49% (MSE: 1.2328)
+2026-02-19 09:29:06,058 - INFO -   Sign Acc:   97.03%
+2026-02-19 09:29:06,058 - INFO -   Mod Acc:    36.04% (Mean of 100 mods)
+2026-02-19 09:29:06,058 - INFO -     mod2: 78.1%, mod3: 57.0%, mod5: 39.2%, mod7: 34.3%, mod10: 39.4%, mod100: 36.0%, mod101: 33.8%
+2026-02-19 09:34:49,261 - INFO - Validating Epoch 184...
+2026-02-19 09:35:13,319 - INFO - Epoch 184 Results:
+2026-02-19 09:35:13,319 - INFO -   Train Loss: 2.3816
+2026-02-19 09:35:13,319 - INFO -   Val Loss:   2.1824
+2026-02-19 09:35:13,319 - INFO -   Mag Acc:    85.61% (MSE: 1.2782)
+2026-02-19 09:35:13,319 - INFO -   Sign Acc:   96.97%
+2026-02-19 09:35:13,319 - INFO -   Mod Acc:    36.05% (Mean of 100 mods)
+2026-02-19 09:35:13,319 - INFO -     mod2: 78.2%, mod3: 56.9%, mod5: 39.2%, mod7: 34.5%, mod10: 39.4%, mod100: 36.2%, mod101: 33.7%
+2026-02-19 09:40:51,080 - INFO - Validating Epoch 185...
+2026-02-19 09:41:15,353 - INFO - Epoch 185 Results:
+2026-02-19 09:41:15,353 - INFO -   Train Loss: 2.3766
+2026-02-19 09:41:15,353 - INFO -   Val Loss:   2.1856
+2026-02-19 09:41:15,353 - INFO -   Mag Acc:    85.73% (MSE: 1.0490)
+2026-02-19 09:41:15,353 - INFO -   Sign Acc:   96.96%
+2026-02-19 09:41:15,353 - INFO -   Mod Acc:    36.08% (Mean of 100 mods)
+2026-02-19 09:41:15,353 - INFO -     mod2: 78.3%, mod3: 56.9%, mod5: 39.4%, mod7: 34.3%, mod10: 39.6%, mod100: 36.0%, mod101: 33.8%
+2026-02-19 09:47:07,603 - INFO - Validating Epoch 186...
+2026-02-19 09:47:31,499 - INFO - Epoch 186 Results:
+2026-02-19 09:47:31,499 - INFO -   Train Loss: 2.3780
+2026-02-19 09:47:31,499 - INFO -   Val Loss:   2.1842
+2026-02-19 09:47:31,499 - INFO -   Mag Acc:    85.61% (MSE: 1.3292)
+2026-02-19 09:47:31,499 - INFO -   Sign Acc:   97.07%
+2026-02-19 09:47:31,499 - INFO -   Mod Acc:    35.99% (Mean of 100 mods)
+2026-02-19 09:47:31,499 - INFO -     mod2: 78.1%, mod3: 57.0%, mod5: 39.4%, mod7: 34.5%, mod10: 39.5%, mod100: 35.9%, mod101: 33.8%
+2026-02-19 09:53:24,312 - INFO - Validating Epoch 187...
+2026-02-19 09:53:48,435 - INFO - Epoch 187 Results:
+2026-02-19 09:53:48,436 - INFO -   Train Loss: 2.3827
+2026-02-19 09:53:48,436 - INFO -   Val Loss:   2.1984
+2026-02-19 09:53:48,436 - INFO -   Mag Acc:    85.61% (MSE: 1.1476)
+2026-02-19 09:53:48,436 - INFO -   Sign Acc:   96.98%
+2026-02-19 09:53:48,436 - INFO -   Mod Acc:    35.98% (Mean of 100 mods)
+2026-02-19 09:53:48,436 - INFO -     mod2: 78.1%, mod3: 56.8%, mod5: 39.1%, mod7: 34.2%, mod10: 39.4%, mod100: 36.0%, mod101: 33.7%
+2026-02-19 09:59:32,554 - INFO - Validating Epoch 188...
+2026-02-19 09:59:56,413 - INFO - Epoch 188 Results:
+2026-02-19 09:59:56,413 - INFO -   Train Loss: 2.3771
+2026-02-19 09:59:56,413 - INFO -   Val Loss:   2.1801
+2026-02-19 09:59:56,413 - INFO -   Mag Acc:    85.64% (MSE: 1.1728)
+2026-02-19 09:59:56,413 - INFO -   Sign Acc:   97.00%
+2026-02-19 09:59:56,413 - INFO -   Mod Acc:    36.05% (Mean of 100 mods)
+2026-02-19 09:59:56,413 - INFO -     mod2: 78.3%, mod3: 56.9%, mod5: 39.2%, mod7: 34.3%, mod10: 39.6%, mod100: 36.1%, mod101: 33.8%
+2026-02-19 10:05:44,142 - INFO - Validating Epoch 189...
+2026-02-19 10:06:08,147 - INFO - Epoch 189 Results:
+2026-02-19 10:06:08,147 - INFO -   Train Loss: 2.3826
+2026-02-19 10:06:08,147 - INFO -   Val Loss:   2.1877
+2026-02-19 10:06:08,147 - INFO -   Mag Acc:    85.66% (MSE: 1.1861)
+2026-02-19 10:06:08,147 - INFO -   Sign Acc:   96.97%
+2026-02-19 10:06:08,147 - INFO -   Mod Acc:    35.92% (Mean of 100 mods)
+2026-02-19 10:06:08,147 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.3%, mod7: 34.3%, mod10: 39.4%, mod100: 36.0%, mod101: 33.7%
+2026-02-19 10:11:47,157 - INFO - Validating Epoch 190...
+2026-02-19 10:12:10,975 - INFO - Epoch 190 Results:
+2026-02-19 10:12:10,976 - INFO -   Train Loss: 2.3787
+2026-02-19 10:12:10,976 - INFO -   Val Loss:   2.1856
+2026-02-19 10:12:10,976 - INFO -   Mag Acc:    85.60% (MSE: 1.1620)
+2026-02-19 10:12:10,976 - INFO -   Sign Acc:   96.96%
+2026-02-19 10:12:10,976 - INFO -   Mod Acc:    36.08% (Mean of 100 mods)
+2026-02-19 10:12:10,976 - INFO -     mod2: 78.2%, mod3: 57.0%, mod5: 39.4%, mod7: 34.5%, mod10: 39.5%, mod100: 36.1%, mod101: 33.8%
+2026-02-19 10:17:33,833 - INFO - Validating Epoch 191...
+2026-02-19 10:17:57,799 - INFO - Epoch 191 Results:
+2026-02-19 10:17:57,799 - INFO -   Train Loss: 2.3777
+2026-02-19 10:17:57,799 - INFO -   Val Loss:   2.1978
+2026-02-19 10:17:57,800 - INFO -   Mag Acc:    85.54% (MSE: 1.3387)
+2026-02-19 10:17:57,800 - INFO -   Sign Acc:   96.98%
+2026-02-19 10:17:57,800 - INFO -   Mod Acc:    35.99% (Mean of 100 mods)
+2026-02-19 10:17:57,800 - INFO -     mod2: 78.1%, mod3: 57.0%, mod5: 39.1%, mod7: 34.4%, mod10: 39.3%, mod100: 36.1%, mod101: 33.8%
+2026-02-19 10:24:02,774 - INFO - Validating Epoch 192...
+2026-02-19 10:24:26,629 - INFO - Epoch 192 Results:
+2026-02-19 10:24:26,630 - INFO -   Train Loss: 2.3802
+2026-02-19 10:24:26,630 - INFO -   Val Loss:   2.1956
+2026-02-19 10:24:26,630 - INFO -   Mag Acc:    85.52% (MSE: 1.2425)
+2026-02-19 10:24:26,630 - INFO -   Sign Acc:   97.04%
+2026-02-19 10:24:26,630 - INFO -   Mod Acc:    36.04% (Mean of 100 mods)
+2026-02-19 10:24:26,630 - INFO -     mod2: 78.2%, mod3: 57.0%, mod5: 39.4%, mod7: 34.4%, mod10: 39.4%, mod100: 36.0%, mod101: 33.7%
+2026-02-19 10:30:25,135 - INFO - Validating Epoch 193...
+2026-02-19 10:30:49,204 - INFO - Epoch 193 Results:
+2026-02-19 10:30:49,204 - INFO -   Train Loss: 2.3780
+2026-02-19 10:30:49,204 - INFO -   Val Loss:   2.1978
+2026-02-19 10:30:49,204 - INFO -   Mag Acc:    85.67% (MSE: 1.2371)
+2026-02-19 10:30:49,204 - INFO -   Sign Acc:   97.09%
+2026-02-19 10:30:49,204 - INFO -   Mod Acc:    36.00% (Mean of 100 mods)
+2026-02-19 10:30:49,204 - INFO -     mod2: 78.2%, mod3: 56.8%, mod5: 39.3%, mod7: 34.4%, mod10: 39.5%, mod100: 36.0%, mod101: 33.7%
+2026-02-19 10:36:38,048 - INFO - Validating Epoch 194...
+2026-02-19 10:37:01,634 - INFO - Epoch 194 Results:
+2026-02-19 10:37:01,634 - INFO -   Train Loss: 2.3856
+2026-02-19 10:37:01,634 - INFO -   Val Loss:   2.2044
+2026-02-19 10:37:01,634 - INFO -   Mag Acc:    85.48% (MSE: 1.2843)
+2026-02-19 10:37:01,634 - INFO -   Sign Acc:   97.00%
+2026-02-19 10:37:01,634 - INFO -   Mod Acc:    35.90% (Mean of 100 mods)
+2026-02-19 10:37:01,634 - INFO -     mod2: 78.0%, mod3: 56.9%, mod5: 39.2%, mod7: 34.3%, mod10: 39.4%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 10:42:47,555 - INFO - Validating Epoch 195...
+2026-02-19 10:43:11,552 - INFO - Epoch 195 Results:
+2026-02-19 10:43:11,553 - INFO -   Train Loss: 2.3821
+2026-02-19 10:43:11,553 - INFO -   Val Loss:   2.2006
+2026-02-19 10:43:11,553 - INFO -   Mag Acc:    85.63% (MSE: 1.3717)
+2026-02-19 10:43:11,553 - INFO -   Sign Acc:   97.00%
+2026-02-19 10:43:11,553 - INFO -   Mod Acc:    35.90% (Mean of 100 mods)
+2026-02-19 10:43:11,553 - INFO -     mod2: 78.1%, mod3: 56.9%, mod5: 39.2%, mod7: 34.4%, mod10: 39.4%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 10:49:00,459 - INFO - Validating Epoch 196...
+2026-02-19 10:49:24,306 - INFO - Epoch 196 Results:
+2026-02-19 10:49:24,306 - INFO -   Train Loss: 2.3828
+2026-02-19 10:49:24,306 - INFO -   Val Loss:   2.2035
+2026-02-19 10:49:24,306 - INFO -   Mag Acc:    85.48% (MSE: 1.1997)
+2026-02-19 10:49:24,306 - INFO -   Sign Acc:   97.04%
+2026-02-19 10:49:24,306 - INFO -   Mod Acc:    35.77% (Mean of 100 mods)
+2026-02-19 10:49:24,306 - INFO -     mod2: 78.0%, mod3: 56.7%, mod5: 39.2%, mod7: 34.3%, mod10: 39.1%, mod100: 35.8%, mod101: 33.6%
+2026-02-19 10:55:03,213 - INFO - Validating Epoch 197...
+2026-02-19 10:55:27,389 - INFO - Epoch 197 Results:
+2026-02-19 10:55:27,389 - INFO -   Train Loss: 2.3864
+2026-02-19 10:55:27,389 - INFO -   Val Loss:   2.2113
+2026-02-19 10:55:27,389 - INFO -   Mag Acc:    85.43% (MSE: 1.2913)
+2026-02-19 10:55:27,389 - INFO -   Sign Acc:   97.02%
+2026-02-19 10:55:27,389 - INFO -   Mod Acc:    35.97% (Mean of 100 mods)
+2026-02-19 10:55:27,389 - INFO -     mod2: 78.0%, mod3: 56.8%, mod5: 39.4%, mod7: 34.1%, mod10: 39.3%, mod100: 35.9%, mod101: 33.7%
+2026-02-19 11:01:05,959 - INFO - Validating Epoch 198...
+2026-02-19 11:01:29,973 - INFO - Epoch 198 Results:
+2026-02-19 11:01:29,973 - INFO -   Train Loss: 2.3877
+2026-02-19 11:01:29,973 - INFO -   Val Loss:   2.2225
+2026-02-19 11:01:29,973 - INFO -   Mag Acc:    85.59% (MSE: 1.3085)
+2026-02-19 11:01:29,973 - INFO -   Sign Acc:   97.02%
+2026-02-19 11:01:29,973 - INFO -   Mod Acc:    35.86% (Mean of 100 mods)
+2026-02-19 11:01:29,973 - INFO -     mod2: 78.2%, mod3: 57.0%, mod5: 39.2%, mod7: 34.3%, mod10: 39.4%, mod100: 35.7%, mod101: 33.6%
+2026-02-19 11:07:11,966 - INFO - Validating Epoch 199...
+2026-02-19 11:07:36,565 - INFO - Epoch 199 Results:
+2026-02-19 11:07:36,565 - INFO -   Train Loss: 2.3911
+2026-02-19 11:07:36,565 - INFO -   Val Loss:   2.2131
+2026-02-19 11:07:36,565 - INFO -   Mag Acc:    85.40% (MSE: 1.1639)
+2026-02-19 11:07:36,565 - INFO -   Sign Acc:   96.99%
+2026-02-19 11:07:36,565 - INFO -   Mod Acc:    35.90% (Mean of 100 mods)
+2026-02-19 11:07:36,565 - INFO -     mod2: 78.2%, mod3: 56.9%, mod5: 39.2%, mod7: 34.3%, mod10: 39.3%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 11:13:13,195 - INFO - Validating Epoch 200...
+2026-02-19 11:13:37,432 - INFO - Epoch 200 Results:
+2026-02-19 11:13:37,432 - INFO -   Train Loss: 2.3902
+2026-02-19 11:13:37,432 - INFO -   Val Loss:   2.2116
+2026-02-19 11:13:37,432 - INFO -   Mag Acc:    85.60% (MSE: 1.1906)
+2026-02-19 11:13:37,432 - INFO -   Sign Acc:   96.96%
+2026-02-19 11:13:37,432 - INFO -   Mod Acc:    35.93% (Mean of 100 mods)
+2026-02-19 11:13:37,432 - INFO -     mod2: 78.0%, mod3: 56.9%, mod5: 39.3%, mod7: 34.3%, mod10: 39.3%, mod100: 35.9%, mod101: 33.6%
+2026-02-19 11:13:37,765 - INFO - Training complete.

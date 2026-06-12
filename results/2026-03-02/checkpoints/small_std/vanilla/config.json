@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-02-18 14:38:31",
+  "args": {
+    "split_type": "std",
+    "data_root": "data/oeis",
+    "output_dir": "checkpoints/small_std_v5/vanilla",
+    "model_type": "vanilla",
+    "d_model": 256,
+    "nhead": 4,
+    "num_layers": 6,
+    "batch_size": 32,
+    "lr": 5e-05,
+    "epochs": 200,
+    "accum_steps": 2,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "patience": 200,
+    "num_workers": 8,
+    "resume": null,
+    "seed": 42,
+    "test_only": false,
+    "model_path": null,
+    "test_split": "test",
+    "test_output": null
+  },
+  "loss_weights": {
+    "mag": 1.0,
+    "sign": 1.0,
+    "mod": 2.0
+  },
+  "environment": {
+    "python_version": "3.13.11",
+    "torch_version": "2.9.1+cu128",
+    "cuda_version": "12.8",
+    "device": "cuda",
+    "git_hash": "9ad49ff"
+  },
+  "data_stats": {
+    "train_samples": 219765,
+    "val_samples": 27470
+  },
+  "resume_from": null
+}

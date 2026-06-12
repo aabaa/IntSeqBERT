@@ -17,6 +17,19 @@ other branches of mathematics, making it the \emph{de facto} standard reference 
 sequences. Each entry associates a finite integer sequence with its mathematical definition,
 rendering the OEIS a uniquely machine-readable corpus of mathematical knowledge.
 
+% 数値パターンの観察が予想の端緒となってきた歴史を踏まえ、異分野の数列間に潜む数論的類似性を
+% 発見し予想生成を支援する AI システムの構築が長期目標。本論文はその第一歩として、
+% Modulo スペクトル表現が数論的構造をどの程度捉えられるかを穴埋めタスクで検証する。
+The long-term goal of this research is an AI system that discovers hidden number-theoretic
+similarities between integer sequences arising in different mathematical fields or from
+different algorithms, and thereby supports the generation of mathematical conjectures---a
+goal in the same spirit as recent AI-driven discovery systems such as
+AlphaProof~\cite{alphaproof2024}, the Ramanujan Machine~\cite{raayoni2021ramanujan}, and
+FunSearch~\cite{romera2023funsearch} (Section~\ref{sec:background:ai-math}). A prerequisite
+for this goal is a machine representation that captures the number-theoretic structure of
+OEIS sequences. This paper takes a first step: we propose such a representation and measure,
+through a masked-prediction task, how much arithmetic structure it actually captures.
+
 % 本研究が定式化するタスクは マスク付き系列モデリング（masked sequence modelling; 穴埋め）である。
 % 数列の複数の位置をランダムにマスクし、モデルは周囲の整数の並びから各マスク位置の値を予測するよう
 % 学習される。このタスクは「モデルが整数数列を支配する算術的・組合せ論的法則をどの程度内在化できて
@@ -77,6 +90,19 @@ regression, sign classification, and modulo prediction for 100 moduli. Concrete 
 are recovered from the masked-position predictions (magnitude, sign, residue distributions)
 using a probabilistic Chinese Remainder Theorem (CRT)-based \textbf{Solver} (Section~\ref{sec:solver}).
 
+% Kaggle 型の数列予測タスクとの違い（貢献は精度そのものではなく表現の提案と定量的証拠）。
+This combination of the modulo-spectrum representation and the CRT solver is a
+\emph{neural-symbolic} design: residue arithmetic and the Chinese Remainder Theorem are
+built into the model and the decoding procedure as explicit number-theoretic structure,
+rather than left for the network to discover end-to-end. Our contribution is therefore not
+the prediction accuracy itself---predicting integer sequences via machine learning is a
+long-standing task, e.g.\ the Kaggle Integer Sequence Learning
+competition~\cite{kaggle-integer-seq}---but the representation that explicitly encodes
+number-theoretic structure, together with quantitative evidence that this representation
+captures the structure of OEIS sequences. At the same time, our results document how
+difficult direct neural prediction of OEIS terms remains even with this structure built in,
+providing motivation for hybrid symbolic--neural approaches (Section~\ref{sec:conclusion}).
+
 % 本研究では OEIS から抽出した274,705件のデータセットに対して、3 モデルサイズ（Small: ~9M・
 % Middle: ~44M・Large: ~110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
 % 全実験は GeForce RTX 3070 Ti（VRAM 8 GB）1 枚で実施しており、コンシューマー GPU のメモリ制約下
@@ -85,6 +111,8 @@ using a probabilistic Chinese Remainder Theorem (CRT)-based \textbf{Solver} (Sec
 We evaluate IntSeqBERT against two baselines on 274,705 OEIS sequences across three model
 sizes (Small: 6.4M, Middle: 29.0M, Large: 91.5M parameters), all on a
 single GeForce RTX 3070 Ti (8\,GB VRAM).
+The implementation, preprocessing scripts, and evaluation code are publicly
+available.\footnote{\url{https://github.com/aabaa/IntSeqBERT}}
 
 % 貢献のまとめ。
 \noindent\textbf{Contributions.}

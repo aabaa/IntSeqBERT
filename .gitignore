@@ -1,8 +1,17 @@
 # Ignore all data files
-data/oeis/
-checkpoints/
-nohup.out
+/data/oeis/
+/checkpoints/
+/nohup.out
 *.tar.gz
+texput.log
+
+# Local agent/tooling state
+.claude/
+
+# Paper-internal working notes that should not be published
+paper/*/review/
+paper/*/plan.md
+paper/*/data/
 
 # LaTeX build artifacts
 *.aux
@@ -77,6 +86,7 @@ cover/
 
 # Django stuff:
 *.log
+!results/*/checkpoints/**/*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

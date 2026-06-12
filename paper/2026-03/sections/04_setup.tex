@@ -21,6 +21,20 @@ terms and those carrying any of eleven incompatible OEIS tags (out-of-scope repr
 \texttt{cons}/\texttt{cofr}/\texttt{frac}/\texttt{base}/\texttt{word}; undefined task:
 \texttt{fini}/\texttt{tabl}; quality: \texttt{dead}/\texttt{unkn}/\texttt{less}/\texttt{dumb}),
 yielding 274,705 sequences (70.1\%) as our standard dataset (\texttt{std}).
+% 表現依存・品質・タスク定義不能の三分類により、整数値そのものを通じて数論的構造を研究できる数列に
+% 絞り込むことが意図。less/dumb は主観的基準であり、tabl は標準変換で一次元化可能なため除外は
+% 必須ではない。第一弾ベンチマーク構築のための実用的判断であり、系統的なフィルタリング基準の設計は
+% 今後の課題。
+The intent of this filtering is to narrow the corpus to sequences whose number-theoretic
+structure can be studied through the integer values themselves: the excluded representations
+depend strongly on a particular encoding (e.g.\ decimal digit expansions), and the
+quality-label tags mark incomplete or deprecated entries. We acknowledge that some of these
+choices are not strictly necessary: the quality labels \texttt{less} and \texttt{dumb} are
+based on subjective criteria, and \texttt{tabl} sequences can be encoded as one-dimensional
+sequences by a standard transformation. These exclusions are a practical decision for
+constructing a first benchmark; designing a more systematic filtering criterion---for
+example, classifying sequences by the complexity of their generation rule or by their
+prediction difficulty---is left for future work.
 
 % コーパスはシード 42 で固定したランダムシャッフル後に数列レベルで重複のない 8:1:1 に分割される：
 % 学習 219,765 / 検証 27,470 / テスト 27,470
@@ -106,6 +120,13 @@ GPU                   & GeForce RTX 3070 Ti (8\,GB VRAM) $\times$ 1 \\
 We evaluate using the following metrics:
 \textbf{Magnitude Accuracy} (\textbf{Mag Acc}, $\text{Acc}_{0.5}$): fraction of masked positions with
 $|\hat{v}_i - v_i| < 0.5$ ($\sqrt{10}{\approx}3.16\times$ tolerance in integer scale).
+% 厳密一致ではなく Solver の探索範囲を絞り込むための指標であることを明示。
+% 真値 10^6 なら約 3.16×10^5〜3.16×10^6 が正解扱い。厳密一致は Solver Top-k で別途評価。
+This metric does \emph{not} measure exact integer match; it measures whether the magnitude
+prediction is precise enough to set a realistic search range for the Solver's Dense and
+Sieve modes (Section~\ref{sec:solver}). Concretely, if the true value is $10^6$, any
+prediction between roughly $3.16 \times 10^5$ and $3.16 \times 10^6$ counts as correct.
+Exact integer match is evaluated separately by Solver Top-$k$ accuracy.
 \textbf{Sign Accuracy} (\textbf{Sign Acc}): fraction with correct predicted sign class.
 \textbf{Mean Modulo Accuracy} (\textbf{MMA}): mean classification accuracy across all 100 moduli.
 \textbf{Solver Top-$k$}: fraction of next-term instances where the true value appears in the

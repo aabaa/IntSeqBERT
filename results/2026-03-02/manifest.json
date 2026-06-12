@@ -1,0 +1,83 @@
+{
+  "name": "IntSeqBERT CICM 2026 paper results",
+  "result_date": "2026-03-02",
+  "repository_commit_before_reorganization": "6d8f94856abe1c92bd8bedb1dc8c908625bc6fd2",
+  "training_git_hashes": {
+    "small_std/intseq": "9ad49ff",
+    "small_std/vanilla": "9ad49ff",
+    "small_std/ablation": "9ad49ff",
+    "middle_std/intseq": "9ad49ff",
+    "middle_std/vanilla": "9ad49ff",
+    "middle_std/ablation": "9ad49ff",
+    "large_std/intseq": "b175750",
+    "large_std/vanilla": "9ad49ff",
+    "large_std/ablation": "9ad49ff"
+  },
+  "dataset": {
+    "source": "OEIS",
+    "split_type": "std",
+    "seed": 42,
+    "train_sequences": 219765,
+    "validation_sequences": 27470,
+    "test_sequences": 27470,
+    "excluded_tags": [
+      "cons",
+      "cofr",
+      "frac",
+      "base",
+      "word",
+      "fini",
+      "tabl",
+      "dead",
+      "unkn",
+      "less",
+      "dumb"
+    ]
+  },
+  "training": {
+    "epochs": 200,
+    "batch_size": 32,
+    "gradient_accumulation_steps": 2,
+    "effective_batch_size": 64,
+    "learning_rate": 0.00005,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "precision": "FP32",
+    "loss_weights": {
+      "magnitude": 1.0,
+      "sign": 1.0,
+      "modulo": 2.0
+    }
+  },
+  "files": {
+    "summary.md": {
+      "sha256": "9a8d8ea04b2003068889d1798ec88de7e39a8fe5bf3945aa33ea3ae99cc642a9",
+      "lines": 450
+    },
+    "cache/attention_summary.csv": {
+      "sha256": "89f4afef1e2d457228f9cbe68d865ade38d849ad0937b4d2bf4829d18db2b5ec",
+      "lines": 6
+    },
+    "cache/scatter_cache_ablation.csv": {
+      "sha256": "70ce48cfc0028ada0fb0b47134c89c0f21ea262779911f7b0e79034e890fd202",
+      "lines": 175303
+    },
+    "cache/scatter_cache_intseq.csv": {
+      "sha256": "54d956ab7127fa7a536d7e0ae03c692ef6787106997d8541d8a5a7e5919233ca",
+      "lines": 175204
+    },
+    "cache/scatter_cache_vanilla.csv": {
+      "sha256": "433b648f8af53301c9749041c223e350718d9cb400b2a96fb6a580e34cce6dcf",
+      "lines": 175442
+    },
+    "checkpoint_manifest.json": {
+      "sha256": "490ed6af38da58a708c868c99c5bcba5cf17f8919487b1c8ba5f695509322be2",
+      "lines": 493
+    },
+    "checkpoints/": {
+      "description": "Lightweight copied checkpoint metadata: config, metrics, history, logs, and test result CSVs. Model weights are excluded.",
+      "files": 54,
+      "size": "4.8M"
+    }
+  }
+}

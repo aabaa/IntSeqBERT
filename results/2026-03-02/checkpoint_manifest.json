@@ -1,0 +1,493 @@
+{
+  "created": "2026-06-12",
+  "description": "Lightweight checkpoint settings, logs, histories, and metrics are copied under results/2026-03-02/checkpoints. Model weight files are not stored in Git; this manifest records their sizes and SHA256 hashes for external artifact verification.",
+  "name": "IntSeqBERT checkpoint metadata manifest",
+  "runs": {
+    "large_std/ablation": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 540,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/best_metrics.json",
+          "sha256": "c3c9e07161279e0c5737dabe2017ca52f01882cd1aaa60bdd53764aa0949af2e"
+        },
+        "best_model.pt": {
+          "bytes": 1083063307,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "89e17985f24cb0760cbd1eab7f573e7f7ad4bb8b41e4ba23ea4642a12adabd40"
+        },
+        "config.json": {
+          "bytes": 906,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/config.json",
+          "sha256": "7ea1962e5ec88c3981ba859ae31533cffb9bb041dc623043e63c0b480d63560f"
+        },
+        "history.csv": {
+          "bytes": 409287,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/history.csv",
+          "sha256": "1075a77213aec5a6869211cd639cc479b8684ab391ced2143dd397cae3ba5bce"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 1083066635,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "1d8a0577c99f6dd627b5457635c0eb219014caacd6bc63aa327f56cd024b7705"
+        },
+        "test_metrics.json": {
+          "bytes": 2984,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/test_metrics.json",
+          "sha256": "46daf82a6d90a9829023de18c0491a03aa27cd9a785a92bee7c83f644a3d7570"
+        },
+        "test_results.csv": {
+          "bytes": 3204,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/test_results.csv",
+          "sha256": "e5a13028b4ff061a382cc9041dbf34c2a2cb78ff464d1d16e0505bef5b493ce8"
+        },
+        "train.log": {
+          "bytes": 112189,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/ablation/train.log",
+          "sha256": "8ce86d17f47f2ad129ae8d674bf93faddec99e37e1eb3d9bad187c3f30181ca5"
+        }
+      },
+      "results_path": "checkpoints/large_std/ablation",
+      "source_path": "checkpoints/large_std/ablation"
+    },
+    "large_std/intseq": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 541,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/best_metrics.json",
+          "sha256": "cfdd74828209a150d4d9d28858771452698bd8f930c1615c7dddaf570b426cfd"
+        },
+        "best_model.pt": {
+          "bytes": 1099095907,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "8960ae169b33bb4fa6fd9d29f797abc6f97b9f3cedcd73d16d65b860e4d11b0b"
+        },
+        "config.json": {
+          "bytes": 902,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/config.json",
+          "sha256": "0f4e6ea8345f1a9deff4b233f1166c975c31b096d7e6d3f0a852c7528649de8f"
+        },
+        "history.csv": {
+          "bytes": 404884,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/history.csv",
+          "sha256": "4080f5f645f3e6c808ae9dc75ae68ea01e5c9d47d3bcfa1fb865ab3360e661fa"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 1099099355,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "b698cdc677dc4de2f2002b4870a241ee565ba8f994412526300c32708054b675"
+        },
+        "test_metrics.json": {
+          "bytes": 2998,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/test_metrics.json",
+          "sha256": "a44c11f92ccdb943d02d7f150e1973b15dd58cc933a773c75419caccdb72ff61"
+        },
+        "test_results.csv": {
+          "bytes": 3221,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/test_results.csv",
+          "sha256": "b1c2cfd444dd96e539f97932cbb229e7f9cd1146444bdbd7db733dc3513bbdf4"
+        },
+        "train.log": {
+          "bytes": 114639,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/intseq/train.log",
+          "sha256": "3ed7b05879dc30469587187d1714d9272cc2483259dcbbaf529ced44a8b56d93"
+        }
+      },
+      "results_path": "checkpoints/large_std/intseq",
+      "source_path": "checkpoints/large_std/intseq"
+    },
+    "large_std/vanilla": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 537,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/best_metrics.json",
+          "sha256": "9dbef65ed64e0747cefb18ed1ecba54a4d286b9af04f4ae3bc3e2fbb1fdb9a22"
+        },
+        "best_model.pt": {
+          "bytes": 1444854855,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "c7ab90d7df381141afd3aac73c0b8d9bb6db16f546ee8ead9a2f0a5d3b63b069"
+        },
+        "config.json": {
+          "bytes": 904,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/config.json",
+          "sha256": "c765f11d14cd6542d50ffd0a129c8c5ca6cf2589f74df73436edb7576cb0f043"
+        },
+        "history.csv": {
+          "bytes": 405174,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/history.csv",
+          "sha256": "e18b2d649a1270a064863ad9aef429c0d2a33768e3e8b62163e8ca3139340099"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 1444858163,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "7dec60da029a8b1fcc85e8e7265bf22e45e5ab336402d767062ec9628f89667f"
+        },
+        "test_metrics.json": {
+          "bytes": 3004,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/test_metrics.json",
+          "sha256": "e1140fdea5aded3374de669df5c0396e085bf61cc8b57828c6e5d0f3442e103f"
+        },
+        "test_results.csv": {
+          "bytes": 3225,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/test_results.csv",
+          "sha256": "061a9823355721db02673b98de157fa871a352b1a0f1e6a3663d75e6e3b9e31c"
+        },
+        "train.log": {
+          "bytes": 114849,
+          "included_in_results": true,
+          "results_path": "checkpoints/large_std/vanilla/train.log",
+          "sha256": "7951a6b1590d41069d003712f1d0b5bc850ca540642e2e196b8066570a91d187"
+        }
+      },
+      "results_path": "checkpoints/large_std/vanilla",
+      "source_path": "checkpoints/large_std/vanilla"
+    },
+    "middle_std/ablation": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 544,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/best_metrics.json",
+          "sha256": "ff99761d355545206c784a3bfe6dc5402d74abbe35d5b40e0ecfca93489d90f3"
+        },
+        "best_model.pt": {
+          "bytes": 341117195,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "eff182141b673829ca77e3f531e3d0c33cecce2b99716b8612811f045e70324c"
+        },
+        "config.json": {
+          "bytes": 905,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/config.json",
+          "sha256": "18cf7cf89cae2938d260beb84f79fa90c3d686ed4e65013b37bc785dba7a6dc4"
+        },
+        "history.csv": {
+          "bytes": 411371,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/history.csv",
+          "sha256": "1ed18c4508c492e691babae6830189bd9de18a67f2cc2b57873b922c6f9ba335"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 341119563,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "13e570978d92d89f0efcd42e15606b86bd2823bc8cf62e6b360ed813d216963f"
+        },
+        "test_metrics.json": {
+          "bytes": 3042,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/test_metrics.json",
+          "sha256": "689c4ad0b75b92c5c433a164e64e98a6e15bd0683da2cb6b27577c57be6aa95c"
+        },
+        "test_results.csv": {
+          "bytes": 3260,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/test_results.csv",
+          "sha256": "e6470ea1e79c1dabe708c0da4d5337dd280d4581fc743f186ceaaf7b054dcab5"
+        },
+        "train.log": {
+          "bytes": 112047,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/ablation/train.log",
+          "sha256": "e2a38e4f4273d23944d27aa8781a2bee9a7c7ba4dcd3d0fb1a2297416ee6adb1"
+        }
+      },
+      "results_path": "checkpoints/middle_std/ablation",
+      "source_path": "checkpoints/middle_std/ablation"
+    },
+    "middle_std/intseq": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 540,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/best_metrics.json",
+          "sha256": "c35ef882261212fc8ba9990b20c37cefc61e7f3d6353838c74f595d164e84a43"
+        },
+        "best_model.pt": {
+          "bytes": 348662179,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "31aacd3e631d1627ff5399d24d7cdaaa5d6625175330440e564e3bac9b4edd36"
+        },
+        "config.json": {
+          "bytes": 901,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/config.json",
+          "sha256": "d35aa6c194dc446afc7154cd1bbdb148b12bf04bcf564d4a77f0bc970c7b69b1"
+        },
+        "history.csv": {
+          "bytes": 405042,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/history.csv",
+          "sha256": "747e294dcaf48ed30c046f09c4771992a0a8f57426176445ddf54061b7b1fb0b"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 348664667,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "aa397aa7451337b3fcb918c8a5803db330117bb75c04de0f38153c1e831b7223"
+        },
+        "test_metrics.json": {
+          "bytes": 3004,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/test_metrics.json",
+          "sha256": "0052c519a638f856817dd7738520d692a31d7d6ec207f7df226902ff600e0f15"
+        },
+        "test_results.csv": {
+          "bytes": 3223,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/test_results.csv",
+          "sha256": "f996a9b83d2b7efd590ca8b7d0ba5091dc27abcef8cec137240faa4071a9c932"
+        },
+        "train.log": {
+          "bytes": 115337,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/intseq/train.log",
+          "sha256": "4fed6575963c1ef806298fb6eb56a906058df1a2b3d8a18261023de74254d961"
+        }
+      },
+      "results_path": "checkpoints/middle_std/intseq",
+      "source_path": "checkpoints/middle_std/intseq"
+    },
+    "middle_std/vanilla": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 542,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/best_metrics.json",
+          "sha256": "a7d9fb071306f69e8311888080e03ba95268c1e133e41aeb56c7b9e560845832"
+        },
+        "best_model.pt": {
+          "bytes": 583963975,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "6c68a774f7b14e46f1c6125f3c9e68c6cf6192be91be444a152b2d123f338ddf"
+        },
+        "config.json": {
+          "bytes": 903,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/config.json",
+          "sha256": "5ca4fb02dd706b7ed933a61c894a2c95d2b24babee3f54ab50faa42557f3998d"
+        },
+        "history.csv": {
+          "bytes": 405213,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/history.csv",
+          "sha256": "55750a199b653c7de143f324c71939525514abbaf06e3e752201e9c75ac61e1f"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 583966323,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "a5c99c10f99f6cccbdf47c526be59797660521f24ecc2d6c353db6a11dc8d016"
+        },
+        "test_metrics.json": {
+          "bytes": 3007,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/test_metrics.json",
+          "sha256": "83d3f9a5c39ad3959b66ae360dbd5b32933267f3eca0388c09d1e575eac55347"
+        },
+        "test_results.csv": {
+          "bytes": 3228,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/test_results.csv",
+          "sha256": "21d2812f3f6a38d1aaebb5a8dc1a3d1aa32c3b35352fa9c02beb53738cecda73"
+        },
+        "train.log": {
+          "bytes": 114708,
+          "included_in_results": true,
+          "results_path": "checkpoints/middle_std/vanilla/train.log",
+          "sha256": "9fb37f7693068ae5438b8c9b648744252966d0da2aaa80006925bb3d0244b555"
+        }
+      },
+      "results_path": "checkpoints/middle_std/vanilla",
+      "source_path": "checkpoints/middle_std/vanilla"
+    },
+    "small_std/ablation": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 542,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/best_metrics.json",
+          "sha256": "47c59be5354dab2a00829961ea2885d2066d117843d3d39d8bf26bb6a055fd1b"
+        },
+        "best_model.pt": {
+          "bytes": 74604907,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "48b2293e6ce7926bfd0f087eac2c7b4590b828bfbc1fe2457f045beb6f360424"
+        },
+        "config.json": {
+          "bytes": 904,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/config.json",
+          "sha256": "d1fe4ae460783d4e03aa1c64df202ef4cc0562dde2f401e07761adfe83eb5346"
+        },
+        "history.csv": {
+          "bytes": 412295,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/history.csv",
+          "sha256": "51e577ec79ca7e2b258c88cd9e9f4d16961fd775f7a4574efbcea2ff2a9fbc51"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 74606795,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "58e9beb3745cb6e44d7b813b7546ebc9087fbe183dd8106b5dac4b6deb154fab"
+        },
+        "test_metrics.json": {
+          "bytes": 3042,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/test_metrics.json",
+          "sha256": "78a30d76872376fbe3ab5eb770e490361b8987cb23595a2f2b6ee4a94f70d482"
+        },
+        "test_results.csv": {
+          "bytes": 3261,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/test_results.csv",
+          "sha256": "84040678e68fbf6657bb7543f450b0c22783d6746550cf5becdd51af2f9525c7"
+        },
+        "train.log": {
+          "bytes": 112674,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/ablation/train.log",
+          "sha256": "74d10171c69da79bef7a31f9f84cdf14f82b94f12ed2cfdb1135c5907d0018a1"
+        }
+      },
+      "results_path": "checkpoints/small_std/ablation",
+      "source_path": "checkpoints/small_std/ablation"
+    },
+    "small_std/intseq": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 539,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/best_metrics.json",
+          "sha256": "8fe83e719be7d9e55fedf967470fd449d8e26e153bfafd71745edca39d269bcd"
+        },
+        "best_model.pt": {
+          "bytes": 76807875,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "d249709119e5b31a8776e14602a66b1fe3d0d15241def9a10c1a51ec49ebe4a3"
+        },
+        "config.json": {
+          "bytes": 900,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/config.json",
+          "sha256": "c7e52446e9979aff1f8a3e6fd268a8c83edcfa00daaed520a371819957cb70c7"
+        },
+        "history.csv": {
+          "bytes": 406037,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/history.csv",
+          "sha256": "6845fc8437b1e84e8c90b3398d2d2e9e735ba254c934316f86e62950ee7c9284"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 76809883,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "0472a697a9c7f2de7aa3cfef26d43f2a5b86d9eb4104ade3a3af7896efe7c072"
+        },
+        "test_metrics.json": {
+          "bytes": 3011,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/test_metrics.json",
+          "sha256": "b12ea3c3a3fd4a80c1a288261af5c7eb16fd647d2ccc77e8c0297390d68d9280"
+        },
+        "test_results.csv": {
+          "bytes": 3232,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/test_results.csv",
+          "sha256": "b8076d1d3ca48eeaf416e6c69db4956f78daee9df74878232b418ae5f35dc7b5"
+        },
+        "train.log": {
+          "bytes": 115825,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/intseq/train.log",
+          "sha256": "011f2a2849c4d5d4c35b420c71ebc8a55fd922706b509dee3ac2382202704f6a"
+        }
+      },
+      "results_path": "checkpoints/small_std/intseq",
+      "source_path": "checkpoints/small_std/intseq"
+    },
+    "small_std/vanilla": {
+      "files": {
+        "best_metrics.json": {
+          "bytes": 541,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/best_metrics.json",
+          "sha256": "000a00af1b144f7d12e8931a0f966d65286233bd0aef15d9579a6af83f90c2b2"
+        },
+        "best_model.pt": {
+          "bytes": 196934119,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "3079984e2426bcda3cf5a8bc5bb12bb12b8728c8aeb7d6935f3d85af27bb0b8a"
+        },
+        "config.json": {
+          "bytes": 902,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/config.json",
+          "sha256": "b02be86bcdb55046ac8648356b76dbb5315ab97b570595e165bda677d5531113"
+        },
+        "history.csv": {
+          "bytes": 407640,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/history.csv",
+          "sha256": "59927d1210d5f4de4f03397fb3b5fd4e10e9af9f67f4cc02e6cd01598b5b4df1"
+        },
+        "last_checkpoint.pt": {
+          "bytes": 196935987,
+          "included_in_results": false,
+          "reason": "model weight file; publish via external artifact storage",
+          "sha256": "2a646d2be418c8da63e09588798842c5acd49ba01738ad26b3dc4cdb8e82a1dd"
+        },
+        "test_metrics.json": {
+          "bytes": 2991,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/test_metrics.json",
+          "sha256": "4dd080a96813294aeac8ca7bc394eab925e1e4b533f86aefa6648ce2e10fff53"
+        },
+        "test_results.csv": {
+          "bytes": 3214,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/test_results.csv",
+          "sha256": "d14a4abdfba0c57569730eecdb2a216caeca8c6fc13a10192441ef06f2ef124d"
+        },
+        "train.log": {
+          "bytes": 114987,
+          "included_in_results": true,
+          "results_path": "checkpoints/small_std/vanilla/train.log",
+          "sha256": "98903e3cad4136d3379ffacaa14c20257b34cc11925d2c2b315ffeb7d09b446b"
+        }
+      },
+      "results_path": "checkpoints/small_std/vanilla",
+      "source_path": "checkpoints/small_std/vanilla"
+    }
+  }
+}

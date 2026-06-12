@@ -123,5 +123,13 @@ and apply FiLM~\cite{perez2018film} to modulate the magnitude stream via the mod
 In contrast to the Gauthier and Urban group's program-synthesis line~\cite{urban-alien-coding,gauthier2023qsynt,gauthier2025conjecturing},
 which explicitly describes each sequence's generation rule, this work uses \emph{representation
 learning} to acquire shared arithmetic structure across the OEIS corpus.
+% プログラム合成は数列を生成する式・プログラムの発見を目指すのに対し、本研究は生成法が異なっても
+% 数論的に類似した数列を判定することを目指す。両者は相補的であり、IntSeqBERT の事前学習表現は
+% プログラム合成の探索ヒューリスティクスや類似数列検索のインデックスとして利用できる可能性がある。
+We view the two approaches as complementary: program synthesis seeks a formula or program
+that generates a given sequence, whereas our representations aim to judge whether two
+sequences are number-theoretically similar even when they are generated in entirely
+different ways. Pre-trained IntSeqBERT embeddings could in turn serve as a search heuristic
+for program synthesis, or as an index for retrieving similar sequences.
 Where FACT~\cite{zurich-fact} identified the limits of a plain tokenised Transformer,
 IntSeqBERT overcomes them via modulo-spectrum feature engineering and FiLM fusion.

@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-02-16 08:53:14",
+  "args": {
+    "split_type": "std",
+    "data_root": "data/oeis",
+    "output_dir": "checkpoints/middle_std_v5/ablation",
+    "model_type": "ablation",
+    "d_model": 512,
+    "nhead": 8,
+    "num_layers": 8,
+    "batch_size": 32,
+    "lr": 5e-05,
+    "epochs": 200,
+    "accum_steps": 2,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "patience": 200,
+    "num_workers": 8,
+    "resume": null,
+    "seed": 42,
+    "test_only": false,
+    "model_path": null,
+    "test_split": "test",
+    "test_output": null
+  },
+  "loss_weights": {
+    "mag": 1.0,
+    "sign": 1.0,
+    "mod": 2.0
+  },
+  "environment": {
+    "python_version": "3.13.11",
+    "torch_version": "2.9.1+cu128",
+    "cuda_version": "12.8",
+    "device": "cuda",
+    "git_hash": "9ad49ff"
+  },
+  "data_stats": {
+    "train_samples": 219765,
+    "val_samples": 27470
+  },
+  "resume_from": null
+}
