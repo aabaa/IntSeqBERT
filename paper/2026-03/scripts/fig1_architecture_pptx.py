@@ -1,12 +1,12 @@
 """
-Fig.1 IntSeqBERT アーキテクチャ図 — PowerPoint 版
+Fig.1 IntSeqBERT architecture diagram -- PowerPoint version
 CICM 2026 paper — Figure 1 (editable PPTX)
 
-python-pptx を使って編集可能な PPTX を生成。
-座標系: matplotlib の (0–16, 0–7) データ座標を
-        スライド幅 33.87cm, 高さ 14.82cm に変換。
+Generates an editable PPTX with python-pptx.
+Coordinate system: maps matplotlib-style data coordinates (0-16, 0-7)
+        to a slide width of 33.87 cm and height of 14.82 cm.
 
-出力: paper/cicm2026/figures/fig1_architecture.pptx
+Output: paper/2026-03/figures/fig1_architecture.pptx
 """
 
 from pathlib import Path
@@ -20,7 +20,7 @@ from pptx.oxml.ns import qn
 OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── スライドサイズ ────────────────────────────────────────────────────────
+# ── Slide size ───────────────────────────────────────────────────────────
 SLIDE_W_CM = 33.87
 SLIDE_H_CM = 14.82
 DATA_W = 16.0
@@ -36,7 +36,7 @@ def to_emu_x(data_x):
 
 
 def to_emu_y(data_y):
-    """data_y → EMU (y反転: matplotlib 下=0 → pptx 上=0)"""
+    """Convert data_y to EMU, flipping y from matplotlib bottom-origin to PPTX top-origin."""
     return cm((DATA_H - data_y) / DATA_H * SLIDE_H_CM)
 
 
@@ -53,7 +53,7 @@ def rgb(hex_str):
     return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
-# ── 色 ───────────────────────────────────────────────────────────────────
+# ── Colors ───────────────────────────────────────────────────────────────
 C_MAG   = "#3b82f6"
 C_MOD   = "#f97316"
 C_FILM  = "#8b5cf6"
@@ -65,7 +65,7 @@ C_BG_MOD  = "#fff7ed"
 C_BG_ENC  = "#ecfdf5"
 C_BG_HEAD = "#f9fafb"
 
-# ── Presentation 初期化 ──────────────────────────────────────────────────
+# ── Presentation setup ───────────────────────────────────────────────────
 prs = Presentation()
 prs.slide_width  = cm(SLIDE_W_CM)
 prs.slide_height = cm(SLIDE_H_CM)
@@ -74,22 +74,22 @@ shapes = slide.shapes
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Helper: 角丸矩形
-# (x, y) = data 座標 左下角, (w, h) = data 幅・高さ
+# Helper: rounded rectangle
+# (x, y) = bottom-left data coordinates, (w, h) = data width and height
 # ─────────────────────────────────────────────────────────────────────────
 def add_box(x, y, w, h, fill_hex, line_hex, line_pt=1.5, alpha=1.0):
-    """alpha: 0=透明, 1=不透明"""
+    """alpha: 0=transparent, 1=opaque."""
     left   = to_emu_x(x)
-    top    = to_emu_y(y + h)     # 上端 = y+h をy軸反転
+    top    = to_emu_y(y + h)     # top edge = y+h after y-axis flip
     width  = to_emu_w(w)
     height = to_emu_h(h)
 
     shape = shapes.add_shape(5, left, top, width, height)  # 5=rounded rect
 
-    # 塗りつぶし (solidFill + alpha)
+    # Fill (solidFill + alpha)
     sp = shape.element
     spPr = sp.find(qn("p:spPr"))
-    # 既存 fill 要素を削除して solidFill を直接 XML で設定
+    # Remove existing fill elements and set solidFill directly in XML.
     for tag in ("noFill", "solidFill", "gradFill", "pattFill"):
         for e in spPr.findall(qn("a:" + tag)):
             spPr.remove(e)
@@ -101,7 +101,7 @@ def add_box(x, y, w, h, fill_hex, line_hex, line_pt=1.5, alpha=1.0):
         alphaElem = etree.SubElement(srgbClr, qn("a:alpha"))
         alphaElem.set("val", str(int(alpha * 100000)))
 
-    # 枠線
+    # Border
     shape.line.color.rgb = rgb(line_hex)
     shape.line.width = Pt(line_pt)
 
@@ -109,13 +109,13 @@ def add_box(x, y, w, h, fill_hex, line_hex, line_pt=1.5, alpha=1.0):
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Helper: テキストボックス
-# center_x, center_y = data 座標中心
+# Helper: text box
+# center_x, center_y = center in data coordinates
 # ─────────────────────────────────────────────────────────────────────────
 def add_text(cx, cy, w, h, text, font_pt=11, bold=False,
              color_hex="#000000", align=PP_ALIGN.CENTER):
     """
-    複数行テキスト: '\\n' で段落分割。
+    Multi-line text: split paragraphs on '\\n'.
     """
     left   = to_emu_x(cx - w / 2)
     top    = to_emu_y(cy + h / 2)
@@ -143,10 +143,10 @@ def add_text(cx, cy, w, h, text, font_pt=11, bold=False,
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Helper: 矢印 (直線コネクター + 先端矢印)
+# Helper: arrow (straight connector + arrow head)
 # ─────────────────────────────────────────────────────────────────────────
 def add_arrow(x1, y1, x2, y2, color_hex="#374151", line_pt=1.5):
-    """始点 (x1,y1) → 終点 (x2,y2), data 座標"""
+    """Draw from start (x1, y1) to end (x2, y2) in data coordinates."""
     bx = to_emu_x(x1)
     by = to_emu_y(y1)
     ex = to_emu_x(x2)
@@ -154,11 +154,11 @@ def add_arrow(x1, y1, x2, y2, color_hex="#374151", line_pt=1.5):
 
     conn = shapes.add_connector(1, bx, by, ex, ey)  # 1=straight
 
-    # 色・太さ
+    # Color and width
     sp = conn.element
     spPr = sp.find(qn("p:spPr"))
 
-    # <a:ln> を追加（色・太さ・矢印頭）
+    # Add <a:ln> with color, width, and arrow head.
     ln = spPr.find(qn("a:ln"))
     if ln is None:
         ln = etree.SubElement(spPr, qn("a:ln"))
@@ -168,18 +168,18 @@ def add_arrow(x1, y1, x2, y2, color_hex="#374151", line_pt=1.5):
     srgbClr = etree.SubElement(solidFill, qn("a:srgbClr"))
     srgbClr.set("val", color_hex.lstrip("#"))
 
-    # 先端矢印 (headEnd)
+    # Arrow head (headEnd)
     headEnd = etree.SubElement(ln, qn("a:headEnd"))
     headEnd.set("type", "arrow")
     headEnd.set("w", "med")
     headEnd.set("len", "med")
 
-    # pstyle の schemeClr を上書き（PowerPoint のデフォルト色を消す）
+    # Override the pstyle schemeClr to avoid PowerPoint's default color.
     style = sp.find(qn("p:style"))
     if style is not None:
         lnRef = style.find(qn("a:lnRef"))
         if lnRef is not None:
-            # schemeClr を削除して srgbClr に差し替え
+            # Replace schemeClr with srgbClr.
             for child in list(lnRef):
                 lnRef.remove(child)
             srgb2 = etree.SubElement(lnRef, qn("a:srgbClr"))
@@ -189,7 +189,7 @@ def add_arrow(x1, y1, x2, y2, color_hex="#374151", line_pt=1.5):
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# 描画開始
+# Start drawing
 # ═════════════════════════════════════════════════════════════════════════
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -280,23 +280,23 @@ HEAD_SPECS = [
 for (y0, fc, ec, title_text, subtitle_text) in HEAD_SPECS:
     add_box(HEAD_X, y0, HEAD_W, 1.1, fc, ec, line_pt=1.5)
     title_lines = title_text.split("\n")
-    # タイトル行1
+    # Title line 1
     add_text(HEAD_X + HEAD_W / 2, y0 + 0.89, HEAD_W - 0.1, 0.35,
              title_lines[0], font_pt=11, bold=True, color_hex=ec)
-    # タイトル行2
+    # Title line 2
     if len(title_lines) > 1:
         add_text(HEAD_X + HEAD_W / 2, y0 + 0.60, HEAD_W - 0.1, 0.35,
                  title_lines[1], font_pt=11, bold=True, color_hex=ec)
-    # サブタイトル
+    # Subtitle
     add_text(HEAD_X + HEAD_W / 2, y0 + 0.24, HEAD_W - 0.1, 0.35,
              subtitle_text, font_pt=10, color_hex="#374151")
 
 # ─────────────────────────────────────────────────────────────────────────
 # Arrows
 # ─────────────────────────────────────────────────────────────────────────
-# Input → Mag feature (上方向に斜め)
+# Input -> Mag feature (diagonal upward)
 add_arrow(1.65, 3.75, 1.95, 4.75, C_MAG, line_pt=1.4)
-# Input → Mod feature (水平)
+# Input -> Mod feature (horizontal)
 add_arrow(1.65, 3.25, 1.95, 3.25, C_MOD, line_pt=1.4)
 
 # Mag feature → MLP_mag
@@ -306,7 +306,7 @@ add_arrow(3.85, 3.25, 4.15, 3.25, C_MOD, line_pt=1.4)
 
 # MLP_mag → FiLM (h_mag)
 add_arrow(5.65, 4.75, 6.05, 4.75, C_MAG, line_pt=1.4)
-# W_mod → FiLM (h_mod, 斜め上)
+# W_mod -> FiLM (h_mod, diagonal upward)
 add_arrow(5.65, 3.25, 6.05, 4.05, C_MOD, line_pt=1.4)
 
 # FiLM → Encoder
@@ -317,7 +317,7 @@ for y_head in [4.95, 3.60, 2.25]:
     add_arrow(11.78, 4.00, 12.50, y_head, C_HEAD, line_pt=1.2)
 
 # ─────────────────────────────────────────────────────────────────────────
-# Legend (色サンプル + ラベル)
+# Legend (color swatch + label)
 # ─────────────────────────────────────────────────────────────────────────
 legend_items = [
     ("#dbeafe", C_MAG,  "Magnitude stream"),
@@ -335,15 +335,15 @@ item_w    = 3.0
 
 for i, (fc, ec, lbl) in enumerate(legend_items):
     lx = leg_x0 + i * item_w
-    # 色サンプル
+    # Color swatch
     add_box(lx, leg_y - swatch_h / 2, swatch_w, swatch_h,
             fc, ec, line_pt=1.2)
-    # ラベル
+    # Label
     add_text(lx + swatch_w + 0.85, leg_y, item_w - swatch_w - 0.1, 0.40,
              lbl, font_pt=10, color_hex="#374151", align=PP_ALIGN.LEFT)
 
 # ─────────────────────────────────────────────────────────────────────────
-# 保存
+# Save
 # ─────────────────────────────────────────────────────────────────────────
 out_path = OUT_DIR / "fig1_architecture.pptx"
 prs.save(str(out_path))

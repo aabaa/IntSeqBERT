@@ -1,6 +1,5 @@
 %% Section 4: Dataset and Experimental Setup
-%% Japanese draft (draft2/04_setup.md) embedded as comments.
-%% English translation written below each paragraph.
+%% English manuscript section.
 %% -----------------------------------------------------------------------
 
 \section{Dataset and Experimental Setup}
@@ -9,22 +8,11 @@
 \subsection{Dataset}
 \label{sec:dataset}
 
-% 2026年1月時点で OEIS には合計 391,710 件の数列が登録されているが、系列長 10 未満の数列ならびに
-% 整数列予測タスクに不適切な 11 タグを持つ数列を除去し、274,705 件（全体の 70.1%）を標準データセット
-% （std）として使用する。
-% 除外理由は三種類に大別される：
-% (i) スコープ外の表現——cons/cofr/frac（数学定数の桁展開・分数値）、base（十進表記依存）、word（言語由来）；
-% (ii) 予測タスクの定義不能——fini（有限列）、tabl（二次元配列を1次元に平坦化した系列）；
-% (iii) 品質・完全性——dead（廃止済み）、unkn/less（不完全）、dumb（低品質）
 As of January 2026, OEIS contains 391,710 sequences. We exclude sequences with fewer than ten
 terms and those carrying any of eleven incompatible OEIS tags (out-of-scope representations:
 \texttt{cons}/\texttt{cofr}/\texttt{frac}/\texttt{base}/\texttt{word}; undefined task:
 \texttt{fini}/\texttt{tabl}; quality: \texttt{dead}/\texttt{unkn}/\texttt{less}/\texttt{dumb}),
 yielding 274,705 sequences (70.1\%) as our standard dataset (\texttt{std}).
-% 表現依存・品質・タスク定義不能の三分類により、整数値そのものを通じて数論的構造を研究できる数列に
-% 絞り込むことが意図。less/dumb は主観的基準であり、tabl は標準変換で一次元化可能なため除外は
-% 必須ではない。第一弾ベンチマーク構築のための実用的判断であり、系統的なフィルタリング基準の設計は
-% 今後の課題。
 The intent of this filtering is to narrow the corpus to sequences whose number-theoretic
 structure can be studied through the integer values themselves: the excluded representations
 depend strongly on a particular encoding (e.g.\ decimal digit expansions), and the
@@ -36,19 +24,13 @@ constructing a first benchmark; designing a more systematic filtering criterion-
 example, classifying sequences by the complexity of their generation rule or by their
 prediction difficulty---is left for future work.
 
-% コーパスはシード 42 で固定したランダムシャッフル後に数列レベルで重複のない 8:1:1 に分割される：
-% 学習 219,765 / 検証 27,470 / テスト 27,470
 The corpus is split 8:1:1 (seed~42): 219,765 training / 27,470 validation / 27,470 test sequences.
 
-% 各サンプルは最大 L = 128 要素の数列プレフィックスに対応する。
-% テストデータで最短 10 項・最長 168 項（平均 42.5 項）。Solver 評価では常に 9 項以上の先行文脈が
-% 利用される。数列には OEIS キーワードタグが付与されており、第 5 節の層別解析に用いる。
 Each sample corresponds to a sequence prefix of at most $L = 128$ terms (longer sequences are
 truncated). In the raw test corpus (before truncation), sequence lengths range from 10 to 168
 terms (mean 42.5). After truncation, all model inputs satisfy $L \le 128$, while still ensuring
 that the Solver receives at least 9 terms of preceding context (Section~\ref{sec:solver-eval}).
 
-% スケール別評価のため、u = log10(|x|) (x≠0), u=0 (x=0) に基づく 5 つの Magnitude バケットを定義：
 For scale-stratified evaluation, we define five magnitude buckets by value range:
 
 \begin{table}[htbp]
@@ -68,19 +50,12 @@ Astronomical & $|x| \geq 10^{50}$              &  0.0\%           \\
 \end{tabular}
 \end{table}
 
-% 分割の限界。ランダムシャッフルに基づく分割では、数学的に類似した数列（例：A000045 Fibonacci と
-% A000032 Lucas）が train と test に分かれて出現しうる。この関連数列間リークは OEIS を用いる研究
-% 全般に共通する困難であり、数列ファミリーを考慮した系統的な分割設計は今後の課題である（第 7 節）。
 \textbf{Limitations of the split.} The random split may place related sequences (e.g.,
 Fibonacci and Lucas) in different splits; family-aware splits are left for future work.
 
 \subsection{Training Configuration}
 \label{sec:training-config}
 
-% 全モデルで共通のハイパーパラメータ
-% OEIS の値には |x| ≈ 10^{210} に達するものが存在し、生の値は FP16 で桁あふれするため
-% 全計算に FP32 を強制する。全結果は固定 200 エポック完了時の学習済みモデルをテストデータに
-% 適用して報告する。
 All models share the hyperparameters shown in Table~\ref{tab:hyperparams}.
 Some OEIS values reach $|x| \approx 10^{210}$, causing FP16 overflow; all computation is
 therefore conducted in FP32. All results are reported by applying the model trained for the
@@ -110,18 +85,9 @@ GPU                   & GeForce RTX 3070 Ti (8\,GB VRAM) $\times$ 1 \\
 \subsection{Evaluation Metrics}
 \label{sec:metrics}
 
-% Magnitude 精度（Acc_{0.5}）: |v_hat_i - v_i| < 0.5 を満たす割合。元の整数スケールでは
-%   √10 ≈ 3.16 倍の許容誤差に相当する。
-% 符号精度（Sign Accuracy）: 予測符号クラスが正解と一致する割合。
-% 平均 Modulo 精度（MMA）: 100 個の法すべてに対する分類精度の平均（マスク位置のみ）。
-% Solver Top-k 精度: 真の次項が、Solver が生成した上位 k 件の候補に含まれる割合。
-% 正規化情報利得（NIG）: NIG = 1 - L_CE^(m) / ln m
-%   NIG が高いほど、そのモジュラスに対して強い周期構造が学習されていることを示す。
 We evaluate using the following metrics:
 \textbf{Magnitude Accuracy} (\textbf{Mag Acc}, $\text{Acc}_{0.5}$): fraction of masked positions with
 $|\hat{v}_i - v_i| < 0.5$ ($\sqrt{10}{\approx}3.16\times$ tolerance in integer scale).
-% 厳密一致ではなく Solver の探索範囲を絞り込むための指標であることを明示。
-% 真値 10^6 なら約 3.16×10^5〜3.16×10^6 が正解扱い。厳密一致は Solver Top-k で別途評価。
 This metric does \emph{not} measure exact integer match; it measures whether the magnitude
 prediction is precise enough to set a realistic search range for the Solver's Dense and
 Sieve modes (Section~\ref{sec:solver}). Concretely, if the true value is $10^6$, any

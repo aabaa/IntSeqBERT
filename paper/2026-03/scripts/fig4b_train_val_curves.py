@@ -1,14 +1,14 @@
 """
-Fig.4b Train vs Val 学習曲線（過学習確認用）
+Fig.4b Train vs. Val learning curves (overfitting check)
 CICM 2026 paper — Figure 4b
 
-各パネル = モデルバリアント（IntSeqBERT / Vanilla / Ablation）
-各パネル内 = Small / Middle / Large の Train（細点線）+ Val（太実線）
+Each panel = model variant (IntSeqBERT / Vanilla / Ablation)
+Within each panel = Train (thin dotted) + Val (thick solid) for Small / Middle / Large
 
-出力: experiment/cicm2026/fig4b_train_val_curves.pdf
-      experiment/cicm2026/fig4b_train_val_curves.png
+Output: paper/2026-03/figures/fig4b_train_val_curves.pdf
+      paper/2026-03/figures/fig4b_train_val_curves.png
 
-データソース: checkpoints/{size}_std/{model}/history.csv
+Data source: checkpoints/{size}_std/{model}/history.csv
 """
 
 from pathlib import Path
@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-# ── パス設定 ──────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT_ROOT = REPO_ROOT / "checkpoints"
 OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
@@ -28,7 +28,7 @@ LABELS  = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
 
 SIZES    = ["Small", "Middle", "Large"]
 SIZE_DIR = {"Small": "small_std", "Middle": "middle_std", "Large": "large_std"}
-# サイズ別カラー（識別しやすい3色）
+# Size colors (three easy-to-distinguish colors)
 SIZE_COLORS = {"Small": "#2ca02c", "Middle": "#ff7f0e", "Large": "#1f77b4"}
 
 def load_history(size_key: str, model: str) -> pd.DataFrame:
@@ -36,7 +36,7 @@ def load_history(size_key: str, model: str) -> pd.DataFrame:
     df = pd.read_csv(path, usecols=["epoch", "train_loss", "val_loss"])
     return df.sort_values("epoch")
 
-# ── プロット ──────────────────────────────────────────────────────────────
+# ── Plot ─────────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.2), sharey=False)
 fig.subplots_adjust(left=0.06, right=0.88, top=0.96, bottom=0.13, wspace=0.32)
 
@@ -44,11 +44,11 @@ for ax, model in zip(axes, MODELS):
     for size in SIZES:
         df = load_history(size, model)
         c = SIZE_COLORS[size]
-        # Val Loss: 太実線
+        # Val Loss: thick solid line
         ax.plot(df["epoch"], df["val_loss"],
                 color=c, linestyle="-", linewidth=2.0,
                 label=f"{size} Val")
-        # Train Loss: 細点線
+        # Train Loss: thin dotted line
         ax.plot(df["epoch"], df["train_loss"],
                 color=c, linestyle=":", linewidth=1.0,
                 label=f"{size} Train")
@@ -64,11 +64,11 @@ for ax, model in zip(axes, MODELS):
 
 axes[0].set_ylabel("Loss", fontsize=11)
 
-# ── 凡例（図の右外に配置）────────────────────────────────────────────────
-# IntSeqBERT パネルのハンドルを再利用して右外に凡例を出す
+# ── Legend (placed outside the figure on the right) ──────────────────────
+# Reuse the IntSeqBERT panel handles to build an external legend.
 handles, raw_labels = axes[0].get_legend_handles_labels()
 
-# カスタム凡例アイテムを構築
+# Build custom legend items.
 from matplotlib.lines import Line2D
 legend_items = []
 for size in SIZES:
@@ -90,7 +90,7 @@ fig.legend(
     title_fontsize=10,
 )
 
-# ── 保存 ──────────────────────────────────────────────────────────────────
+# ── Save ─────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
     out_path = OUT_DIR / f"fig4b_train_val_curves.{ext}"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")

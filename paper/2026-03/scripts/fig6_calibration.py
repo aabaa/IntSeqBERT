@@ -1,20 +1,21 @@
 """
-Fig.6 校正曲線（Uncertainty Calibration）
+Fig.6 calibration curves (uncertainty calibration)
 CICM 2026 paper — Figure 6
 
-X軸: 予測不確かさ σ（Mean over bin）
-Y軸: 実際の RMSE（bin 内の実測誤差）
-y=x: 完全校正線
-上側(赤): 過信（underpredicted σ）、下側(青): 過大推定（overpredicted σ）
+X-axis: predicted uncertainty sigma (mean over bin)
+Y-axis: actual RMSE (empirical error within the bin)
+y=x: perfect calibration line
+Upper region (red): overconfident (underpredicted sigma);
+lower region (blue): over-uncertain (overpredicted sigma).
 
-3 パネル構成（IntSeqBERT / Vanilla / Ablation、Large モデル）。
-Vanilla は σ レンジが極端に広い（0 → 46）ので X 軸をログスケールに統一。
+Three-panel layout (IntSeqBERT / Vanilla / Ablation, Large models).
+The x-axis uses a log scale because Vanilla has an extremely wide sigma range (0 -> 46).
 
-データ: checkpoints/large_std/{model}/analysis/magnitude/calibration_data.csv
+Data: checkpoints/large_std/{model}/analysis/magnitude/calibration_data.csv
        checkpoints/large_std/{model}/analysis/magnitude/overall_metrics.csv
 
-出力: experiment/cicm2026/fig6_calibration.pdf
-      experiment/cicm2026/fig6_calibration.png
+Output: paper/2026-03/figures/fig6_calibration.pdf
+      paper/2026-03/figures/fig6_calibration.png
 """
 
 from pathlib import Path
@@ -25,7 +26,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-# ── パス設定 ──────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CKPT      = REPO_ROOT / "checkpoints" / "large_std"
 OUT_DIR   = Path(__file__).resolve().parent.parent / "figures"
@@ -34,7 +35,7 @@ MODELS  = ["intseq", "vanilla", "ablation"]
 LABELS  = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
 COLORS  = {"intseq": "#1f77b4", "vanilla": "#ff7f0e", "ablation": "#2ca02c"}
 
-# ── データ読み込み ────────────────────────────────────────────────────────
+# ── Data loading ─────────────────────────────────────────────────────────
 def load_cal(model: str):
     cal_path  = CKPT / model / "analysis" / "magnitude" / "calibration_data.csv"
     met_path  = CKPT / model / "analysis" / "magnitude" / "overall_metrics.csv"
@@ -42,7 +43,7 @@ def load_cal(model: str):
     metrics = pd.read_csv(met_path).iloc[0]
     return cal_df, float(metrics["ece"])
 
-# ── プロット ──────────────────────────────────────────────────────────────
+# ── Plot ─────────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.5))
 fig.subplots_adjust(left=0.07, right=0.99, top=0.96, bottom=0.14, wspace=0.32)
 
@@ -51,32 +52,32 @@ for ax, model in zip(axes, MODELS):
     x = cal_df["mean_sigma"].values.astype(float)
     y = cal_df["rmse"].values.astype(float)
 
-    # ── 共通軸レンジ: 最小・最大 ─────────────────────────────────────
+    # ── Shared axis range: minimum and maximum ───────────────────────────
     x_lo = max(1e-3, x.min() * 0.8)
     x_hi = x.max() * 1.2
     y_lo = 0.0
-    y_hi = max(x_hi, y.max() * 1.1)   # y=x 線が見えるよう x_hi まで確保
+    y_hi = max(x_hi, y.max() * 1.1)   # Ensure the y=x line remains visible up to x_hi.
 
-    # ── 完全校正線 (y=x) ─────────────────────────────────────────────
+    # ── Perfect calibration line (y=x) ──────────────────────────────────
     xs = np.logspace(np.log10(x_lo), np.log10(x_hi), 300)
     ax.plot(xs, xs, color="#cc0000", linestyle="--", linewidth=1.4,
             label="Perfect ($y=x$)", zorder=3)
 
-    # ── 過信・過大推定の背景 ──────────────────────────────────────────
+    # ── Overconfidence / over-uncertainty background regions ────────────
     ax.fill_between(xs, xs, y_hi, color="#fde8e8", alpha=0.55,
                     zorder=0, label="Overconfident")
     ax.fill_between(xs, 0,  xs,  color="#e8edf8", alpha=0.55,
                     zorder=0, label="Over-uncertain")
 
-    # ── 校正曲線 ─────────────────────────────────────────────────────
+    # ── Calibration curve ───────────────────────────────────────────────
     ax.plot(x, y, color=COLORS[model], linewidth=1.8,
             marker="o", markersize=6, zorder=4,
             label=LABELS[model])
-    # マーカーだけ白縁
+    # Add white marker outlines.
     ax.scatter(x, y, color=COLORS[model], s=36, edgecolors="white",
                linewidths=0.6, zorder=5)
 
-    # ── ECE アノテーション ────────────────────────────────────────────
+    # ── ECE annotation ──────────────────────────────────────────────────
     ax.text(0.96, 0.96,
             f"ECE = {ece:.3f}",
             transform=ax.transAxes, ha="right", va="top",
@@ -84,7 +85,7 @@ for ax, model in zip(axes, MODELS):
             bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.9),
             zorder=6)
 
-    # ── 軸設定 ───────────────────────────────────────────────────────
+    # ── Axes ────────────────────────────────────────────────────────────
     ax.set_xscale("log")
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
@@ -95,8 +96,8 @@ for ax, model in zip(axes, MODELS):
 
 axes[0].set_ylabel("Actual RMSE", fontsize=10)
 
-# ── 凡例（右パネル内） ────────────────────────────────────────────────────
-# 共通凡例: 完全校正線 / 過信 / 過大推定だけ最右パネルに出す
+# ── Legend (inside the right panel) ──────────────────────────────────────
+# Shared legend: show only perfect calibration / overconfident / over-uncertain regions.
 handles = [
     plt.Line2D([0], [0], color="#cc0000", linestyle="--", linewidth=1.4,
                label="Perfect calibration ($y=x$)"),
@@ -108,7 +109,7 @@ handles = [
 axes[2].legend(handles=handles, loc="upper left", fontsize=8.5,
                framealpha=0.9, handlelength=1.5)
 
-# ── 保存 ──────────────────────────────────────────────────────────────────
+# ── Save ─────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
     out_path = OUT_DIR / f"fig6_calibration.{ext}"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")

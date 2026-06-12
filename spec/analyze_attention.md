@@ -1,25 +1,24 @@
-# `src/intseq_bert/analysis/analyze_attention.py` 実装仕様書
+# Implementation Specification: `src/intseq_bert/analysis/analyze_attention.py`
 
-## 1. 概要
+## 1. Overview
 
-本スクリプトは、Transformer モデルの **Attention パターン可視化** を専門的に行う。
-学習済みモデルが「どの位置に注目して予測を行っているか」を解析し、数列の構造理解を検証する。
+This script specializes in **attention pattern visualization** for Transformer models. It analyzes which positions a trained model attends to during prediction and helps validate whether the model understands sequence structure.
 
-> **Note:** このスクリプトは Optional であり、`analyze_cases.py` でも簡易版の Attention 可視化が提供される。
-> 本スクリプトはより詳細な層別・ヘッド別分析を行う。
+> **Note:** This script is optional. `analyze_cases.py` also provides a simpler attention visualization.
+> This script performs more detailed layer-wise and head-wise analysis.
 
-### 主要機能
+### Key Features
 
-1. **Layer-wise Attention**: 各 Encoder 層の Attention パターン可視化
-2. **Head-wise Analysis**: 個別ヘッドの専門性分析
-3. **Aggregated View**: 全層・全ヘッド平均のサマリビュー
-4. **Recurrence Detection**: 隣接項への注目パターンの検出
+1. **Layer-wise Attention:** Visualize attention patterns for each encoder layer.
+2. **Head-wise Analysis:** Analyze specialization of individual heads.
+3. **Aggregated View:** Summary view averaged across all layers and heads.
+4. **Recurrence Detection:** Detect attention patterns toward neighboring terms.
 
 ---
 
-## 2. 依存関係
+## 2. Dependencies
 
-### ライブラリ
+### Libraries
 
 ```python
 import torch
@@ -33,7 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 ```
 
-### 内部モジュール
+### Internal Modules
 
 ```python
 from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
@@ -42,7 +41,7 @@ from intseq_bert.analysis.analyze_cases import load_single_sequence
 
 ---
 
-## 3. コマンドライン引数 (CLI)
+## 3. Command-Line Arguments (CLI)
 
 ```bash
 python -m intseq_bert.analysis.analyze_attention \
@@ -54,53 +53,53 @@ python -m intseq_bert.analysis.analyze_attention \
     --head_ids all
 ```
 
-### 引数一覧
+### Argument List
 
-| 引数 | 型 | 必須 | デフォルト | 説明 |
+| Argument | Type | Required | Default | Description |
 |------|------|------|-----------|------|
-| `--checkpoint` | str | ✅ | - | チェックポイントパス |
-| `--oeis_ids` | str | ✅ | - | カンマ区切りの OEIS ID リスト |
-| `--output_dir` | str | ✅ | - | 出力ディレクトリ |
-| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
-| `--features_dir` | str | | `data/oeis/features` | 特徴量ディレクトリ |
-| `--layer_ids` | str | | `all` | 可視化する層 (`all` or カンマ区切り) |
-| `--head_ids` | str | | `all` | 予約引数（現行実装では描画対象の絞り込みには未使用） |
-| `--device` | str | | `auto` | デバイス指定 |
-| `--figsize` | str | | `16,12` | 図のサイズ |
-| `--dpi` | int | | `150` | 出力解像度 |
+| `--checkpoint` | str | yes | - | Checkpoint path |
+| `--oeis_ids` | str | yes | - | Comma-separated list of OEIS IDs |
+| `--output_dir` | str | yes | - | Output directory |
+| `--model_type` | str | | `intseq` | Model type (`intseq`, `vanilla`, `ablation`) |
+| `--features_dir` | str | | `data/oeis/features` | Feature directory |
+| `--layer_ids` | str | | `all` | Layers to visualize (`all` or comma-separated IDs) |
+| `--head_ids` | str | | `all` | Reserved argument; currently not used to filter drawn heads |
+| `--device` | str | | `auto` | Device |
+| `--figsize` | str | | `16,12` | Figure size |
+| `--dpi` | int | | `150` | Output resolution |
 
 ---
 
-## 4. Attention 抽出
+## 4. Attention Extraction
 
-### 4.1. `AttentionExtractor` クラス
+### 4.1. `AttentionExtractor`
 
-Forward Hook を用いて全層の Attention Weight を収集する。
+Collect attention weights from all layers using forward hooks.
 
 ```python
 class AttentionExtractor:
-    """Transformer Encoder の Attention Weight を抽出"""
-    
+    """Extract attention weights from a Transformer encoder."""
+
     def __init__(self, model: torch.nn.Module):
         self.model = model
         self.attention_weights = []
         self.hooks = []
-    
+
     def register_hooks(self):
-        """全 EncoderLayer の self_attn に hook を登録"""
+        """Register hooks on self_attn for all EncoderLayer modules."""
         for layer in self._get_encoder_layers():
             hook = layer.self_attn.register_forward_hook(self._hook_fn)
             self.hooks.append(hook)
-    
+
     def _hook_fn(self, module, input, output):
-        """Attention weight を保存 (output[1] に格納されている)"""
+        """Save attention weights from output[1]."""
         if isinstance(output, tuple) and len(output) > 1:
             attn_weights = output[1]  # (B, num_heads, L, L)
             if attn_weights is not None:
                 self.attention_weights.append(attn_weights.detach().cpu())
-    
+
     def _get_encoder_layers(self):
-        """モデルタイプに応じて EncoderLayer を取得"""
+        """Find EncoderLayer modules according to model type."""
         if hasattr(self.model, 'bert'):
             return self.model.bert.encoder.layers
         elif hasattr(self.model, 'backbone') and hasattr(self.model.backbone, 'encoder'):
@@ -112,17 +111,17 @@ class AttentionExtractor:
                 return self.model.encoder.encoder.layers
         else:
             raise ValueError("Cannot find encoder layers")
-    
+
     def remove_hooks(self):
-        """登録した hook を削除"""
+        """Remove registered hooks."""
         for hook in self.hooks:
             hook.remove()
         self.hooks = []
-    
+
     def clear(self):
-        """収集した weight をクリア"""
+        """Clear collected weights."""
         self.attention_weights = []
-    
+
     def get_attention_tensor(self) -> torch.Tensor:
         """
         Returns:
@@ -131,87 +130,87 @@ class AttentionExtractor:
         return torch.stack(self.attention_weights, dim=0)
 ```
 
-### 4.2. 使用例 (パディングトリミング付き)
+### 4.2. Usage with Padding Trimming
 
-OEIS 数列は実際には 30〜50 程度の長さが多く、`config.MAX_SEQUENCE_LENGTH` (128) までパディングされる。
-そのままヒートマップを描画すると、左上のごく一部に意味のある模様があり、残り90%が真っ白になる。
+OEIS sequences are often only 30 to 50 terms long, but they are padded up to `config.MAX_SEQUENCE_LENGTH` (128). If the heatmap is drawn directly, meaningful patterns appear only in the upper-left portion and the remaining area is mostly blank.
 
-**有効長だけを切り取って描画するため、`valid_len` を取得して可視化関数に渡す。**
+**To draw only the valid region, compute `valid_len` and pass it to the visualization functions.**
 
 ```python
-extractor = AttentionExtractor(model)
+_patch_attention_layers(model.model)
+extractor = AttentionExtractor(model.model)
 extractor.register_hooks()
 
 batch = load_single_sequence(oeis_id, features_dir)
 
-# 有効長を取得 (パディングを除く実際の数列長)
+# Get valid length, excluding padding
 valid_len = batch["attention_mask"].sum().item()
 
 with torch.no_grad():
-    outputs = model(**batch)
+    outputs = model.predict(batch)
 
 attention = extractor.get_attention_tensor()  # (num_layers, 1, num_heads, L, L)
 extractor.remove_hooks()
 
-# 可視化時に valid_len を渡す
+# Pass valid_len to visualization
 plot_layerwise_attention(attention[:, 0], output_path, oeis_id, valid_len=valid_len)
 ```
 
 ---
 
-## 5. 可視化
+## 5. Visualization
 
-### 5.1. Layer-wise Grid (パディングトリミング対応)
+### 5.1. Layer-wise Grid with Padding Trimming
 
 ```python
 def plot_layerwise_attention(
     attention: torch.Tensor,      # (num_layers, num_heads, L, L)
     output_path: Path,
     oeis_id: str,
-    valid_len: Optional[int] = None,  # 有効長 (指定時はトリミング)
+    valid_len: Optional[int] = None,  # Valid length; trim when provided
     layer_ids: Optional[List[int]] = None,
     figsize: Tuple[int, int] = (16, 12)
 ):
     """
-    全層の平均 Attention を Grid 表示
-    
-    Layout: 2行 x (num_layers/2)列
-    
+    Show average attention for each layer in a grid.
+
+    Layout: 2 rows x (num_layers / 2) columns
+
     Note:
-        valid_len を指定すると、パディング領域を除外して有効部分のみ描画。
-        これにより短い数列 (30〜50項) でも詳細なパターンが確認できる。
+        If valid_len is provided, draw only the valid region excluding padding.
+        This makes detailed patterns visible even for shorter sequences of 30 to 50 terms.
     """
     num_layers = attention.size(0)
     if layer_ids is None:
         layer_ids = list(range(num_layers))
-    
-    # 各層のヘッド平均
+
+    # Average heads in each layer
     layer_avg = attention.mean(dim=1)  # (num_layers, L, L)
-    
-    # パディングトリミング: 有効長が指定されていれば切り取る
+
+    # Padding trim: crop if valid_len is provided
     if valid_len is not None:
         layer_avg = layer_avg[:, :valid_len, :valid_len]
-    
+
     ncols = min(4, len(layer_ids))
     nrows = (len(layer_ids) + ncols - 1) // ncols
-    
+
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     axes = np.atleast_2d(axes)
-    
+
     for idx, layer_id in enumerate(layer_ids):
         row, col = divmod(idx, ncols)
         ax = axes[row, col]
-        
+
         im = ax.imshow(layer_avg[layer_id].numpy(), cmap='Blues', vmin=0)
         ax.set_title(f'Layer {layer_id}')
         ax.set_xlabel("Key Pos")
         ax.set_ylabel("Query Pos")
-    
-    # 未使用の axes を非表示
+
+    # Hide unused axes
     for idx in range(len(layer_ids), nrows * ncols):
         row, col = divmod(idx, ncols)
         axes[row, col].axis('off')
-    
+
     title = f'Layer-wise Attention: {oeis_id}'
     if valid_len is not None:
         title += f' (L={valid_len})'
@@ -224,7 +223,7 @@ def plot_layerwise_attention(
 
 ### 5.2. Head-wise Analysis
 
-各ヘッドの「専門性」を分析。
+Analyze the specialization of each head.
 
 ```python
 def plot_headwise_attention(
@@ -232,31 +231,31 @@ def plot_headwise_attention(
     layer_id: int,
     output_path: Path,
     oeis_id: str,
-    valid_len: Optional[int] = None  # パディングトリミング用
+    valid_len: Optional[int] = None  # For padding trimming
 ):
     """
-    指定層の全ヘッドを Grid 表示
+    Show all heads in a specified layer in a grid.
     """
     num_heads = attention.size(1)
     layer_attn = attention[layer_id]  # (num_heads, L, L)
-    
-    # パディングトリミング
+
+    # Padding trim
     if valid_len is not None:
         layer_attn = layer_attn[:, :valid_len, :valid_len]
-    
+
     ncols = min(4, num_heads)
     nrows = (num_heads + ncols - 1) // ncols
-    
+
     fig, axes = plt.subplots(nrows, ncols, figsize=(16, 4 * nrows))
     axes = np.atleast_2d(axes)
-    
+
     for head_id in range(num_heads):
         row, col = divmod(head_id, ncols)
         ax = axes[row, col]
-        
+
         im = ax.imshow(layer_attn[head_id].numpy(), cmap='Blues', vmin=0)
         ax.set_title(f'Head {head_id}')
-    
+
     fig.suptitle(f'{oeis_id} - Layer {layer_id} Heads', fontsize=14)
     plt.colorbar(im, ax=axes, shrink=0.6)
     plt.tight_layout()
@@ -271,33 +270,33 @@ def plot_aggregated_attention(
     attention: torch.Tensor,      # (num_layers, num_heads, L, L)
     output_path: Path,
     oeis_id: str,
-    valid_len: Optional[int] = None  # パディングトリミング用
+    valid_len: Optional[int] = None  # For padding trimming
 ):
     """
-    全層・全ヘッド平均の Attention + 横プロファイル
+    Mean attention over all layers and heads, plus a horizontal profile.
     """
-    # 全層・全ヘッド平均
+    # Average across all layers and heads
     avg_attn = attention.mean(dim=(0, 1)).numpy()  # (L, L)
-    
-    # パディングトリミング
+
+    # Padding trim
     if valid_len is not None:
         avg_attn = avg_attn[:valid_len, :valid_len]
-    
+
     L = avg_attn.shape[0]
-    
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
+
     # Panel 1: Heatmap
     im = axes[0].imshow(avg_attn, cmap='Blues', vmin=0)
     axes[0].set_title(f'Aggregated Attention (L={L})')
     axes[0].set_xlabel("Key Position")
     axes[0].set_ylabel("Query Position")
     plt.colorbar(im, ax=axes[0])
-    
-    # Panel 2: Horizontal Profile (各 query の最大 attention key)
+
+    # Panel 2: Horizontal profile, i.e. max-attention key for each query
     max_key_pos = avg_attn.argmax(axis=1)
-    relative_pos = max_key_pos - np.arange(L)  # 相対位置
-    
+    relative_pos = max_key_pos - np.arange(L)  # Relative position
+
     axes[1].bar(range(L), relative_pos, color='steelblue', alpha=0.7)
     axes[1].axhline(y=-1, color='red', linestyle='--', label='n-1 (prev)')
     axes[1].axhline(y=-2, color='orange', linestyle='--', label='n-2')
@@ -305,7 +304,7 @@ def plot_aggregated_attention(
     axes[1].set_ylabel('Relative Key Position (max attn)')
     axes[1].set_title('Attention Focus Offset')
     axes[1].legend()
-    
+
     fig.suptitle(f'Attention Analysis: {oeis_id}', fontsize=14)
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
@@ -314,51 +313,50 @@ def plot_aggregated_attention(
 
 ---
 
-## 6. 再帰パターン検出
+## 6. Recurrence Pattern Detection
 
-### 6.1. 隣接項注目の定量化
+### 6.1. Quantifying Attention to Neighboring Terms
 
-Fibonacci のような再帰数列では、`a_n = f(a_{n-1}, a_{n-2})` の関係から、
-n-1 および n-2 への Attention が強くなることが期待される。
+For recurrence sequences such as Fibonacci, the relation `a_n = f(a_{n-1}, a_{n-2})` suggests stronger attention to `n-1` and `n-2`.
 
 ```python
 def analyze_recurrence_pattern(
     attention: torch.Tensor      # (num_layers, num_heads, L, L)
 ) -> Dict[str, float]:
     """
-    再帰パターンへの注目度を定量化
-    
+    Quantify attention toward recurrence patterns.
+
     Returns:
         {
-            "prev_1_ratio": float,  # n-1 への平均 attention 比率
-            "prev_2_ratio": float,  # n-2 への平均 attention 比率
-            "diagonal_ratio": float,  # 対角線 (自己注目) 比率
-            "total_local_ratio": float,  # |offset| <= 2 の総和比率
+            "prev_1_ratio": float,  # Mean attention ratio to n-1
+            "prev_2_ratio": float,  # Mean attention ratio to n-2
+            "diagonal_ratio": float,  # Diagonal/self-attention ratio
+            "total_local_ratio": float,  # Total ratio for |offset| <= 2
         }
     """
     avg_attn = attention.mean(dim=(0, 1)).numpy()  # (L, L)
     L = avg_attn.shape[0]
-    
+
     prev_1_sum = 0
     prev_2_sum = 0
     diag_sum = 0
     total = 0
-    
+
     for q in range(L):
         row_sum = avg_attn[q].sum()
         total += row_sum
-        
-        # 対角線 (自己注目)
+
+        # Diagonal/self-attention
         diag_sum += avg_attn[q, q]
-        
+
         # n-1
         if q >= 1:
             prev_1_sum += avg_attn[q, q - 1]
-        
+
         # n-2
         if q >= 2:
             prev_2_sum += avg_attn[q, q - 2]
-    
+
     # Local ratio (|offset| <= 2)
     local_sum = 0
     for q in range(L):
@@ -366,7 +364,7 @@ def analyze_recurrence_pattern(
             k = q + offset
             if 0 <= k < L:
                 local_sum += avg_attn[q, k]
-    
+
     return {
         "prev_1_ratio": prev_1_sum / total if total > 0 else 0,
         "prev_2_ratio": prev_2_sum / total if total > 0 else 0,
@@ -375,7 +373,7 @@ def analyze_recurrence_pattern(
     }
 ```
 
-### 6.2. 期待パターンとの照合
+### 6.2. Alignment with Expected Patterns
 
 ```python
 EXPECTED_PATTERNS = {
@@ -389,93 +387,99 @@ def check_pattern_alignment(
     recurrence_stats: Dict[str, float]
 ) -> str:
     """
-    期待パターンとの整合性を判定
-    
+    Check consistency with the expected pattern.
+
     Returns:
         "ALIGNED" | "MISALIGNED" | "UNKNOWN"
     """
     if oeis_id not in EXPECTED_PATTERNS:
         return "UNKNOWN"
-    
+
     expected = EXPECTED_PATTERNS[oeis_id]
-    
+
     if expected["type"] == "linear_recurrence":
-        # 隣接項への注目が強いはず
+        # Attention to neighboring terms should be strong
         if recurrence_stats["total_local_ratio"] > 0.5:
             return "ALIGNED"
         else:
             return "MISALIGNED"
-    
+
     elif expected["type"] == "non_local":
-        # 特定パターンがないはず
+        # No specific local pattern should dominate
         if recurrence_stats["total_local_ratio"] < 0.3:
             return "ALIGNED"
         else:
             return "MISALIGNED"
-    
+
     return "UNKNOWN"
 ```
 
 ---
 
-## 7. 処理フロー
+## 7. Processing Flow
 
-### 7.1. メインフロー
+### 7.1. Main Flow
 
+```text
+1. Parse arguments and configure logging.
+2. Create model wrapper.
+3. Monkey-patch `TransformerEncoderLayer._sa_block` to force `need_weights=True`.
+4. Initialize AttentionExtractor.
+5. For each OEIS ID:
+   a. Load features.
+   b. Extract attention.
+   c. Generate visualizations:
+      - Layer-wise grid
+      - Head-wise view for the final layer
+      - Aggregated summary
+   d. Analyze recurrence pattern.
+6. Write summary CSV.
 ```
-1. 引数パース & ロギング設定
-2. モデルラッパー作成
-3. `TransformerEncoderLayer._sa_block` を monkey-patch して `need_weights=True` を強制
-4. AttentionExtractor 初期化
-5. 各 OEIS ID について:
-   a. 特徴量読み込み
-   b. Attention 抽出
-   c. 可視化生成
-      - Layer-wise Grid
-      - Head-wise (最終層)
-      - Aggregated Summary
-   d. 再帰パターン分析
-6. サマリ CSV 出力
-```
 
-### 7.2. Main 関数
+### 7.2. Main Function
 
 ```python
 def main(args):
     # Setup
-    model = create_model_wrapper(args.model_type, args.checkpoint, args.device)
+    device = args.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = create_model_wrapper(args.model_type, args.checkpoint, device)
+    _patch_attention_layers(model.model)
+
     extractor = AttentionExtractor(model.model)
     extractor.register_hooks()
-    
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     results = []
-    
+
     for oeis_id in args.oeis_ids.split(","):
         logging.info(f"Processing: {oeis_id}")
-        
+
         try:
             batch = load_single_sequence(oeis_id, Path(args.features_dir))
-            
-            # 有効長を取得 (パディングを除く実際の数列長)
+
+            # Get valid length, excluding padding
             valid_len = int(batch["attention_mask"].sum().item())
-            
-            # Forward pass (attention collected via hook)
+
+            # Forward pass; attention is collected via hooks
             extractor.clear()
             _ = model.predict(batch)
-            
+
             attention = extractor.get_attention_tensor()[:, 0]  # Remove batch dim
             # attention: (num_layers, num_heads, L, L)
-            
-            # Visualizations (有効長でトリミング)
+
+            # Visualizations, trimmed to valid length
             plot_layerwise_attention(
                 attention,
                 output_dir / f"{oeis_id}_layerwise.png",
                 oeis_id,
                 valid_len=valid_len
             )
-            
+
             plot_headwise_attention(
                 attention,
                 layer_id=-1,  # Last layer
@@ -483,30 +487,30 @@ def main(args):
                 oeis_id=oeis_id,
                 valid_len=valid_len
             )
-            
+
             plot_aggregated_attention(
                 attention,
                 output_dir / f"{oeis_id}_aggregated.png",
                 oeis_id,
                 valid_len=valid_len
             )
-            
+
             # Recurrence analysis
             stats = analyze_recurrence_pattern(attention)
             alignment = check_pattern_alignment(oeis_id, stats)
-            
+
             results.append({
                 "oeis_id": oeis_id,
                 **stats,
                 "pattern_alignment": alignment
             })
-            
+
         except Exception as e:
             logging.error(f"Error processing {oeis_id}: {e}")
             continue
-    
+
     extractor.remove_hooks()
-    
+
     # Save summary
     df = pd.DataFrame(results)
     df.to_csv(output_dir / "attention_summary.csv", index=False)
@@ -515,19 +519,19 @@ def main(args):
 
 ---
 
-## 8. 出力ファイル
+## 8. Output Files
 
-### 8.1. ディレクトリ構成
+### 8.1. Directory Structure
 
 ```text
 results/analysis/attention/
-├── A000045_layerwise.png        # 全層の Attention Grid
-├── A000045_heads_last.png       # 最終層の各ヘッド
-├── A000045_aggregated.png       # 集約ビュー + 再帰分析
+├── A000045_layerwise.png        # Attention grid for all layers
+├── A000045_heads_last.png       # Heads in the final layer
+├── A000045_aggregated.png       # Aggregated view plus recurrence analysis
 ├── A000142_layerwise.png
 ├── A000142_heads_last.png
 ├── A000142_aggregated.png
-└── attention_summary.csv        # 再帰パターン統計
+└── attention_summary.csv        # Recurrence pattern statistics
 ```
 
 ### 8.2. `attention_summary.csv`
@@ -541,19 +545,19 @@ A000040,0.10,0.08,0.20,0.42,ALIGNED
 
 ---
 
-## 9. 制約事項
+## 9. Limitations
 
-| 制約 | 説明 |
+| Limitation | Description |
 |------|------|
-| PyTorch TransformerEncoder | `need_weights=True` が必要（標準実装では `False` のため本スクリプトで monkey-patch） |
-| Vanilla Transformer | 同じ Hook 方式で対応可能 |
-| メモリ | 長系列では Attention (L×L) が大きくなる |
+| PyTorch `TransformerEncoder` | Requires `need_weights=True`; the standard implementation uses `False`, so this script monkey-patches it |
+| Vanilla Transformer | Can be supported with the same hook approach |
+| Memory | Attention tensors (`L x L`) become large for long sequences |
 
 ---
 
-## 10. 使用例
+## 10. Usage Examples
 
-### 基本使用
+### Basic Usage
 
 ```bash
 python -m intseq_bert.analysis.analyze_attention \
@@ -562,7 +566,7 @@ python -m intseq_bert.analysis.analyze_attention \
     --output_dir results/attention
 ```
 
-### 特定層のみ
+### Specific Layers Only
 
 ```bash
 python -m intseq_bert.analysis.analyze_attention \

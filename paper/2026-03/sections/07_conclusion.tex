@@ -1,25 +1,16 @@
 %% Section 7: Conclusion
-%% Japanese draft (draft2/07_conclusion.md) embedded as comments.
-%% English translation written below each paragraph.
+%% English manuscript section.
 %% -----------------------------------------------------------------------
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-% 本研究では IntSeqBERT を提案した。整数数列向けの双ストリーム Transformer エンコーダであり、各要素を
-% 2 つの相補的な軸で表現する。1 つ目はスケールと成長挙動を捉える連続的な対数 Magnitude 埋め込みであり、
-% 2 つ目は周期的算術構造を捉える Sin/Cos Modulo 埋め込みである。
-% 2 つのストリームは FiLM で融合され、219,765 件の OEIS 数列に対して Magnitude 回帰・符号分類・
-% 100 次元 Modulo 予測を組み合わせたマルチタスク目標で共同学習される。
 We have presented \textbf{IntSeqBERT}, a dual-stream Transformer encoder that fuses a
 continuous log-scale magnitude embedding with sin/cos modulo embeddings via FiLM, jointly
 trained on 219,765 OEIS sequences. Experiments (Section~\ref{sec:experiments}) demonstrate
 that the dual-stream design substantially outperforms both a standard tokenised Transformer
 and a magnitude-only ablation across all scales and metrics.
 
-% IntSeqBERT は Magnitude・符号・剰余を分離予測し CRT Solver で統合する設計であり、ニューラル
-% ネットワークが学習しにくい厳密な数論的制約を記号処理が補う。純粋な end-to-end 学習の限界と
-% ハイブリッド設計の必要性の両方を示す事例である。
 Our results also carry a broader message. Even with number-theoretic structure built into
 the representation, the absolute success rate of next-term prediction remains modest
 (Top-1: 19.09\%), and a purely tokenised Transformer is far weaker still (2.59\%)---
@@ -30,7 +21,6 @@ constraints that neural networks struggle to learn end-to-end. We therefore read
 results both as evidence of the limits of pure end-to-end learning on this task and as
 motivation for hybrid symbolic--neural approaches to computer mathematics.
 
-% 今後の課題として以下が挙げられる：
 \textbf{Future work} includes combining magnitude uncertainty estimation with approximate CRT
 to improve large-integer prediction; extending the modulo stream beyond $m = 101$;
 evaluating on the remaining FACT benchmark tasks---sequence classification, sequence

@@ -1,18 +1,18 @@
 """
-Fig.5 Magnitude 散布図（予測 vs. 真値、バケット色分け）
+Fig.5 Magnitude scatter plot (prediction vs. ground truth, colored by bucket)
 CICM 2026 paper — Figure 5
 
-Large モデル 3 バリアント（IntSeqBERT / Vanilla / Ablation）の
-予測 Magnitude vs. 真の Magnitude を並列 3 パネルで表示。
-各点は Magnitude バケット（Small / Medium / Large / Huge / Astronomical）で色分け。
+Shows predicted magnitude vs. true magnitude for the three Large model variants
+(IntSeqBERT / Vanilla / Ablation) in parallel panels.
+Points are colored by magnitude bucket (Small / Medium / Large / Huge / Astronomical).
 
-ステップ:
-  1. 推論を実行して per-sample (gt, pred) を CSV 保存（初回のみ）
-  2. CSV から読み込んでプロット
+Steps:
+  1. Run inference and save per-sample (gt, pred) values to CSV on the first run
+  2. Load the CSV cache and plot
 
-出力: paper/2026-03/figures/fig5_magnitude_scatter.pdf
+Output: paper/2026-03/figures/fig5_magnitude_scatter.pdf
       paper/2026-03/figures/fig5_magnitude_scatter.png
-データキャッシュ: results/2026-03-02/cache/scatter_cache_{model}.csv
+Data cache: results/2026-03-02/cache/scatter_cache_{model}.csv
 """
 
 from pathlib import Path
@@ -24,7 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-# ── パス設定 ──────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
@@ -36,7 +36,7 @@ MODELS = ["intseq", "vanilla", "ablation"]
 LABELS = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
 MODEL_TYPES = {"intseq": "intseq", "vanilla": "vanilla", "ablation": "ablation"}
 
-# ── バケット定義（config.MAGNITUDE_BUCKETS に対応） ─────────────────────
+# ── Bucket definitions (matches config.MAGNITUDE_BUCKETS) ────────────────
 BUCKET_BOUNDS = [
     (0,  2,  "Small"),
     (2,  5,  "Medium"),
@@ -46,11 +46,11 @@ BUCKET_BOUNDS = [
 ]
 BUCKET_ORDER  = ["Small", "Medium", "Large", "Huge", "Astronomical"]
 BUCKET_COLORS = {
-    "Small":        "#3b82f6",   # 青
-    "Medium":       "#10b981",   # 緑
-    "Large":        "#f59e0b",   # 黄橙
-    "Huge":         "#ef4444",   # 赤
-    "Astronomical": "#7c3aed",   # 紫
+    "Small":        "#3b82f6",   # blue
+    "Medium":       "#10b981",   # green
+    "Large":        "#f59e0b",   # yellow-orange
+    "Huge":         "#ef4444",   # red
+    "Astronomical": "#7c3aed",   # purple
 }
 BUCKET_MARKERS = {
     "Small":        "o",
@@ -67,11 +67,11 @@ def get_bucket(v: float) -> str:
     return "Astronomical"
 
 
-# ── Step 1: 推論 → CSV キャッシュ ─────────────────────────────────────
+# ── Step 1: inference -> CSV cache ──────────────────────────────────────
 def collect_and_cache(model_name: str) -> Path:
     """
-    モデルを推論して (gt, pred) を CSV に保存。
-    既に CSV があればスキップ。
+    Run model inference and save (gt, pred) values to CSV.
+    Skip inference if the CSV already exists.
     """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache_path = CACHE_DIR / f"scatter_cache_{model_name}.csv"
@@ -116,8 +116,8 @@ def collect_and_cache(model_name: str) -> Path:
     return cache_path
 
 
-# ── Step 2: プロット ───────────────────────────────────────────────────
-SAMPLE_PER_BUCKET = 3000   # 各バケットからサンプリングする最大点数
+# ── Step 2: plot ────────────────────────────────────────────────────────
+SAMPLE_PER_BUCKET = 3000   # Maximum number of sampled points per bucket.
 
 fig, axes = plt.subplots(1, 3, figsize=(14, 4.8))
 fig.subplots_adjust(left=0.06, right=0.88, top=0.96, bottom=0.13, wspace=0.30)
@@ -126,7 +126,7 @@ for ax, model_name in zip(axes, MODELS):
     cache_path = collect_and_cache(model_name)
     df = pd.read_csv(cache_path)
 
-    # バケット別にサンプリングして散布図
+    # Sample by bucket for the scatter plot.
     frames = []
     for bname in BUCKET_ORDER:
         sub = df[df["bucket"] == bname]
@@ -137,7 +137,7 @@ for ax, model_name in zip(axes, MODELS):
         frames.append(sub)
     plot_df = pd.concat(frames, ignore_index=True)
 
-    # バケットごとにプロット（凡例用に逆順で重ねる）
+    # Plot each bucket in reverse order for the legend.
     for bname in reversed(BUCKET_ORDER):
         sub = plot_df[plot_df["bucket"] == bname]
         if len(sub) == 0:
@@ -152,12 +152,12 @@ for ax, model_name in zip(axes, MODELS):
             label=bname, zorder=3,
         )
 
-    # y=x 対角線
+    # y=x diagonal
     vmax = max(plot_df["gt"].max(), plot_df["pred"].max())
     vmin = min(plot_df["gt"].min(), plot_df["pred"].min())
     ax.plot([vmin, vmax], [vmin, vmax], "k--", linewidth=1.2, zorder=4, label="$y=x$")
 
-    # R² 計算（全点）
+    # R^2 computed on all points.
     df_all = pd.read_csv(cache_path)
     r2 = 1 - np.sum((df_all["gt"] - df_all["pred"])**2) / \
              np.sum((df_all["gt"] - df_all["gt"].mean())**2)
@@ -173,8 +173,8 @@ for ax, model_name in zip(axes, MODELS):
 
 axes[0].set_ylabel("Prediction (log$_{10}$ scale)", fontsize=10)
 
-# ── 凡例（図の右外に） ──────────────────────────────────────────────
-# バケット凡例をサイズ・マーカー付きで生成
+# ── Legend (outside the figure on the right) ─────────────────────────────
+# Build bucket legend entries with size and marker information.
 import matplotlib.lines as mlines
 legend_handles = []
 for bname in BUCKET_ORDER:
@@ -200,7 +200,7 @@ fig.legend(
     title_fontsize=10,
 )
 
-# ── 保存 ──────────────────────────────────────────────────────────────
+# ── Save ─────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
     out_path = OUT_DIR / f"fig5_magnitude_scatter.{ext}"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")

@@ -1,24 +1,17 @@
-# 7. まとめ
+# 7. Conclusion
 
-<!-- 目標: ~0.5ページ (~250語) -->
+<!-- Target: ~0.5 pages (~250 words) -->
 
-本研究では **IntSeqBERT** を提案した。
-IntSeqBERT は整数数列向けの双ストリーム Transformer エンコーダであり、各要素を 2 つの相補的な軸で表現する。
-1 つ目はスケールと成長挙動を捉える連続的な対数 Magnitude 埋め込みであり、2 つ目は周期的算術構造を捉える Sin/Cos Modulo 埋め込みである。
-2 つのストリームは FiLM で融合され、219,765 件の OEIS 数列に対して Magnitude 回帰・符号分類・100 次元 Modulo 予測を組み合わせたマルチタスク目標で共同学習される。
+We proposed **IntSeqBERT**, a dual-stream Transformer encoder for integer sequences. Each element is represented along two complementary axes: a continuous logarithmic Magnitude embedding that captures scale and growth, and a sin/cos Modulo embedding that captures periodic arithmetic structure. The two streams are fused with FiLM and jointly trained on 219,765 OEIS sequences with a multitask objective combining magnitude regression, sign classification, and residue classification for 100 moduli.
 
-テストデータにおいて、Large IntSeqBERT は Magnitude 精度 95.85%・符号精度 98.54%・平均 Modulo 精度 50.38% を達成し、トークン化ベースの Vanilla Transformer をそれぞれ +8.9pt・+0.9pt・+4.5pt 上回った。
-Solverによる次項予測では IntSeqBERT が Top-1 完全一致精度 19.09% を達成し、Vanilla ベースラインの 7.4 倍の精度を示す。
-アブレーション実験により、Modulo ストリームが Modulo 予測改善の大半を担い（+15.2pt）、Magnitude 回帰にも副次的な改善をもたらすこと（+6.2pt）が確認された。
-モジュラス間解析では NIG とオイラーのトーシェント比 $\varphi(m)/m$ の間に極めて強い負の相関（$r = -0.851$、$p < 10^{-28}$）が確認された。これは合成数法ほど CRT 集約効果により OEIS 数列の算術構造を効率的に捉えるという数論的規則性の実証的根拠となる。
+On the test set, Large IntSeqBERT achieves 95.85% magnitude accuracy, 98.54% sign accuracy, and 50.38% mean modulo accuracy, outperforming the tokenized Vanilla Transformer by +8.9pt, +0.9pt, and +4.5pt. In solver-based next-term prediction, IntSeqBERT reaches 19.09% Top-1 exact-match accuracy, 7.4x the Vanilla baseline. Ablation confirms that the Modulo stream accounts for most of the modulo-prediction improvement (+15.2pt) and also provides a secondary gain for magnitude regression (+6.2pt). Across moduli, we observe a strong negative correlation between NIG and Euler's totient ratio $\varphi(m)/m$ ($r=-0.851$, $p<10^{-28}$), providing empirical evidence that composite moduli efficiently capture OEIS arithmetic structure through CRT aggregation.
 
-**今後の課題**として以下が挙げられる：
+Future work includes:
 
-- Magnitude の不確かさ推定と近似 CRT を組み合わせた大きな整数の予測改善。
-- Modulo ストリームの対象を 101 より大きな素数や $\mathbb{Z}/m\mathbb{Z}$ 以外の代数的構造へと拡張。
-- どの漸化式構造に各アテンションヘッドが特化するかを特定するための、より精細なアテンションアライメント指標の開発。
-- 数学的系統を考慮した分割設計の構築：現行のランダム分割は関連数列間のリークを防げないため、数列ファミリーを認識した評価プロトコルへの移行が評価の信頼性を高める。
-- Solver 評価における予測位置の改善：本研究のモデルの予測性能評価には実用上の観点から次項（系列末尾）予測を採用したが、この設定では双方向エンコーダの強み（後続文脈の活用）が十分に発揮されない。中間位置のマスク予測との比較分析は今後の課題である。
-- FACT [cite:zurich-fact] で採用されているような数列合成によるデータ拡張の導入：現行の学習データは OEIS の実数列のみに依存しているため、漸化式テンプレートや代数的規則から人工的に生成した数列を訓練データに加えることで、特にスパースなバケット（Huge・Astronomical）での汎化性能向上が期待される。
-- モデルの大規模化：本研究では最大 Large（91.5M パラメータ、GPU 1 枚）での実験に留まった。より大規模な計算資源を用いた Huge スケール（数百 M〜数十億パラメータ）への拡張や、OEIS 全数列を対象とした事前学習により、特に Modulo 精度および CRT モードにおける性能向上が期待される。
-
+- Improving large-integer prediction by combining magnitude uncertainty with approximate CRT.
+- Extending the Modulo stream to primes larger than 101 and to algebraic structures beyond $\mathbb{Z}/m\mathbb{Z}$.
+- Developing finer attention-alignment metrics to identify which recurrence structures are captured by individual heads.
+- Building family-aware splits, since random splits cannot prevent leakage across related sequence families.
+- Improving solver evaluation by comparing next-term prediction with masked prediction at interior positions, where bidirectional context can be used more fully.
+- Adding synthetic sequence augmentation, as in FACT [cite:zurich-fact], from recurrence templates and algebraic rules to improve generalization in sparse buckets such as Huge and Astronomical.
+- Scaling to larger models and larger pretraining corpora. This study is limited to the Large model on one GPU; larger compute may especially improve modulo accuracy and CRT-mode reconstruction.

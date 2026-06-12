@@ -1,34 +1,34 @@
-# `src/intseq_bert/analysis/analyze_solver.py` 実装仕様書
+# Implementation Specification: `src/intseq_bert/analysis/analyze_solver.py`
 
-## 目次
+## Table of Contents
 
-1. [概要](#1-概要)
-2. [依存関係](#2-依存関係)
-3. [コマンドライン引数](#3-コマンドライン引数)
-4. [処理フロー](#4-処理フロー)
-5. [分析指標](#5-分析指標)
-6. [出力ファイル](#6-出力ファイル)
-7. [実装上の工夫](#7-実装上の工夫)
-8. [エラーハンドリング](#8-エラーハンドリング)
-
----
-
-## 1. 概要
-
-学習済みモデルと `solver.py` を組み合わせ、テストデータに対して「次の項」の数値を復元（推論）し、その **完全一致正解率（Exact Match Accuracy）** を計測する。
-
-### 評価のポイント
-
-1. **Exact Match:** 数値が完全に一致したか（GPT-4等との最大の差別化ポイント）
-2. **Top-K Accuracy:** 正解が候補の Top-5 に含まれていたか
-3. **Solver Mode別性能:** Dense / Sieve / CRT の各モードでどれくらい解けているか
-4. **桁数別性能:** 小さい数から巨大数まで、どの範囲が得意か
+1. [Overview](#1-overview)
+2. [Dependencies](#2-dependencies)
+3. [Command-Line Arguments](#3-command-line-arguments)
+4. [Processing Flow](#4-processing-flow)
+5. [Analysis Metrics](#5-analysis-metrics)
+6. [Output Files](#6-output-files)
+7. [Implementation Details](#7-implementation-details)
+8. [Error Handling](#8-error-handling)
 
 ---
 
-## 2. 依存関係
+## 1. Overview
 
-### ライブラリ
+This script combines a trained model with `solver.py`, reconstructs the value of the next term for test data, and measures **Exact Match Accuracy**.
+
+### Evaluation Points
+
+1. **Exact Match:** Whether the predicted integer exactly matches the target, which is the strongest differentiator against systems such as GPT-4.
+2. **Top-K Accuracy:** Whether the correct answer appears in the Top-5 candidates.
+3. **Performance by Solver Mode:** Performance for Dense, Sieve, and CRT modes.
+4. **Performance by Magnitude:** Which numeric ranges are solved well, from small values to huge integers.
+
+---
+
+## 2. Dependencies
+
+### Libraries
 
 ```python
 import torch
@@ -40,7 +40,7 @@ from tqdm import tqdm
 from typing import Dict, List, Tuple, Optional
 ```
 
-### 内部モジュール
+### Internal Modules
 
 ```python
 from intseq_bert import config
@@ -50,19 +50,19 @@ from intseq_bert.features import process_sequence
 from intseq_bert.collator import OEISCollator
 ```
 
-### 設定 (`config.py`)
+### Configuration (`config.py`)
 
-| 定数 | 値 | 用途 |
+| Constant | Value | Purpose |
 |------|------|------|
-| `MOD_RANGE` | `list(range(2, 102))` | 法のリスト |
-| `MAGNITUDE_BUCKETS` | リスト | 桁数別分類の閾値 |
-| `SOLVER_TOP_K_DEFAULT` | 5 | デフォルトの候補数 |
-| `VANILLA_MASK_TOKEN_ID` | 1 | Vanilla Transformer の MASK トークン ID |
-| `VANILLA_SPECIAL_TOKENS_OFFSET` | 3 | トークンとInteger間のオフセット |
+| `MOD_RANGE` | `list(range(2, 102))` | List of moduli |
+| `MAGNITUDE_BUCKETS` | list | Thresholds for magnitude buckets |
+| `SOLVER_TOP_K_DEFAULT` | 5 | Default number of candidates |
+| `VANILLA_MASK_TOKEN_ID` | 1 | Mask token ID for the Vanilla Transformer |
+| `VANILLA_SPECIAL_TOKENS_OFFSET` | 3 | Offset between tokens and integers |
 
 ---
 
-## 3. コマンドライン引数
+## 3. Command-Line Arguments
 
 ```bash
 python -m intseq_bert.analysis.analyze_solver \
@@ -74,49 +74,49 @@ python -m intseq_bert.analysis.analyze_solver \
     --top_k 5
 ```
 
-### 引数一覧
+### Argument List
 
-| 引数 | 型 | 必須 | デフォルト | 説明 |
+| Argument | Type | Required | Default | Description |
 |------|------|------|-----------|------|
-| `--checkpoint` | str | ✅ | - | モデルチェックポイントパス |
-| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
-| `--split_type` | str | ✅ | - | 分割タイプ (例: `std`, `easy`) |
-| `--split_name` | str | | `test` | 分割名 (`train`, `val`, `test`) |
-| `--output_dir` | str | ✅ | - | 出力ディレクトリ |
-| `--data_root` | str | | `config.DATA_ROOT` | データルートディレクトリ |
-| `--max_samples` | int | | `1000` | 評価する最大サンプル数 |
-| `--top_k` | int | | `5` | Solver が返す候補数 |
-| `--filter_magnitude` | str | | `None` | 特定桁数範囲のみテスト (`small`, `medium`, `large`, `huge`, `astronomical`) |
-| `--device` | str | | `auto` | デバイス指定 (`cuda`, `cpu`, `auto`) |
+| `--checkpoint` | str | yes | - | Model checkpoint path |
+| `--model_type` | str | | `intseq` | Model type (`intseq`, `vanilla`, `ablation`) |
+| `--split_type` | str | yes | - | Split type, e.g. `std` or `easy` |
+| `--split_name` | str | | `test` | Split name (`train`, `val`, `test`) |
+| `--output_dir` | str | yes | - | Output directory |
+| `--data_root` | str | | `config.DATA_ROOT` | Data root directory |
+| `--max_samples` | int | | `1000` | Maximum number of samples to evaluate |
+| `--top_k` | int | | `5` | Number of candidates returned by the solver |
+| `--filter_magnitude` | str | | `None` | Test only a specific magnitude range (`small`, `medium`, `large`, `huge`, `astronomical`) |
+| `--device` | str | | `auto` | Device (`cuda`, `cpu`, `auto`) |
 
 ---
 
-## 4. 処理フロー
+## 4. Processing Flow
 
-### 4.1. メインフロー
+### 4.1. Main Flow
 
+```text
+1. Parse arguments and configure logging.
+2. Load the model, restoring configuration from the checkpoint.
+3. Load test data from JSONL.
+4. Run the inference loop sample by sample.
+5. Aggregate results.
+6. Generate output files.
 ```
-1. 引数パース & ロギング設定
-2. モデル読み込み (チェックポイントから設定復元)
-3. JSONL からテストデータ読み込み
-4. 推論ループ (1件ずつ処理)
-5. 結果の集計
-6. 出力ファイル生成
-```
 
-### 4.2. Step 1: データの準備
+### 4.2. Step 1: Data Preparation
 
-通常の `DataLoader` は数値を Tensor（Magnitude/Mod）に変換してしまうが、**Exact Match 判定には「変換前の生の整数」が必要**。
+The normal `DataLoader` converts values into tensors such as Magnitude and Mod features, but exact-match evaluation requires the **raw integer before conversion**.
 
-そのため、JSONL を直接読み込み、以下を行う：
+For this reason, read JSONL directly and perform the following:
 
-1. 系列から最後の項（ターゲット）を分離
-2. 入力系列に対して `features.process_sequence()` でテンソル化
-3. ターゲットは Python int として保持
+1. Split the final term from the sequence as the target.
+2. Tensorize the input sequence using `features.process_sequence()`.
+3. Keep the target as a Python `int`.
 
-> **系列長の前提条件：** 前処理（`preprocess.py`）にて `config.MIN_SEQUENCE_LENGTH = 10` による明示的なフィルタが適用されるため、std split のテストデータには系列長 < 10 の系列が存在しない（実測値：最小 10 項・中央値 36 項・平均 42.5 項）。
-> `len(seq) < 2` フィルタはコード上の安全弁として残存するが、実データでは不要。
-> したがって Solver への入力文脈は常に **9 項以上**が保証されており、「文脈なし（1 項のみ）での予測」という極端に困難なケースは本評価に含まれない。
+> **Sequence-length assumption:** In preprocessing (`preprocess.py`), `config.MIN_SEQUENCE_LENGTH = 10` applies an explicit filter. Therefore, the std test split does not contain sequences shorter than 10 terms. Observed statistics: minimum 10 terms, median 36 terms, mean 42.5 terms.
+> The `len(seq) < 2` filter remains as a code-level guard, but it is unnecessary for the actual dataset.
+> Solver input context is therefore always guaranteed to contain **at least 9 terms**, and the extremely difficult case of predicting from no context, i.e. one term only, is not included in this evaluation.
 
 ```python
 def load_test_samples(
@@ -128,49 +128,51 @@ def load_test_samples(
     Returns:
         List of dicts with keys:
           - oeis_id: str
-          - input_seq: List[int] (ターゲット除く)
-          - target: int (正解の整数)
-          - target_str: str (正解の文字列表現)
+          - input_seq: List[int] (without target)
+          - target: int (ground-truth integer)
+          - target_str: str (string representation of the ground truth)
     """
 ```
 
-### 4.3. Step 2: 推論ループ
+### 4.3. Step 2: Inference Loop
 
-各サンプルに対して以下を実行：
+Run the following for each sample:
 
 ```python
 for sample in tqdm(samples):
-    # 1. 特徴量作成
-    features_dict = process_sequence(sample["input_seq"])
-    
-    # 2. バッチ形式に変換 (B=1)
+    # 1. Append a dummy next-term slot and create features
+    seq_with_dummy = sample["input_seq"] + [0]
+    features_dict = process_sequence(seq_with_dummy)
+
+    # 2. Convert to batch format (B=1)
     batch = collator([features_dict])
-    
-    # 3. Forward Pass
+
+    # 3. Explicitly mask the appended final position to avoid leakage
+    batch["mag_inputs"][:, -1, :config.MAG_RAW_DIM] = 0.0
+    batch["mag_inputs"][:, -1, -1] = 1.0
+    batch["mod_inputs"][:, -1, :] = 0.0
+
+    # 4. Forward pass through the model wrapper
     with torch.no_grad():
-        outputs = model(
-            mag_features=batch["mag_inputs"].to(device),
-            mod_features=batch["mod_inputs"].to(device),
-            src_key_padding_mask=(batch["attention_mask"] == 0).to(device)
-        )
-    
-    # 4. Solver 用パラメータ抽出 (最後の位置 = 次の項予測)
+        predictions = model_wrapper.predict(batch)
+
+    # 5. Extract solver parameters from the appended final position, i.e. next-term prediction
     last_pos = batch["attention_mask"].sum(dim=1).item() - 1
     args = IntegerSolver.from_model_output(
-        outputs["predictions"], position=last_pos, model=model
+        predictions, position=last_pos, model=model_wrapper.model
     )
-    
-    # 5. Solve
+
+    # 6. Solve
     candidates = solver.solve(*args, top_k=top_k)
-    
-    # 6. 判定
+
+    # 7. Judge match rank
     match_rank = -1
     for rank, cand in enumerate(candidates, 1):
         if cand["value"] == sample["target"]:
             match_rank = rank
             break
-    
-    # 7. 結果記録
+
+    # 8. Record result
     results.append({
         "oeis_id": sample["oeis_id"],
         "target": sample["target"],
@@ -180,116 +182,118 @@ for sample in tqdm(samples):
         "solver_mode": candidates[0]["method"] if candidates else "none",
         "mag_log10": get_log10_magnitude(sample["target"]),
         "score_top1": candidates[0]["score"] if candidates else None,
-        "sign_pred": get_sign_idx(pred_top1),  # 予測結果からの符号
+        "sign_pred": get_sign_idx(candidates[0]["value"]) if candidates else None,
         "sign_true": get_sign_idx(sample["target"])
     })
 ```
 
-> **Note:** マスク処理について
-> 
-> 入力系列の末尾にダミートークン (0) を追加後、その位置を **明示的にマスク** する。
-> これにより Data Leakage を防止し、モデルはダミー値を見ることなく予測を行う。
-> 
+> **Note:** Masking
+>
+> After appending a dummy token (`0`) to the end of the input sequence, explicitly mask that position.
+> This prevents data leakage and ensures that the model predicts without observing the dummy value.
+>
 > ```python
-> # マスキング処理 (collator.py と同じ方式)
-> batch["mag_inputs"][:, -1, :config.MAG_RAW_DIM] = 0.0  # コンテンツをゼロ化
-> batch["mag_inputs"][:, -1, -1] = 1.0  # is_masked フラグを1に
-> batch["mod_inputs"][:, -1, :] = 0.0  # Sin/Cos をゼロ化
+> # Masking, using the same convention as collator.py
+> batch["mag_inputs"][:, -1, :config.MAG_RAW_DIM] = 0.0  # Zero out content
+> batch["mag_inputs"][:, -1, -1] = 1.0  # Set is_masked flag to 1
+> batch["mod_inputs"][:, -1, :] = 0.0  # Zero out sin/cos features
 > ```
 
-### 4.4. Step 3: 結果の集計
+### 4.4. Step 3: Aggregate Results
 
-全サンプルの結果を集計し、統計量を算出する。
+Aggregate all sample-level results and compute summary statistics.
 
 ---
 
-## 5. 分析指標
+## 5. Analysis Metrics
 
 ### 5.1. Overall Metrics
 
-| 指標 | 計算方法 | 説明 |
+| Metric | Formula | Description |
 |------|----------|------|
-| `top1_acc` | `(match_rank == 1).mean() × 100` | Top-1 完全一致率 (%) |
-| `top5_acc` | `(match_rank > 0).mean() × 100` | Top-5 内に正解が含まれる率 (%) |
-| `sign_acc` | `(sign_pred == sign_true).mean() × 100` | 符号予測正解率 (%) |
-| `valid_rate` | `(match_rank != -1 or candidates not empty)` | Solver が解を返した率 |
+| `top1_acc` | `(match_rank == 1).mean() x 100` | Top-1 exact match accuracy (%) |
+| `top5_acc` | `(match_rank > 0).mean() x 100` | Fraction where the answer appears in Top-5 (%) |
+| `sign_acc` | `(sign_pred == sign_true).mean() x 100` | Sign prediction accuracy (%) |
+| `valid_rate` | `(match_rank != -1 or candidates not empty)` | Rate at which the solver returns a solution |
 
-### 5.2. By Magnitude (桁数別)
+### 5.2. By Magnitude
 
-`config.MAGNITUDE_BUCKETS` に基づく分類：
+Classification based on `config.MAGNITUDE_BUCKETS`:
 
-| バケット | 範囲 (log10) | 数値範囲 |
+| Bucket | Range (log10) | Numeric Range |
 |----------|-------------|---------|
 | Small | 0 ~ 2 | 1 ~ 100 |
 | Medium | 2 ~ 5 | 100 ~ 100,000 |
-| Large | 5 ~ 20 | 10^5 ~ 10^20 |
-| Huge | 20 ~ 50 | 10^20 ~ 10^50 |
-| Astronomical | 50+ | 10^50+ |
+| Large | 5 ~ 20 | `10^5 ~ 10^20` |
+| Huge | 20 ~ 50 | `10^20 ~ 10^50` |
+| Astronomical | 50+ | `10^50+` |
 
-各バケットについて Top-1 Acc, Top-5 Acc を算出。
+Compute Top-1 accuracy and Top-5 accuracy for each bucket.
 
 ### 5.3. By Solver Mode
 
-| モード | 説明 |
+| Mode | Description |
 |--------|------|
-| `dense` | Mode A: 全探索 |
-| `sieve` | Mode AB: アンカー・シーブ |
-| `crt` | Mode B: Sparse CRT |
-| `vanilla_lm` | Vanilla Transformer (LM ヘッドのみ) |
-| `zero` | ゼロ即時返却 |
-| `none` | 解なし |
+| `dense` | Mode A: exhaustive search |
+| `sieve` | Mode AB: anchor sieve |
+| `crt` | Mode B: sparse CRT |
+| `vanilla_lm` | Vanilla Transformer, LM head only |
+| `zero` | Immediate zero return |
+| `none` | No solution |
 
-各モードについて使用率と正解率を算出。
+Compute usage rate and accuracy for each mode.
 
-### 5.4. Vanilla Transformer サポート
+### 5.4. Vanilla Transformer Support
 
-`model_type=vanilla` の場合、以下の特別な処理が行われる：
+When `model_type=vanilla`, use the following special handling:
 
-1. **Solver の切り替え**: `IntegerSolver` の代わりに `VanillaSolver` を使用
-2. **トークンID マスキング**: `token_ids` の最終位置を `VANILLA_MASK_TOKEN_ID` に設定
-3. **推論ロジック**: `lm_head` の logits から直接トークンIDを予測し、整数に変換
-4. **UNK 処理**: 語彙外トークン (UNK) が予測された場合、`is_unk=True` をマーク
+1. **Solver switch:** Use `VanillaSolver` instead of `IntegerSolver`.
+2. **Token ID masking:** Set the final position of `token_ids` to `VANILLA_MASK_TOKEN_ID`.
+3. **Inference logic:** Predict token IDs directly from `lm_head` logits and convert them to integers.
+4. **UNK handling:** If an out-of-vocabulary token (`UNK`) is predicted, mark `is_unk=True`.
 
 ```python
-# Vanilla Transformer の推論フロー
+# Inference flow for the Vanilla Transformer
 if model_type == "vanilla":
     solver = VanillaSolver()
-    logits = VanillaSolver.from_model_output(output)  # (L, vocab_size)
+    logits = VanillaSolver.from_model_output(
+        predictions, position=last_pos, batch_idx=0
+    )  # (vocab_size,)
     candidates = solver.solve(logits, top_k)
     # candidates: [{"value": int | None, "score": float, "is_unk": bool}, ...]
 ```
 
 ---
 
-## 6. 出力ファイル
+## 6. Output Files
 
-### 6.1. ディレクトリ構成
+### 6.1. Directory Structure
 
 ```text
 results/solver_analysis/
-├── solver_results.csv        # 全サンプルの詳細結果
-├── summary.json              # 集計サマリー
-├── magnitude_breakdown.csv   # 桁数別集計
-├── mode_breakdown.csv        # モード別集計
-└── analysis_config.json      # 実行設定
+├── solver_results.csv        # Detailed result for every sample
+├── summary.json              # Aggregated summary
+├── magnitude_breakdown.csv   # Aggregation by magnitude bucket
+├── mode_breakdown.csv        # Aggregation by solver mode
+└── analysis_config.json      # Run configuration
 ```
 
 ### 6.2. `solver_results.csv`
 
-個別サンプルの詳細結果。
+Detailed results for individual samples.
 
-| カラム | 型 | 説明 |
+| Column | Type | Description |
 |--------|------|------|
 | `oeis_id` | str | OEIS ID |
-| `target` | int | 正解の整数 |
-| `target_str` | str | 正解の文字列表現（大きな数用） |
-| `pred_top1` | int | Top-1 予測値 |
-| `match_rank` | int | 正解の順位 (1-5, -1=不正解) |
-| `solver_mode` | str | 使用したモード |
-| `mag_log10` | float | ターゲットの桁数 (log10) |
-| `score_top1` | float | Top-1 のスコア |
-| `sign_pred` | int | 予測した符号 (0/1/2) |
-| `sign_true` | int | 正解の符号 (0/1/2) |
+| `target` | int | Ground-truth integer |
+| `target_str` | str | String representation of the ground truth, for very large numbers |
+| `pred_top1` | int | Top-1 predicted value |
+| `match_rank` | int | Rank of the ground truth, 1-5 or -1 for incorrect |
+| `solver_mode` | str | Solver mode used |
+| `mag_log10` | float | Target magnitude in `log10` |
+| `score_top1` | float | Top-1 score |
+| `sign_pred` | int | Predicted sign (0/1/2) |
+| `sign_true` | int | Ground-truth sign (0/1/2) |
 
 ```csv
 oeis_id,target,target_str,pred_top1,match_rank,solver_mode,mag_log10,score_top1,sign_pred,sign_true
@@ -367,13 +371,13 @@ zero,5,0.5,100.0,100.0
 
 ---
 
-## 7. 実装上の工夫
+## 7. Implementation Details
 
-### 7.1. 正解データの取得方法
+### 7.1. Retrieving Ground-Truth Data
 
-JSONL ファイルを直接読み込み、`process_sequence()` 相当の処理でテンソル化しつつ、**「最後の項（ターゲット）」を Python int として保持**する。
+Read the JSONL file directly, tensorize with logic equivalent to `process_sequence()`, and keep the **final term, i.e. the target, as a Python `int`**.
 
-> **重要:** 既存の DataLoader 経由だと、巨大整数が float 変換でロスする可能性があるため、JSONL 直接読み込みを採用。
+> **Important:** Loading through the existing `DataLoader` can lose very large integers through float conversion, so direct JSONL loading is used.
 
 ```python
 def load_test_samples(jsonl_path: Path, split_ids: Set[str], max_samples: int):
@@ -383,64 +387,64 @@ def load_test_samples(jsonl_path: Path, split_ids: Set[str], max_samples: int):
             record = json.loads(line)
             if record["oeis_id"] not in split_ids:
                 continue
-            
+
             seq = record["sequence"]
             if len(seq) < 2:
                 continue
-            
+
             target = seq[-1]
             input_seq = seq[:-1]
-            
+
             samples.append({
                 "oeis_id": record["oeis_id"],
                 "input_seq": input_seq,
                 "target": target,
                 "target_str": str(target)
             })
-            
+
             if len(samples) >= max_samples:
                 break
-    
+
     return samples
 ```
 
-### 7.2. モデルパラメータの復元
+### 7.2. Restoring Model Parameters
 
-チェックポイントから `d_model`, `nhead`, `num_layers` を復元する。
+Restore `d_model`, `nhead`, and `num_layers` from the checkpoint.
 
 ```python
 def load_model_from_checkpoint(model_type: str, checkpoint_path: Path, device: str):
-    """create_model_wrapper を使用してモデルを読み込み"""
+    """Load the model using create_model_wrapper."""
     from intseq_bert.analysis.common import create_model_wrapper
     return create_model_wrapper(model_type, str(checkpoint_path), device)
 ```
 
-### 7.3. パフォーマンス目安
+### 7.3. Performance Estimates
 
-| サンプル数 | 推定時間 (GPU) | 推定時間 (CPU) |
+| Number of Samples | Estimated Time (GPU) | Estimated Time (CPU) |
 |-----------|---------------|---------------|
-| 100 | ~30 秒 | ~2 分 |
-| 1000 | ~5 分 | ~20 分 |
-| 全件 (2500) | ~12 分 | ~50 分 |
+| 100 | ~30 sec | ~2 min |
+| 1000 | ~5 min | ~20 min |
+| All samples (2500) | ~12 min | ~50 min |
 
 ---
 
-## 8. エラーハンドリング
+## 8. Error Handling
 
-| 状況 | 対応 |
+| Situation | Handling |
 |------|------|
-| チェックポイント不存在 | `FileNotFoundError` を raise |
-| JSONL 不存在 | `FileNotFoundError` を raise |
-| Split ファイル不存在 | `FileNotFoundError` を raise |
-| Solver が空リストを返す | `match_rank = -1`, `solver_mode = "none"` として記録 |
-| 系列長が短すぎる (< 2) | スキップ |
-| 巨大数で log10 オーバーフロー | `math.log10` のガード（文字列長で代用） |
+| Checkpoint does not exist | Raise `FileNotFoundError` |
+| JSONL does not exist | Raise `FileNotFoundError` |
+| Split file does not exist | Raise `FileNotFoundError` |
+| Solver returns an empty list | Record `match_rank = -1`, `solver_mode = "none"` |
+| Sequence is too short (`< 2`) | Skip |
+| `log10` overflow on huge numbers | Guard `math.log10`, falling back to string length |
 
 ---
 
-## 9. 使用例
+## 9. Usage Examples
 
-### 基本的な使用
+### Basic Usage
 
 ```bash
 python -m intseq_bert.analysis.analyze_solver \
@@ -449,7 +453,7 @@ python -m intseq_bert.analysis.analyze_solver \
     --output_dir results/solver_analysis
 ```
 
-### 小さい数だけテスト
+### Test Only Small Numbers
 
 ```bash
 python -m intseq_bert.analysis.analyze_solver \
@@ -459,7 +463,7 @@ python -m intseq_bert.analysis.analyze_solver \
     --filter_magnitude small
 ```
 
-### 全件評価
+### Full Evaluation
 
 ```bash
 python -m intseq_bert.analysis.analyze_solver \

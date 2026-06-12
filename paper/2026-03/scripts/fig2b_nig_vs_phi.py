@@ -1,15 +1,15 @@
 """
-Fig.2b NIG vs φ(m)/m 散布図（追加分析）
+Fig.2b NIG vs phi(m)/m scatter plot (additional analysis)
 CICM 2026 paper — supplementary / Section 5.3
 
-NIG と Euler のトーシェント比 φ(m)/m の関係を検証。
-  - Pearson / Spearman 相関係数を算出
-  - 素数 / 合成数を色分け
-  - 注目モジュラスをアノテーション
-  - 回帰直線を重ねる
+Examines the relationship between NIG and Euler's totient ratio phi(m)/m.
+  - Computes Pearson / Spearman correlations
+  - Colors prime and composite moduli separately
+  - Annotates notable moduli
+  - Overlays a regression line
 
-出力: experiment/cicm2026/fig2b_nig_vs_phi.pdf
-      experiment/cicm2026/fig2b_nig_vs_phi.png
+Output: paper/2026-03/figures/fig2b_nig_vs_phi.pdf
+      paper/2026-03/figures/fig2b_nig_vs_phi.png
 """
 
 from pathlib import Path
@@ -21,7 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# ── データ準備 ────────────────────────────────────────────────────────────
+# ── Data preparation ─────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CKPT = REPO_ROOT / "checkpoints" / "large_std"
 OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
@@ -37,20 +37,20 @@ y = df["nig_score"].values.astype(float)
 r_p, p_p = stats.pearsonr(x, y)
 r_s, p_s = stats.spearmanr(x, y)
 
-# 回帰直線
+# Regression line
 slope, intercept, *_ = stats.linregress(x, y)
 x_line = np.linspace(x.min(), x.max(), 200)
 y_line = slope * x_line + intercept
 
-# ── プロット ──────────────────────────────────────────────────────────────
+# ── Plot ─────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7.5, 5.0))
 fig.subplots_adjust(left=0.11, right=0.97, top=0.96, bottom=0.13)
 
-# 回帰直線（背景）
+# Regression line (background)
 ax.plot(x_line, y_line, color="#aaaaaa", linewidth=1.2, linestyle="--",
         zorder=1, label=f"Regression ($r={r_p:.3f}$)")
 
-# 合成数（青系）
+# Composite moduli (blue scale)
 comp = df[~df["is_prime"]]
 sc_c = ax.scatter(comp["phi_over_n"], comp["nig_score"],
                   c=comp["modulus"], cmap="Blues_r",
@@ -58,19 +58,19 @@ sc_c = ax.scatter(comp["phi_over_n"], comp["nig_score"],
                   s=55, zorder=3, edgecolors="none",
                   label="Composite $m$")
 
-# 素数（赤三角）
+# Prime moduli (red triangles)
 prim = df[df["is_prime"]]
 ax.scatter(prim["phi_over_n"], prim["nig_score"],
            marker="^", color="#e74c3c", s=50, zorder=4,
            edgecolors="none", label="Prime $m$")
 
-# カラーバー（合成数の大きさ）
+# Colorbar for composite modulus size
 cbar = fig.colorbar(sc_c, ax=ax, pad=0.02, fraction=0.035)
 cbar.set_label("Modulus $m$ (composite)", fontsize=9)
 
-# 注目モジュラスのアノテーション
+# Notable modulus annotations
 ANNOTATE = {
-    2:  ("m=2\n(parity)",   (+0.05, -0.025)),   # 右下に移動 (m=96と重ならないよう)
+    2:  ("m=2\n(parity)",   (+0.05, -0.025)),   # Move down-right to avoid overlap with m=96.
     60: ("m=60\n(Babylonian)", (-0.13, -0.018)),
     96: ("m=96",            (+0.015, +0.003)),
     3:  ("m=3",             (+0.010, -0.010)),
@@ -85,7 +85,7 @@ for m, (label, (dx, dy)) in ANNOTATE.items():
                 fontsize=8.5, color="#222222",
                 ha="center")
 
-# 統計情報テキスト
+# Statistics text
 ax.text(0.97, 0.97,
         f"Pearson  $r = {r_p:.3f}$  ($p < 10^{{-28}}$)\n"
         f"Spearman $\\rho = {r_s:.3f}$  ($p < 10^{{-26}}$)",
@@ -98,7 +98,7 @@ ax.set_ylabel("Normalized Information Gain (NIG)", fontsize=11)
 ax.legend(loc="lower left", fontsize=9.5, framealpha=0.9)
 ax.grid(linestyle=":", linewidth=0.6, alpha=0.6)
 
-# ── 保存 ──────────────────────────────────────────────────────────────────
+# ── Save ─────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
     out_path = OUT_DIR / f"fig2b_nig_vs_phi.{ext}"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")

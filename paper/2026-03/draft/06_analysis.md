@@ -1,113 +1,92 @@
-# 6. 分析と考察
+# 6. Analysis and Discussion
 
-<!-- 目標: ~2ページ (~900語 + 図1枚) -->
+<!-- Target: ~2 pages (~900 words + one figure) -->
 
-## 6.1 アブレーション研究：Modulo ストリームの寄与
+## 6.1 Ablation Study: Contribution of the Modulo Stream
 
-Modulo ストリームと FiLM 融合の効果を単独で定量化するため、全 3 スケールにわたって IntSeqBERT と Magnitude-only のアブレーションモデルを比較する。
-表~\ref{tab:ablation} に Large 設定における差分をまとめる。
+To isolate the effect of the Modulo stream and FiLM fusion, we compare IntSeqBERT against the Magnitude-only ablation across all three scales. Table~\ref{tab:ablation} summarizes the Large-scale differences.
 
-**表4.** Large スケールにおける IntSeq vs. アブレーション（テスト性能）。$\Delta$ = IntSeq − アブレーション。
+**Table 4.** IntSeq vs. ablation at the Large scale on test performance. $\Delta$ = IntSeq - Ablation.
 
-| 指標              | IntSeq | アブレーション | $\Delta$ |
+| Metric | IntSeq | Ablation | $\Delta$ |
 |-------------------|-------:|---------------:|---------:|
-| Mag Acc（%）      |  95.85 |          89.70 |   +6.15  |
-| 符号精度（%）     |  98.54 |          98.29 |   +0.25  |
-| MMA（%）          |  50.38 |          35.22 |  +15.16  |
-| mod-2 精度（%）   |  85.65 |          72.13 |  +13.52  |
-| Solver Top-1（%） |  19.09 |          11.75 |   +7.34  |
-| Magnitude MSE     |  0.142 |          0.371 |   −0.228 |
+| Mag Acc (%) | 95.85 | 89.70 | +6.15 |
+| Sign Acc (%) | 98.54 | 98.29 | +0.25 |
+| MMA (%) | 50.38 | 35.22 | +15.16 |
+| mod-2 Acc (%) | 85.65 | 72.13 | +13.52 |
+| Solver Top-1 (%) | 19.09 | 11.75 | +7.34 |
+| Magnitude MSE | 0.142 | 0.371 | -0.228 |
 
-設計通り、Modulo ストリームは**Modulo 予測**において最大の改善をもたらす（MMA +15.2pt、パリティ +13.5pt）。
-**Magnitude 予測**への寄与は比較的小さいが（Acc$_{0.5}$ +6.2pt、MSE −0.228）、一貫して有意である。
-これは周期的算術構造がスケール回帰に対して相補的な帰納バイアスを提供していることを示唆する。
-すなわち、$x_i$ の2から101に対する剰余を知ることは、とりうる Magnitude の範囲を大幅に絞り込む。
-**符号精度**の差は小さく（+0.25pt）、符号は Magnitude のみからおおむね推定可能であることを示す。
+As intended, the Modulo stream produces its largest improvement in **modulo prediction** (MMA +15.2pt, parity +13.5pt). Its contribution to **magnitude prediction** is smaller but still consistent (Acc$_{0.5}$ +6.2pt, MSE -0.228), suggesting that periodic arithmetic structure provides a complementary inductive bias for scale regression. Knowing residues of $x_i$ modulo 2 through 101 substantially narrows the plausible magnitude patterns. The effect on **sign accuracy** is small (+0.25pt), indicating that sign is mostly recoverable from magnitude-only context.
 
-**Solver 精度**は Modulo ストリームによって +7.3pt 改善される。
-Dense モードおよび Sieve モードにおいてより正確な剰余情報がスコアリングを精緻化することが主な要因であり、CRT モードの直接的な寄与は現状限定的である（Top-1 = 0.09%、第 5.4 節）。
+**Solver accuracy** improves by +7.3pt with the Modulo stream. The main reason is that more accurate residue information refines scoring in Dense and Sieve modes. The direct contribution of CRT mode remains limited at present (Top-1 = 0.09%, Section 5.4).
 
-## 6.2 スケーリング挙動
+## 6.2 Scaling Behaviour
 
-表~\ref{tab:scale_trend} に IntSeqBERT のモデルサイズ別の指標改善幅を示す。
+Table~\ref{tab:scale_trend} shows how IntSeqBERT metrics change with model size.
 
-**表5.** IntSeqBERT のスケーリング：テスト split 指標（Small / Middle / Large）。
+**Table 5.** Scaling of IntSeqBERT on the test split (Small / Middle / Large).
 
-| 指標              | Small  | Middle | Large  | $\Delta$（S→L） |
+| Metric | Small | Middle | Large | $\Delta$ (S to L) |
 |-------------------|-------:|-------:|-------:|----------------:|
-| Mag Acc（%）      |  94.73 |  95.71 |  95.85 |          +1.12  |
-| MMA（%）          |  40.43 |  46.88 |  50.38 |          +9.95  |
-| mod-2 精度（%）   |  81.97 |  84.50 |  85.65 |          +3.68  |
-| Solver Top-1（%） |  14.05 |  17.02 |  19.09 |          +5.04  |
-| Magnitude MSE     |  0.228 |  0.164 |  0.142 |          −0.086 |
+| Mag Acc (%) | 94.73 | 95.71 | 95.85 | +1.12 |
+| MMA (%) | 40.43 | 46.88 | 50.38 | +9.95 |
+| mod-2 Acc (%) | 81.97 | 84.50 | 85.65 | +3.68 |
+| Solver Top-1 (%) | 14.05 | 17.02 | 19.09 | +5.04 |
+| Magnitude MSE | 0.228 | 0.164 | 0.142 | -0.086 |
 
-Magnitude 精度はモデルサイズに対して比較的緩やかな改善に留まる（Small→Large で +1.1pt）のに対し、Modulo 精度はより大きな改善を示す（+10.0pt）。
-これは剰余算術がより合成的（compositional）であり、表現容量の増加からより多くの恩恵を受けやすいという直観と整合する。
-Solver Top-1 精度も Modulo 精度の傾向に追随して一貫した改善を示す（+5.0pt）。
+Magnitude accuracy improves only moderately with scale (+1.1pt from Small to Large), while modulo accuracy improves much more strongly (+10.0pt). This is consistent with the intuition that residue arithmetic is more compositional and benefits more from representational capacity. Solver Top-1 accuracy follows the modulo trend, improving steadily by +5.0pt.
 
-表~\ref{tab:scale_trend} の傾向は図~\ref{fig:scaling} にも可視化されており、
-Modulo 精度と Magnitude 精度のスケーリング幅の差異が折れ線グラフで対比的に示される。
+Figure~\ref{fig:scaling} visualizes the same trend and contrasts the scaling slopes of modulo and magnitude metrics.
 
-<!-- 図3（experiment/cicm2026/fig3_scaling.{pdf,png}）
+<!-- Figure 3 (paper/2026-03/figures/fig3_scaling.{pdf,png})
      \begin{figure}[t]
        \centering
        \includegraphics[width=\linewidth]{figures/fig3_scaling}
-       \caption{モデルサイズ（Small/Middle/Large）に対する各指標のスケーリング挙動。
-                左: Magnitude 精度（Mag Acc）は IntSeqBERT・Ablation ともに高い水準で推移し、
-                Small→Large で +1.1pt の緩やかな改善を示す。
-                中: MMA（平均 Modulo 精度）は IntSeqBERT が Small の 40.3\% から Large の 50.4\% へ
-                +10.1pt 改善する一方、Ablation は +9.3pt と劣り、全スケールで一貫した差が確認される。
-                右: Solver Top-1 精度は IntSeqBERT が 14.1\% → 19.1\%（+5.0pt）と連動して向上し、
-                Vanilla（2.4\%付近で横ばい）との差が拡大する。}
+       \caption{Scaling behaviour across model sizes (Small/Middle/Large).
+                Left: magnitude accuracy stays high for both IntSeqBERT and Ablation,
+                with a mild +1.1pt improvement from Small to Large.
+                Middle: MMA improves from 40.3\% to 50.4\% for IntSeqBERT.
+                Right: Solver Top-1 accuracy improves from 14.1\% to 19.1\%, while
+                Vanilla remains near 2.4\%.}
        \label{fig:scaling}
      \end{figure} -->
 
-## 6.3 アテンションパターン
+## 6.3 Attention Patterns
 
-Large モデルを用いて 5 つの代表的数列に対するアテンション重みを可視化する：
-A107413（線形漸化式）、A022433（Hofstadter 系）、A023622（Lucas 数の畳み込み）、A047961（コーディネーション数列）、A106589（Rauzy 置換）。
+Using the Large model, we visualize attention weights for five representative sequences: A107413 (linear recurrence), A022433 (Hofstadter-type sequence), A023622 (Lucas convolution), A047961 (coordination sequence), and A106589 (Rauzy substitution).
 
-**局所アテンション比率**（直前 3 位置へのアテンション集中度）を指標として定量化する：
+We quantify **local attention ratio**, the amount of attention concentrated on the previous three positions:
 
-| 数列                        | IntSeq | Vanilla | アブレーション |
+| Sequence | IntSeq | Vanilla | Ablation |
 |-----------------------------|-------:|--------:|---------------:|
-| A107413（線形漸化式）       | 0.347  | 0.348   | 0.405          |
-| A022433（Hofstadter）       | 0.261  | 0.248   | 0.233          |
-| A023622（Lucas 畳み込み）   | 0.305  | 0.307   | 0.328          |
-| A047961（Zeolite 配位）     | 0.245  | 0.237   | 0.229          |
-| A106589（Rauzy 置換）       | 0.166  | 0.147   | 0.185          |
+| A107413 (linear recurrence) | 0.347 | 0.348 | 0.405 |
+| A022433 (Hofstadter) | 0.261 | 0.248 | 0.233 |
+| A023622 (Lucas convolution) | 0.305 | 0.307 | 0.328 |
+| A047961 (zeolite coordination) | 0.245 | 0.237 | 0.229 |
+| A106589 (Rauzy substitution) | 0.166 | 0.147 | 0.185 |
 
-2 つの傾向が観察される。
-（i）線形漸化式の数列 A107413 は直前項への強い依存を反映して一貫して高い局所アテンション比率を示す。
-（ii）同一数列でもモデル間で局所アテンション比率が異なり、特に A107413・A023622 ではアブレーションが相対的に高い局所集中（0.405、0.328）を示す。これは Modulo ストリームを除いた場合に、より局所的な参照に依存しやすい可能性を示唆する。
+Two trends emerge. First, A107413 consistently shows high local attention, reflecting dependence on immediately preceding terms. Second, local attention varies across models for the same sequence. In particular, Ablation concentrates more locally for A107413 and A023622, suggesting that removing the Modulo stream may make the model rely more heavily on nearby references.
 
-<!-- アテンションヒートマップ（補足図、必要に応じて作成）
-     出典: experiment/cicm2026/attention/
+<!-- Attention heatmap (supplementary figure, if used)
+     Source: paper/2026-03/figures/attention/
      \begin{figure}[t]
        \centering
-       \includegraphics[width=0.72\linewidth]{figures/fig_attn_A107413}
-       \caption{A107413（線形漸化式）に対する Large IntSeqBERT の層平均アテンションヒートマップ。
-                行が Query 位置、列が Key 位置を表す。局所アテンション比率 0.347 は
-                直前 3 位置への集中度を示す。}
+       \includegraphics[width=0.72\linewidth]{figures/attention/A107413_aggregated}
+       \caption{Layer-averaged attention heatmap for Large IntSeqBERT on A107413.
+                Rows are query positions and columns are key positions. The local attention
+                ratio of 0.347 measures concentration on the previous three positions.}
        \label{fig:attn_heatmap}
      \end{figure} -->
 
-**制限事項。** アテンションが A107413 の漸化式係数を正確に反映しているかどうかの自動判定（パターンアライメント）は、全数列・全モデルで `UNKNOWN` となった。
-定性的な視覚的整合が定量的閾値を満たさないことを示しており、より鋭敏なアライメント指標の開発を今後の課題とする。
+**Limitation.** Automatic pattern-alignment detection, such as checking whether attention reflects the exact recurrence coefficients of A107413, returned `UNKNOWN` for all five case-study sequences across the evaluated models. Qualitative visual alignment did not satisfy the current quantitative thresholds. Developing sharper alignment metrics is future work.
 
-## 6.4 制限事項
+## 6.4 Limitations
 
-**大きな整数の予測困難。** $|x| \geq 10^{20}$（Huge・Astronomical バケット）では Solver 精度がほぼゼロとなる。
-原理的には Modulo 予測から大きな整数を再構成できる CRT モードでも Top-1 精度は 0.09% に留まる。
-ボトルネックは不十分な Modulo 予測精度にある。CRT による復元には複数の法に対する**正確な**剰余が必要であり、MMA が 50% 程度であっても剰余の誤りが頻発し、再構成が失敗する。
+**Difficulty with large integers.** Solver accuracy is almost zero for $|x| \geq 10^{20}$, covering the Huge and Astronomical buckets. Even CRT mode, which could in principle reconstruct large integers from modulo predictions, reaches only 0.09% Top-1 accuracy. The bottleneck is insufficient modulo accuracy. CRT reconstruction requires **correct** residues for several moduli; with MMA around 50%, residue errors are frequent enough to break reconstruction.
 
-**有効候補率の低下。** IntSeqBERT の Solver 呼び出しの約 13% で有効候補が返らない（mode = `none`）。主に CRT 失敗が原因。
-残差制約の緩和や近似 CRT の利用など Solver のフォールバック戦略の改善によって一部を回収できる可能性がある。
+**Lower valid candidate rate.** About 13% of IntSeqBERT solver calls return no valid candidate (mode = `none`), mainly due to CRT failure. Better fallback strategies, such as relaxed residue constraints or approximate CRT, may recover part of this loss.
 
-**アテンション解釈可能性。** `UNKNOWN` のパターンアライメント結果は、どの算術的性質にアテンションヘッドが特化しているかについて強い結論を引き出すには、より慎重な閾値調整が必要であることを示している。
+**Attention interpretability.** The `UNKNOWN` pattern-alignment results indicate that stronger conclusions about head specialization require more careful thresholding and evaluation.
 
-**データセットバイアス。** OEIS の収録数列は「nonn」（非負・非全零）タグを持つものが多数を占める。
-本実験の学習・テストデータもこの分布を継承するため、正の整数に対する性能が負の整数に対する性能より高い可能性がある。
-符号精度 98.54% という高い値の一部はこのバイアスに起因し、負の整数を多く含む数列に対しての評価では下振れる可能性が否定できない。
-また、値が極めて大きい数列（天文学的バケット）は相対的に少数であり、そのバケットでのメトリクスは少数サンプルで算出されている点にも留意が必要である。
-今後の評価では、符号や桁数による層別サンプリングを導入した評価プロトコルが望ましい。
+**Dataset bias.** OEIS contains many sequences tagged `nonn`, meaning nonnegative and not all zero. The train/test distribution inherits this bias, so performance on positive integers may be higher than performance on negative integers. The high sign accuracy of 98.54% may partly reflect this distribution. Astronomical values are also rare, so metrics in that bucket are based on relatively few samples. Future evaluations should introduce stratified sampling by sign and magnitude.

@@ -1,6 +1,5 @@
 %% Section 6: Analysis and Discussion
-%% Japanese draft (draft2/06_analysis.md) embedded as comments.
-%% English translation written below each paragraph.
+%% English manuscript section.
 %% -----------------------------------------------------------------------
 
 \section{Analysis and Discussion}
@@ -9,9 +8,6 @@
 \subsection{Ablation Study: Contribution of the Modulo Stream}
 \label{sec:ablation}
 
-% Modulo ストリームと FiLM 融合の効果を単独で定量化するため、全 3 スケールにわたって IntSeqBERT と
-% Magnitude-only のアブレーションモデルを比較する。
-% 表4 に Large 設定における差分をまとめる。
 To isolate the contribution of the modulo stream and FiLM fusion, we compare IntSeqBERT with
 the magnitude-only Ablation model. As seen in Table~\ref{tab:main}, the modulo stream
 delivers the largest gains in modulo prediction (MMA $+15.2$\,pt, parity $+13.5$\,pt at Large
@@ -24,11 +20,6 @@ refines scoring in Dense and Sieve modes.
 \subsection{Scaling Behaviour}
 \label{sec:scaling}
 
-% 表5 に IntSeqBERT のモデルサイズ別の指標改善幅を示す。
-% Magnitude 精度はモデルサイズに対して比較的緩やかな改善に留まる（Small→Large で +1.1pt）のに対し、
-% Modulo 精度はより大きな改善を示す（+10.0pt）。
-% これは剰余算術がより合成的であり、表現容量の増加からより多くの恩恵を受けやすいという直観と整合する。
-% Solver Top-1 精度も Modulo 精度の傾向に追随して一貫した改善を示す（+5.0pt）。
 Table~\ref{tab:scale_trend} shows how IntSeqBERT's metrics improve with model size.
 Magnitude accuracy improves only modestly from Small to Large ($+1.1$\,pt), whereas modulo
 accuracy improves substantially ($+10.0$\,pt). This is consistent with the intuition that
@@ -52,8 +43,6 @@ Magnitude MSE       &  0.228 &  0.164 &  0.142 & $-0.086$\\
 \end{tabular}
 \end{table}
 
-% 表5 の傾向は図3 にも可視化されており、Modulo 精度と Magnitude 精度のスケーリング幅の差異が
-% 折れ線グラフで対比的に示される。
 The trends in Table~\ref{tab:scale_trend} are visualised in Fig.~\ref{fig:scaling}, which
 contrasts the differential scaling of modulo and magnitude accuracy across model sizes.
 
@@ -69,11 +58,6 @@ contrasts the differential scaling of modulo and magnitude accuracy across model
 \subsection{Alternative Representations: Digit-Based Tokenisation}
 \label{sec:digit-discussion}
 
-% 桁ベーストークン化（各桁を 1 トークン）との実験的比較は本論文では行っていない。
-% 本研究が捉えたいのは十進桁のパターンではなく整数そのものの数論的構造であり、Modulo ストリームは
-% 様々な法での剰余（合同算術の情報）を直接モデルに与える。同じ情報は桁列からも原理的には読み取れる
-% が、間接的にしか得られない。桁単位の生成は自然な代替案だが、整数を単一の値として扱う本研究とは
-% 異なる問題設定（桁列の系列予測）になる。
 A natural alternative to our handcrafted features is digit-based tokenisation, treating each
 decimal digit as a separate token, possibly with digit-by-digit generation on the output
 side. We have not made an experimental comparison with digit-level representations in this
@@ -89,9 +73,6 @@ for future work.
 \subsection{Limitations}
 \label{sec:limitations}
 
-% 大きな整数の予測困難。|x| ≥ 10^{20}（Huge・Astronomical バケット）では Solver 精度がほぼゼロ。
-% ボトルネックは不十分な Modulo 予測精度にある。CRT による復元には複数の法に対する正確な剰余が必要
-% であり、MMA が 50% 程度であっても剰余の誤りが頻発し、再構成が失敗する。
 \textbf{Difficulty with large integers.} Solver accuracy collapses to near zero for
 $|x| \geq 10^{20}$ (Huge and Astronomical buckets): CRT-based reconstruction requires
 \emph{exact} residues for multiple moduli simultaneously, and errors are frequent enough
@@ -101,9 +82,6 @@ primarily due to CRT failures; approximate CRT or relaxed residue constraints ar
 
 \textbf{Dataset bias.} OEIS sequences are predominantly non-negative (\texttt{nonn}).
 The high sign accuracy (98.54\%) may partially reflect this bias.
-% フィルタリング後も線形・劣線形成長の数列が多数派であり、高い Magnitude 精度はこの偏りを部分的に
-% 反映する。本研究の寄与はこの偏りの内側でも、Large 以上のバケットでの精度向上（表2・表8）と
-% Modulo スペクトル表現の有効性（5.3 節）として現れている。
 Similarly, sequences with linear or sub-linear growth remain the majority even after our
 filtering, and the high overall magnitude accuracy partially reflects this growth bias;
 the contribution of our representation shows up within this bias as the large accuracy gains

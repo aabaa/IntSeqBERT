@@ -1,22 +1,20 @@
-# `src/intseq_bert/analysis/analyze_mod_spectrum.py` 実装仕様書
+# Implementation Specification: `src/intseq_bert/analysis/analyze_mod_spectrum.py`
 
-## 1. 概要
+## 1. Overview
 
-本スクリプトは、学習済みモデルの **Modulo Spectrum Analysis** を実行する。
-全ての法 m (2〜101) を対等な条件で比較し、モデルが得意とする構造をランキング化する。
-**IntSeqBERT**, **Vanilla Transformer**, **Ablation (No-Mod)** の全てのモデルタイプに対応する。
+This script performs **Modulo Spectrum Analysis** for a trained model. It compares all moduli `m` from 2 to 101 under equal conditions and ranks the structures the model handles well. It supports **IntSeqBERT**, **Vanilla Transformer**, and **Ablation (No-Mod)** model types.
 
-### 主要機能
+### Key Features
 
-1. **Global Ranking**: 法 m ごとの NIG (Normalized Information Gain) を算出し、ランキング化
-2. **Tag-Stratified Analysis**: OEISタグごとの層別分析
-3. **Bootstrap CI**: 統計的有意性のための 95% 信頼区間推定
+1. **Global Ranking:** Compute NIG (Normalized Information Gain) for each modulus `m` and rank them.
+2. **Tag-Stratified Analysis:** Stratified analysis by OEIS tag.
+3. **Bootstrap CI:** 95% confidence interval estimation for statistical significance.
 
 ---
 
-## 2. 依存関係
+## 2. Dependencies
 
-### ライブラリ
+### Libraries
 
 ```python
 import torch
@@ -30,7 +28,7 @@ from typing import Dict, Optional, List, Tuple
 from torch.utils.data import DataLoader
 ```
 
-### 内部モジュール
+### Internal Modules
 
 ```python
 from intseq_bert import config
@@ -41,7 +39,7 @@ from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
 
 ---
 
-## 3. コマンドライン引数 (CLI)
+## 3. Command-Line Arguments (CLI)
 
 ```bash
 python -m intseq_bert.analysis.analyze_mod_spectrum \
@@ -55,49 +53,48 @@ python -m intseq_bert.analysis.analyze_mod_spectrum \
     --bootstrap_samples 1000
 ```
 
-### 引数一覧
+### Argument List
 
-| 引数 | 型 | 必須 | デフォルト | 説明 |
+| Argument | Type | Required | Default | Description |
 |------|------|------|-----------|------|
-| `--checkpoint` | str | ✅ | - | チェックポイントパス |
-| `--split_type` | str | ✅ | - | 分割タイプ (例: `std`, `easy`) |
-| `--split_name` | str | | `test` | 分割名 (`train`, `val`, `test`) |
-| `--output_dir` | str | ✅ | - | 出力ディレクトリ |
-| `--model_type` | str | | `intseq` | モデル種別 (`intseq`, `vanilla`, `ablation`) |
-| `--jsonl_path` | str | | `data/oeis/data.jsonl` | OEIS JSONL パス (タグ情報取得用) |
-| `--batch_size` | int | | `64` | バッチサイズ |
-| `--bootstrap_samples` | int | | `1000` | Bootstrap サンプル数 |
-| `--data_root` | str | | `config.DATA_ROOT` | データルート |
-| `--device` | str | | `auto` | デバイス指定 (`cuda`, `cpu`, `auto`) |
+| `--checkpoint` | str | yes | - | Checkpoint path |
+| `--split_type` | str | yes | - | Split type, e.g. `std` or `easy` |
+| `--split_name` | str | | `test` | Split name (`train`, `val`, `test`) |
+| `--output_dir` | str | yes | - | Output directory |
+| `--model_type` | str | | `intseq` | Model type (`intseq`, `vanilla`, `ablation`) |
+| `--jsonl_path` | str | | `data/oeis/data.jsonl` | OEIS JSONL path for tag metadata |
+| `--batch_size` | int | | `64` | Batch size |
+| `--bootstrap_samples` | int | | `1000` | Number of bootstrap samples |
+| `--device` | str | | `auto` | Device (`cuda`, `cpu`, `auto`) |
 
 ---
 
-## 4. モデル抽象化
+## 4. Model Abstraction
 
-異なるモデルタイプを統一的に扱うため、`ModelWrapper` クラスを導入する。
+Introduce a `ModelWrapper` class to handle different model types uniformly.
 
 ### 4.1. `ModelWrapper` (Abstract Base)
 
 ```python
 class ModelWrapper(ABC):
-    """抽象モデルラッパー"""
-    
+    """Abstract model wrapper."""
+
     @abstractmethod
     def predict(self, batch: Dict) -> Dict[str, torch.Tensor]:
         """
         Returns:
             {
-                "mag_mu": (B, L),           # Magnitude 予測平均
-                "mag_log_var": (B, L),      # Magnitude 不確実性
-                "sign_logits": (B, L, 3),   # Sign ロジット
-                "mod_logits": (B, L, ~5150) # Modulo 結合ロジット
+                "mag_mu": (B, L),           # Magnitude predicted mean
+                "mag_log_var": (B, L),      # Magnitude uncertainty
+                "sign_logits": (B, L, 3),   # Sign logits
+                "mod_logits": (B, L, ~5150) # Concatenated modulo logits
             }
         """
         pass
-    
+
     @abstractmethod
     def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
-        """各法 m の log-probability を返す"""
+        """Return per-modulus log probabilities."""
         pass
 ```
 
@@ -105,13 +102,13 @@ class ModelWrapper(ABC):
 
 ```python
 class IntSeqWrapper(ModelWrapper):
-    """IntSeqForPreTraining のラッパー"""
-    
+    """Wrapper for IntSeqForPreTraining."""
+
     def __init__(self, checkpoint_path: str, device: str):
         self.model = IntSeqForPreTraining.from_checkpoint(checkpoint_path)
         self.model.to(device).eval()
         self.device = device
-    
+
     def predict(self, batch: Dict) -> Dict:
         with torch.no_grad():
             outputs = self.model(
@@ -120,7 +117,7 @@ class IntSeqWrapper(ModelWrapper):
                 src_key_padding_mask=(batch["attention_mask"] == 0).to(self.device)
             )
         return outputs["predictions"]
-    
+
     def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
         split_logits = self.model._split_mod_logits(mod_logits)
         return [F.log_softmax(logits, dim=-1) for logits in split_logits]
@@ -130,23 +127,27 @@ class IntSeqWrapper(ModelWrapper):
 
 ```python
 class VanillaWrapper(ModelWrapper):
-    """VanillaTransformerForPreTraining のラッパー"""
-    
+    """Wrapper for VanillaTransformerForPreTraining."""
+
     def __init__(self, checkpoint_path: str, device: str):
         self.model = VanillaTransformerForPreTraining.from_checkpoint(checkpoint_path)
         self.model.to(device).eval()
         self.device = device
-    
+
     def predict(self, batch: Dict) -> Dict:
         with torch.no_grad():
             outputs = self.model(
-                token_ids=batch["token_ids"].to(self.device),
+                input_ids=batch["token_ids"].to(self.device),
                 src_key_padding_mask=(batch["attention_mask"] == 0).to(self.device)
             )
         return outputs["predictions"]
+
+    def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
+        split_logits = split_mod_logits(mod_logits)
+        return [F.log_softmax(logits, dim=-1) for logits in split_logits]
 ```
 
-### 4.4. ファクトリ関数
+### 4.4. Factory Function
 
 ```python
 def create_model_wrapper(
@@ -154,7 +155,7 @@ def create_model_wrapper(
     checkpoint_path: str,
     device: str
 ) -> ModelWrapper:
-    """モデルタイプに応じたラッパーを生成"""
+    """Create the appropriate wrapper for a model type."""
     if model_type == "intseq":
         return IntSeqWrapper(checkpoint_path, device)
     elif model_type == "vanilla":
@@ -167,23 +168,23 @@ def create_model_wrapper(
 
 ---
 
-## 5. 評価指標
+## 5. Evaluation Metrics
 
 ### 5.1. Normalized Information Gain (NIG)
 
-法によってクラス数（難易度）が異なるため、最大エントロピーで正規化した指標を用いる。
+Because the number of classes, and thus difficulty, differs by modulus, use a metric normalized by maximum entropy.
 
 ```python
 def compute_nig(ce_loss: float, modulus: int) -> float:
     """
-    計算式: R(m) = 1.0 - (Loss / log(m))
-    
+    Formula: R(m) = 1.0 - (Loss / log(m))
+
     Args:
-        ce_loss: 平均 CrossEntropy 損失
-        modulus: 法 m
-    
+        ce_loss: Mean CrossEntropy loss
+        modulus: Modulus m
+
     Returns:
-        NIG スコア (1.0 = 完全, 0.0 = ランダム, < 0 = ランダム以下)
+        NIG score (1.0 = perfect, 0.0 = random, < 0 = worse than random)
     """
     max_entropy = np.log(modulus)
     return 1.0 - (ce_loss / max_entropy)
@@ -191,43 +192,43 @@ def compute_nig(ce_loss: float, modulus: int) -> float:
 
 ### 5.2. Per-Modulus Metrics
 
-各法について以下を算出:
+Compute the following for each modulus:
 
-| 指標 | 計算 | 説明 |
+| Metric | Computation | Description |
 |------|------|------|
-| `accuracy` | `(pred == target).mean()` | 分類正解率 (%) |
-| `ce_loss` | `CrossEntropy(logits, targets).mean()` | 平均損失 |
-| `nig_score` | `1 - ce_loss / log(m)` | 正規化情報利得 |
+| `accuracy` | `(pred == target).mean()` | Classification accuracy (%) |
+| `ce_loss` | `CrossEntropy(logits, targets).mean()` | Mean loss |
+| `nig_score` | `1 - ce_loss / log(m)` | Normalized Information Gain |
 
 ---
 
-## 6. 処理フロー
+## 6. Processing Flow
 
-### 6.1. メインフロー
+### 6.1. Main Flow
 
+```text
+1. Parse arguments and configure logging.
+2. Create model wrapper with create_model_wrapper.
+3. Prepare dataset and DataLoader.
+4. Run streaming inference with `StreamingEvaluator.process_batch`.
+5. Compute per-modulus metrics with `compute_mod_metrics_from_stats`.
+6. Estimate bootstrap confidence intervals with `bootstrap_ci_from_stats`.
+7. Run tag-stratified analysis with `tag_stratified_analysis_from_stats`.
+8. Generate output files.
 ```
-1. 引数パース & ロギング設定
-2. モデルラッパー作成 (create_model_wrapper)
-3. データセット & DataLoader 準備
-4. 推論ループ (collect_predictions)
-5. Per-Modulus 指標計算 (compute_mod_metrics)
-6. Bootstrap 信頼区間推定 (bootstrap_ci)
-7. タグ別層別分析 (tag_stratified_analysis)
-8. 出力ファイル生成
-```
 
-### 6.2. Streaming Evaluation (Memory Efficiency)
+### 6.2. Streaming Evaluation for Memory Efficiency
 
-大規模データセット（例: 30k sequences）において、全ての予測結果（logits: 20003 x 128 x 5150）をメモリに保持すると 70GB+ のメモリを消費し OOM が発生するため、**Streaming Evaluation** 方式を採用する。
+For large datasets, e.g. 30k sequences, keeping all predictions in memory (`logits: 20003 x 128 x 5150`) consumes over 70 GB and causes OOM. Use **Streaming Evaluation** instead.
 
-1. **バッチ毎の集計:**
-   - 予測 (`mod_logits`) と正解データ (`mod_labels`) をバッチ単位で処理する。
-   - 各バッチで「損失の合計 (`loss_sum`)」「正解数の合計 (`acc_sum`)」「有効サンプル数 (`counts`)」のみを計算・蓄積する。
-   - 巨大な logits テンソルはバッチ処理後に即座に破棄する。
+1. **Batch-wise aggregation:**
+   - Process predictions (`mod_logits`) and labels (`mod_labels`) one batch at a time.
+   - For each batch, compute and accumulate only the loss sum (`loss_sum`), accuracy count (`acc_sum`), and valid counts (`counts`).
+   - Discard the large logits tensor immediately after processing the batch.
 
-2. **遅延計算:**
-   - 全バッチ処理完了後、蓄積された統計量 (Sufficient Statistics) から全体の平均 Loss / Accuracy / NIG を算出する。
-   - これにより、データセットサイズに依存せず一定のメモリ消費量で解析が可能となる。
+2. **Deferred computation:**
+   - After all batches are processed, compute overall mean loss, accuracy, and NIG from accumulated sufficient statistics.
+   - This keeps memory usage approximately constant with respect to dataset size.
 
 ```python
 class StreamingEvaluator:
@@ -236,116 +237,62 @@ class StreamingEvaluator:
     Stores per-sample statistics instead of full logits.
     """
     def process_batch(self, preds: Dict, batch: Dict):
-        # バッチ内の統計量を計算し、self.results に追記
+        # Compute batch statistics and append them to self.results
         pass
 
     def finalize(self) -> Dict[str, torch.Tensor]:
-        # 全バッチの統計量を結合して返す
+        # Merge and return statistics from all batches
         pass
 ```
 
-> **重要: Collator 出力の互換性**
+> **Important: Collator output compatibility**
 >
-> 学習時 (`train.py`) と分析時でデータの読み込み方が同じであることを保証する必要がある。
-> 特に `OEISCollator` が `mod_labels` (全100法) を返すことを確認する。
+> Data loading must be identical between training (`train.py`) and analysis.
+> In particular, confirm that `OEISCollator` returns `mod_labels` for all 100 moduli.
 
-### 6.3. `compute_mod_metrics` 関数
+### 6.3. `compute_mod_metrics_from_stats`
 
-各法についてメトリクスを計算。
+Compute global metrics for each modulus from accumulated streaming statistics.
 
 ```python
-def compute_mod_metrics(
-    mod_logits: torch.Tensor,
-    mod_targets: torch.Tensor,
-    mask_map: torch.Tensor
+def compute_mod_metrics_from_stats(
+    stats: Dict[str, torch.Tensor]
 ) -> pd.DataFrame:
     """
     Returns:
         DataFrame with columns: [modulus, accuracy, ce_loss, nig_score]
     """
-    results = []
-    split_logits = split_mod_logits(mod_logits)  # List of (N, L, m)
-    
-    for i, m in enumerate(config.MOD_RANGE):
-        logits_m = split_logits[i]  # (N, L, m)
-        targets_m = mod_targets[:, :, i]  # (N, L)
-        
-        # マスク位置のみ
-        valid = mask_map & (targets_m != config.IGNORE_INDEX)
-        logits_flat = logits_m[valid]  # (num_valid, m)
-        targets_flat = targets_m[valid]  # (num_valid,)
-        
-        # Accuracy
-        preds = logits_flat.argmax(dim=-1)
-        accuracy = (preds == targets_flat).float().mean().item() * 100
-        
-        # CE Loss
-        ce_loss = F.cross_entropy(logits_flat, targets_flat).item()
-        
-        # NIG
-        nig = compute_nig(ce_loss, m)
-        
-        results.append({
-            "modulus": m,
-            "accuracy": accuracy,
-            "ce_loss": ce_loss,
-            "nig_score": nig
-        })
-    
-    return pd.DataFrame(results)
+    loss_sum = stats["loss_sum"]  # (N, 100)
+    acc_sum = stats["acc_sum"]    # (N, 100)
+    counts = stats["counts"]      # (N,)
+    # Aggregate over sequences, then compute CE, accuracy, and NIG per modulus.
 ```
 
-### 6.4. `bootstrap_ci` 関数
+### 6.4. `bootstrap_ci_from_stats`
 
-NIG スコアの 95% 信頼区間を推定。
+Estimate 95% confidence intervals for NIG scores by resampling sequence-level statistics.
 
 ```python
-def bootstrap_ci(
-    mod_logits: torch.Tensor,
-    mod_targets: torch.Tensor,
-    mask_map: torch.Tensor,
+def bootstrap_ci_from_stats(
+    stats: Dict[str, torch.Tensor],
     n_samples: int = 1000,
-    ci_level: float = 0.95
+    ci_level: float = 0.95,
+    seed: int = None,
+    quiet: bool = False
 ) -> pd.DataFrame:
     """
     Returns:
-        DataFrame with columns: [modulus, nig_mean, nig_lower, nig_upper]
+        DataFrame with columns: [modulus, nig_lower, nig_upper]
     """
-    n_sequences = mod_logits.size(0)
-    results = {m: [] for m in config.MOD_RANGE}
-    
-    for _ in tqdm(range(n_samples), desc="Bootstrap"):
-        # リサンプリング
-        indices = np.random.choice(n_sequences, n_sequences, replace=True)
-        sample_logits = mod_logits[indices]
-        sample_targets = mod_targets[indices]
-        sample_mask = mask_map[indices]
-        
-        # Per-modulus NIG 計算
-        metrics = compute_mod_metrics(sample_logits, sample_targets, sample_mask)
-        for _, row in metrics.iterrows():
-            results[row["modulus"]].append(row["nig_score"])
-    
-    # CI 計算
-    alpha = (1 - ci_level) / 2
-    ci_data = []
-    for m in config.MOD_RANGE:
-        nig_values = np.array(results[m])
-        ci_data.append({
-            "modulus": m,
-            "nig_mean": nig_values.mean(),
-            "nig_lower": np.percentile(nig_values, alpha * 100),
-            "nig_upper": np.percentile(nig_values, (1 - alpha) * 100)
-        })
-    
-    return pd.DataFrame(ci_data)
+    # Resample rows of stats["loss_sum"] and stats["counts"],
+    # recompute NIG, then return percentile bounds.
 ```
 
 ---
 
-## 7. タグ別層別分析
+## 7. Tag-Stratified Analysis
 
-### 7.1. OEIS タグ読み込み
+### 7.1. Load OEIS Tags
 
 ```python
 def load_oeis_tags(jsonl_path: str) -> Dict[str, List[str]]:
@@ -361,42 +308,45 @@ def load_oeis_tags(jsonl_path: str) -> Dict[str, List[str]]:
     return id_to_tags
 ```
 
-### 7.2. `tag_stratified_analysis` 関数
+### 7.2. `tag_stratified_analysis_from_stats`
 
 ```python
-def tag_stratified_analysis(
-    mod_logits: torch.Tensor,
-    mod_targets: torch.Tensor,
-    mask_map: torch.Tensor,
-    oeis_ids: List[str],
+def tag_stratified_analysis_from_stats(
+    stats: Dict[str, torch.Tensor],
     id_to_tags: Dict[str, List[str]]
 ) -> pd.DataFrame:
     """
     Returns:
         DataFrame with columns: [tag, count, overall_acc, non_base10_acc, nig_score, top_modulus]
     """
-    # タグ → インデックスリスト
+    # tag -> sequence-index list
     tag_to_indices = defaultdict(list)
-    for i, oeis_id in enumerate(oeis_ids):
+    for i, oeis_id in enumerate(stats["oeis_ids"]):
         for tag in id_to_tags.get(oeis_id, []):
             tag_to_indices[tag].append(i)
-    
+
     results = []
     for tag, indices in tag_to_indices.items():
-        if len(indices) < 10:  # 最低10サンプル
+        if len(indices) < 10:  # Minimum 10 samples
             continue
-        
-        indices_t = torch.tensor(indices)
-        tag_logits = mod_logits[indices_t]
-        tag_targets = mod_targets[indices_t]
-        tag_mask = mask_map[indices_t]
-        
-        # Per-tag metrics
-        metrics = compute_mod_metrics(tag_logits, tag_targets, tag_mask)
-        
-        # Top modulus
+
+        indices_t = torch.tensor(indices, dtype=torch.long)
+        tag_counts = stats["counts"][indices_t].sum().item()
+        if tag_counts == 0:
+            continue
+
+        tag_loss = stats["loss_sum"][indices_t].sum(dim=0) / tag_counts
+        tag_acc = (stats["acc_sum"][indices_t].sum(dim=0) / tag_counts) * 100
+        metrics = pd.DataFrame([
+            {
+                "modulus": m,
+                "accuracy": tag_acc[i].item(),
+                "nig_score": compute_nig(tag_loss[i].item(), m),
+            }
+            for i, m in enumerate(config.MOD_RANGE)
+        ])
         top_row = metrics.loc[metrics["nig_score"].idxmax()]
-        
+
         results.append({
             "tag": tag,
             "count": len(indices),
@@ -405,40 +355,40 @@ def tag_stratified_analysis(
             "nig_score": metrics["nig_score"].mean(),
             "top_modulus": int(top_row["modulus"])
         })
-    
+
     return pd.DataFrame(results).sort_values("nig_score", ascending=False)
 
 
 def _compute_non_base10_acc(metrics: pd.DataFrame) -> float:
     """
-    Base-10 関連の法 (10, 20, 50, 100) を除外した正解率の平均
-    
-    **用語整理:**
-    - 「自明解 (Trivial Solution)」: |y| < m で剰余計算が不要なケース
-    - 「基数依存 (Base-Dependent)」: Mod 10, 100 等の 10進表記に由来する法
-    
-    この関数は後者（基数依存）を除外する。
-    「数論的構造理解」を測定するための指標として使用。
+    Mean accuracy after excluding base-10-related moduli (10, 20, 50, 100).
+
+    Terminology:
+    - "Trivial solution": a case where |y| < m and residue computation is unnecessary.
+    - "Base-dependent": a modulus derived from decimal notation, such as mod 10 or 100.
+
+    This function excludes the latter, i.e. base-dependent moduli.
+    It is used as a metric for measuring number-theoretic structure understanding.
     """
-    base10_related_mods = {10, 20, 50, 100}  # Base-10 関連の法
+    base10_related_mods = {10, 20, 50, 100}  # Base-10-related moduli
     non_base10 = metrics[~metrics["modulus"].isin(base10_related_mods)]
     return non_base10["accuracy"].mean()
 ```
 
 ---
 
-## 8. 出力ファイル
+## 8. Output Files
 
-### 8.1. ディレクトリ構成
+### 8.1. Directory Structure
 
 ```text
 results/analysis/mod/
-├── mod_spectrum_ranking.csv      # 法別 NIG ランキング
-├── mod_spectrum_with_ci.csv      # Bootstrap 信頼区間付き
-├── tag_performance.csv           # タグ別層別分析
-├── analysis_config.json          # 実行設定
+├── mod_spectrum_ranking.csv      # NIG ranking by modulus
+├── mod_spectrum_with_ci.csv      # With bootstrap confidence intervals
+├── tag_performance.csv           # Tag-stratified analysis
+├── analysis_config.json          # Run configuration
 └── figures/
-    └── mod_spectrum_bar.png      # (オプション) バーチャート
+    └── mod_spectrum_bar.png      # Optional bar chart
 ```
 
 ### 8.2. `mod_spectrum_ranking.csv`
@@ -454,30 +404,30 @@ rank,modulus,accuracy,ce_loss,nig_score,interpretation
 ### 8.3. `mod_spectrum_with_ci.csv`
 
 ```csv
-modulus,nig_mean,nig_lower,nig_upper,accuracy_mean
-2,0.85,0.83,0.87,92.5
-3,0.78,0.75,0.81,78.2
+modulus,nig_lower,nig_upper
+2,0.83,0.87
+3,0.75,0.81
 ...
 ```
 
 ### 8.4. `tag_performance.csv`
 
-拡張されたタグ別メトリクス。
+Extended tag-wise metrics.
 
-| カラム | 説明 |
+| Column | Description |
 |--------|------|
-| `tag` | タグ名 |
-| `count` | サンプル数 |
-| `overall_acc` | 全法平均正解率 |
-| `non_base10_acc` | Base-10除外平均正解率 |
-| `nig_score` | 平均NIGスコア |
-| `top_modulus` | 最高スコアの法 |
-| `acc_mod_2`, `acc_mod_3`, `acc_mod_5`, `acc_mod_10`, `acc_mod_100` | 主要法の個別正解率 |
-| `base10_bias` | 十進法バイアス (`acc_mod_10` - `non_base10_acc`) |
-| `top_5_mods_nig` | NIG上位5法 (例: "2(0.85); 3(0.78); ...") |
-| `worst_5_mods_nig` | NIG下位5法 |
-| `mag_mse` | Magnitude MSE (将来拡張用、現在は N/A) |
-| `mag_acc` | Magnitude 正解率 (将来拡張用、現在は N/A) |
+| `tag` | Tag name |
+| `count` | Number of samples |
+| `overall_acc` | Mean accuracy across all moduli |
+| `non_base10_acc` | Mean accuracy excluding base-10 moduli |
+| `nig_score` | Mean NIG score |
+| `top_modulus` | Highest-scoring modulus |
+| `acc_mod_2`, `acc_mod_3`, `acc_mod_5`, `acc_mod_10`, `acc_mod_100` | Individual accuracies for key moduli |
+| `base10_bias` | Decimal-base bias (`acc_mod_10` - `non_base10_acc`) |
+| `top_5_mods_nig` | Top 5 moduli by NIG, e.g. `"2(0.85); 3(0.78); ..."` |
+| `worst_5_mods_nig` | Bottom 5 moduli by NIG |
+| `mag_mse` | Magnitude MSE, reserved for future extension and currently N/A |
+| `mag_acc` | Magnitude accuracy, reserved for future extension and currently N/A |
 
 ```csv
 tag,count,overall_acc,non_base10_acc,nig_score,top_modulus,acc_mod_2,acc_mod_3,acc_mod_5,acc_mod_10,acc_mod_100,base10_bias,top_5_mods_nig,worst_5_mods_nig,mag_mse,mag_acc
@@ -494,44 +444,43 @@ prime,400,55.0,52.0,0.60,2,88.0,70.5,55.0,38.0,28.0,14.0,"2(0.80); 3(0.68); ..."
   "model_type": "intseq",
   "split_type": "std",
   "split_name": "test",
-  "n_sequences": 2500,
   "bootstrap_samples": 1000,
-  "timestamp": "2026-01-15 12:00:00"
+  "seed": 42
 }
 ```
 
 ---
 
-## 9. 実装メモ
+## 9. Implementation Notes
 
-### 9.1. 解釈マッピング
+### 9.1. Interpretation Mapping
 
-高 NIG の法に対して自動的に解釈を付与する。
+Automatically assign interpretations to moduli with high NIG.
 
 ```python
 INTERPRETATION_MAP = {
-    # 基本的な周期性
+    # Basic periodicity
     2: "Parity (Odd/Even)",
-    3: "Mod-3 (桁和の剰余)",
+    3: "Mod-3 (digit-sum residue)",
     4: "Last 2 Bits",
     5: "Last Digit (Base-5)",
     6: "LCM(2,3) - 2 & 3 Combined",
     7: "Prime",
     8: "Last 3 Bits",
     9: "Mod-9 (Digital Root)",
-    
-    # Base-10 関連 (表記依存性の指標)
+
+    # Base-10 related, as an indicator of notation dependence
     10: "Base-10 (Last Digit)",
     20: "Base-10 Multiple",
     50: "Base-10 Multiple",
     100: "Base-10 (Last 2 Digits)",
-    
-    # Highly Composite Numbers
+
+    # Highly composite numbers
     12: "Highly Composite (LCM(3,4))",
     24: "Highly Composite",
     60: "Sexagesimal Base",
-    
-    # 大きな素数
+
+    # Large primes
     101: "Large Prime (Near 100)",
     97: "Large Prime",
 }
@@ -549,41 +498,11 @@ def get_interpretation(modulus: int) -> str:
         return ""
 ```
 
-### 9.2. エラーハンドリング
+### 9.2. Error Handling
 
-| 状況 | 対応 |
+| Situation | Handling |
 |------|------|
-| チェックポイント不存在 | `FileNotFoundError` |
-| モデルタイプ不明 | `ValueError` |
-| データセット空 | `ValueError` |
-| CUDA OOM | バッチサイズ自動縮小 or エラー終了 |
-
----
-
-## 10. 使用例
-
-### IntSeqBERT の分析
-
-```bash
-python -m intseq_bert.analysis.analyze_mod_spectrum \
-    --checkpoint checkpoints/intseq_std/best_model.pt \
-    --split_type std \
-    --output_dir results/intseq_analysis \
-    --model_type intseq
-```
-
-### Vanilla Transformer との比較
-
-```bash
-# IntSeqBERT
-python -m intseq_bert.analysis.analyze_mod_spectrum \
-    --checkpoint checkpoints/intseq_std/best_model.pt \
-    --output_dir results/comparison/intseq \
-    --model_type intseq
-
-# Vanilla Transformer
-python -m intseq_bert.analysis.analyze_mod_spectrum \
-    --checkpoint checkpoints/vanilla_std/best_model.pt \
-    --output_dir results/comparison/vanilla \
-    --model_type vanilla
-```
+| Checkpoint does not exist | `FileNotFoundError` |
+| Unknown model type | `ValueError` |
+| Empty dataset | `ValueError` |
+| CUDA OOM | Automatically reduce batch size or exit with an error |

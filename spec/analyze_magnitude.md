@@ -1,42 +1,43 @@
-# `src/intseq_bert/analysis/analyze_magnitude.py` 実装仕様書
+# Implementation Specification: `src/intseq_bert/analysis/analyze_magnitude.py`
 
-## 1. 概要
+## 1. Overview
 
-本スクリプトは、モデルの **Magnitude (数値の大きさ) 予測能力** を多角的に分析する。
-単なる精度評価だけでなく、数値のスケール（桁数）ごとの性能変化や、予測不確実性の妥当性（Calibration）を検証する。
+This script analyzes the model's ability to predict numeric magnitude from several angles. It measures not only raw accuracy, but also how performance changes by numeric scale and whether the predicted uncertainty is calibrated.
 
-### 主要機能
+### Key Features
 
-1. **Scale-wise Analysis:** 対数スケール（桁数）ごとの誤差分析（巨大数への汎化性能を確認）。
-2. **Uncertainty Calibration:** 予測分散 `sigma^2` と実際の誤差 `MSE` の相関分析。
-3. **Tag-Stratified Analysis:** 数列の種類（`poly`, `exp` 等）ごとの増大則の理解度比較。
-4. **Vanilla Comparison:** Vanilla Transformer (Token base) との限界性能比較。
-5. **Error Distribution Analysis:** 予測誤差の分布形状と外れ値パターンの特定。
-6. **Sign Consistency Check:** Magnitude 予測と Sign 予測の整合性検証。
-
----
-
-## 2. 依存関係
-
-* `analyze_mod_spectrum.py` と同様のライブラリ構成。
-* `scipy.stats` (相関係数計算用)
-* `seaborn` (分布プロット用)
+1. **Scale-wise Analysis:** Error analysis by log-scale bucket to evaluate generalization to very large numbers.
+2. **Uncertainty Calibration:** Correlation analysis between predicted variance `sigma^2` and observed error/MSE.
+3. **Tag-Stratified Analysis:** Comparison by sequence category such as `poly` and `exp`.
+4. **Vanilla Comparison:** Limit-performance comparison against the token-based Vanilla Transformer.
+5. **Error Distribution Analysis:** Identification of error distribution shape and outlier patterns.
+6. **Sign Consistency Check:** Consistency validation between magnitude and sign predictions.
 
 ---
 
-## 3. コマンドライン引数
+## 2. Dependencies
 
-| 引数 | 型 | デフォルト | 説明 |
+* Same library stack as `analyze_mod_spectrum.py`.
+* `scipy.stats` for correlation coefficients.
+* `seaborn` for distribution plots.
+
+---
+
+## 3. Command-Line Arguments
+
+| Argument | Type | Default | Description |
 |------|-----|-----------|------|
-| `--checkpoint` | str | 必須 | モデルチェックポイントのパス |
-| `--split_type` | str | 必須 | データ分割タイプ (std, easy, all) |
-| `--split_name` | str | `"test"` | 評価する分割 (train/val/test) |
-| `--output_dir` | str | 必須 | 結果出力ディレクトリ |
-| `--model_type` | str | `"intseq"` | モデルタイプ (intseq/vanilla/ablation) |
-| `--batch_size` | int | `64` | 推論バッチサイズ |
-| `--seed` | int | `42` | 乱数シード |
-| `--bootstrap_samples` | int | `1000` | Bootstrap サンプル数 (信頼区間算出用) |
-| `--worst_k` | int | `100` | 最悪ケースとして抽出するサンプル数 |
+| `--checkpoint` | str | required | Path to the model checkpoint |
+| `--split_type` | str | required | Data split type (`std`, `easy`, `all`) |
+| `--split_name` | str | `"test"` | Split to evaluate (`train`/`val`/`test`) |
+| `--output_dir` | str | required | Output directory for results |
+| `--model_type` | str | `"intseq"` | Model type (`intseq`/`vanilla`/`ablation`) |
+| `--jsonl_path` | str | `"data/oeis/data.jsonl"` | OEIS JSONL path for tag metadata |
+| `--batch_size` | int | `64` | Inference batch size |
+| `--seed` | int | `42` | Random seed |
+| `--bootstrap_samples` | int | `1000` | Number of bootstrap samples for confidence intervals |
+| `--worst_k` | int | `100` | Number of samples to extract as worst cases |
+| `--device` | str | `"auto"` | Device (`cuda`, `cpu`, or `auto`) |
 
 ```bash
 python -m intseq_bert.analysis.analyze_magnitude \
@@ -49,194 +50,194 @@ python -m intseq_bert.analysis.analyze_magnitude \
 
 ---
 
-## 4. 分析指標 (Metrics)
+## 4. Analysis Metrics
 
 ### 4.1. Accuracy Metrics
 
-| 指標 | 説明 | 備考 |
+| Metric | Description | Notes |
 |------|------|------|
-| **MSE** | Mean Squared Error | Loss と同等 |
-| **RMSE** | Root Mean Squared Error | 単位を揃えた誤差 |
-| **MAE** | Mean Absolute Error | 外れ値の影響を受けにくい |
-| **MedAE** | Median Absolute Error | 外れ値に対して頑健 |
-| **R²** | 決定係数 | 説明変量の表現力。1に近いほど良い |
-| **Pearson ρ** | ピアソン相関係数 | GT vs Pred の線形相関 |
-| **Spearman ρ** | スピアマン順位相関係数 | 順序関係の保持度合い |
+| **MSE** | Mean Squared Error | Equivalent to the loss |
+| **RMSE** | Root Mean Squared Error | Error in the same unit |
+| **MAE** | Mean Absolute Error | Less sensitive to outliers |
+| **MedAE** | Median Absolute Error | Robust to outliers |
+| **R2** | Coefficient of determination | Explanatory power; closer to 1 is better |
+| **Pearson rho** | Pearson correlation coefficient | Linear correlation between ground truth and predictions |
+| **Spearman rho** | Spearman rank correlation coefficient | Preservation of ordering |
 
 ### 4.2. Tolerance Accuracy
 
-許容誤差 `delta` 以内の割合を算出する。
+Compute the fraction of samples within a tolerance `delta`.
 
-| 指標 | 許容誤差 | 実スケールでの意味 |
+| Metric | Tolerance | Meaning on the original scale |
 |------|----------|-------------------|
-| **Acc_0.5** | `abs(y - y_pred) < 0.5` | 対数スケールで約 3.16倍以内 |
-| **Acc_0.1** | `abs(y - y_pred) < 0.1` | 対数スケールで約 1.25倍以内 |
-| **Acc_0.05** | `abs(y - y_pred) < 0.05` | 対数スケールで約 1.12倍以内 |
+| **Acc_0.5** | `abs(y - y_pred) < 0.5` | Within about 3.16x on the log scale |
+| **Acc_0.1** | `abs(y - y_pred) < 0.1` | Within about 1.25x on the log scale |
+| **Acc_0.05** | `abs(y - y_pred) < 0.05` | Within about 1.12x on the log scale |
 
 ### 4.3. Uncertainty Metrics (IntSeq Only)
 
-| 指標 | 説明 |
+| Metric | Description |
 |------|------|
-| **Calibration Error** | 予測された標準偏差 `sigma` が、実際の誤差残差 `abs(y - y_pred)` とどれだけ一致しているか |
-| **Negative Log Likelihood (NLL)** | ガウス分布を仮定した尤度（小さいほど良い） |
-| **Expected Calibration Error (ECE)** | ビン分割での校正誤差の加重平均 |
+| **Calibration Error** | How well predicted standard deviation `sigma` matches the observed residual `abs(y - y_pred)` |
+| **Negative Log Likelihood (NLL)** | Gaussian negative log likelihood; lower is better |
+| **Expected Calibration Error (ECE)** | Weighted average calibration error over bins |
 
 ### 4.4. Consistency Metrics
 
-| 指標 | 説明 |
+| Metric | Description |
 |------|------|
-| **Sign-Magnitude Consistency** | Magnitude 予測 > 0 かつ Sign 予測が負（またはその逆）となる矛盾サンプルの割合 |
+| **Sign-Magnitude Consistency** | Fraction of inconsistent samples, such as positive magnitude with negative sign prediction, or the reverse |
 
 ---
 
-## 5. 分析ロジック
+## 5. Analysis Logic
 
-### 5.1. Scale-wise Analysis (桁数別評価)
+### 5.1. Scale-wise Analysis
 
-データを正解値 `y` (log scale) の大きさに応じてバケット分けし、各バケットでの MSE を算出する。
+Bucket data by ground-truth `y` on the log scale and compute MSE in each bucket.
 
 | Bucket (Log10) | Description | Example Values |
 | --- | --- | --- |
 | **0 - 2** | Small | `1 ~ 100` |
 | **2 - 5** | Medium | `100 ~ 100,000` |
-| **5 - 20** | Large | `10^5 ~ 10^20` (64bit int 範囲) |
+| **5 - 20** | Large | `10^5 ~ 10^20` (64-bit integer range) |
 | **20 - 50** | Huge | `10^20 ~ 10^50` |
-| **50+** | Astronomical | `10^50` 以上 |
+| **50+** | Astronomical | `10^50` and above |
 
-**目的:** Vanilla Transformer は "Huge" 以降で `[UNK]` となり崩壊するが、IntSeqBERT はトレンドを維持できることを示す。
+**Goal:** Show that the Vanilla Transformer collapses into `[UNK]` beyond the "Huge" range, while IntSeqBERT can maintain the trend.
 
-#### サンプル数の記録と警告
+#### Sample Counts and Warnings
 
-出力CSV (`scale_wise_metrics.csv`) には以下のカラムを必須で含める：
+The output CSV (`scale_wise_metrics.csv`) must include the following columns:
 
-| カラム | 説明 |
+| Column | Description |
 |--------|------|
-| `bucket` | バケット名 (e.g., "Small", "Huge") |
-| `count` | そのバケットに含まれるサンプル数 |
+| `bucket` | Bucket name, e.g. `"Small"` or `"Huge"` |
+| `count` | Number of samples in the bucket |
 | `mse` | Mean Squared Error |
 | `mae` | Mean Absolute Error |
-| `mse_ci_lower` | MSE の 95% 信頼区間下限 |
-| `mse_ci_upper` | MSE の 95% 信頼区間上限 |
+| `mse_ci_lower` | Lower bound of the 95% confidence interval for MSE |
+| `mse_ci_upper` | Upper bound of the 95% confidence interval for MSE |
 
 > [!WARNING]
-> **サンプル数不足への対応:**
-> - `count < 30` のバケットは統計的有意性が低いため、CSV出力時に `is_reliable` カラムを `False` に設定する
-> - 可視化 (`error_vs_scale.png`) では、信頼性の低いバケットは以下のいずれかで表示する：
->   1. 薄い色（alpha=0.3）で表示
->   2. 点線スタイルで接続
->   3. エラーバー（信頼区間）を大きく表示
-> - コンソールログに警告を出力: `"Warning: Bucket 'Astronomical' has only N=5 samples (unreliable)"`
+> **Handling low sample counts:**
+> - For buckets with `count < 30`, set `is_reliable` to `False` in the CSV because statistical reliability is low.
+> - In `error_vs_scale.png`, display unreliable buckets using one of the following:
+>   1. Light color, e.g. `alpha=0.3`.
+>   2. Dotted line style.
+>   3. Large error bars showing the confidence interval.
+> - Emit a console warning such as `"Warning: Bucket 'Astronomical' has only N=5 samples (unreliable)"`.
 
-### 5.2. Calibration Plot (信頼性評価)
+### 5.2. Calibration Plot
 
-1. 予測データを「予測された不確実性 `sigma`」順にソートし、10個のビンに分割する。
-2. 各ビンについて、「平均 `sigma`」と「実際の RMSE (Root Mean Squared Error)」を計算する。
-3. 散布図を描画する。
-   * **理想:** `y=x` の直線に乗る（「自信がない」と予測した時は、実際に誤差が大きい）。
-   * **過信 (Overconfidence):** 実際の誤差 > 予測 `sigma`。
-   * **過小評価 (Underconfidence):** 実際の誤差 < 予測 `sigma`。
+1. Sort predictions by predicted uncertainty `sigma` and divide them into 10 bins.
+2. For each bin, compute the mean `sigma` and the observed RMSE.
+3. Draw a scatter plot.
+   * **Ideal:** Points lie on the `y=x` line, meaning predictions with lower confidence actually have larger errors.
+   * **Overconfidence:** Observed error > predicted `sigma`.
+   * **Underconfidence:** Observed error < predicted `sigma`.
 
-### 5.3. Error Distribution Analysis (誤差分布分析)
+### 5.3. Error Distribution Analysis
 
-予測誤差 `(y - y_pred)` の分布を分析する。
+Analyze the distribution of prediction error `(y - y_pred)`.
 
-1. **ヒストグラム:** 誤差分布の形状（正規性、偏り、多峰性）を可視化
-2. **QQプロット:** 正規分布からの逸脱度を確認
-3. **基本統計量:**
-   - Mean, Median, Std
-   - Skewness (歪度): 正なら右裾、負なら左裾が長い
-   - Kurtosis (尖度): 正なら正規より尖っている
+1. **Histogram:** Visualize shape, normality, skewness, and multimodality.
+2. **QQ plot:** Check deviations from a normal distribution.
+3. **Basic statistics:**
+   - Mean, median, and standard deviation.
+   - Skewness: positive values indicate a longer right tail; negative values indicate a longer left tail.
+   - Kurtosis: positive values indicate a sharper peak than a normal distribution.
 
-### 5.4. Worst-K Analysis (最悪ケース分析)
+### 5.4. Worst-K Analysis
 
-予測誤差が最も大きい K 個のサンプルを抽出・記録する。
+Extract and record the `K` samples with the largest prediction errors.
 
-#### 出力カラム
+#### Output Columns
 
-| カラム | 説明 | 例 |
+| Column | Description | Example |
 |--------|------|----|
-| `rank` | 誤差の大きさ順位 | `1`, `2`, ... |
-| `oeis_id` | 数列ID | `A000045` |
-| `position` | 位置 (0-indexed) | `10` |
-| `gt_value` | 正解値 (log scale) | `5.678` |
-| `pred_value` | 予測値 | `3.210` |
-| `error` | 絶対誤差 | `2.468` |
-| `tag` | 数列タグ | `exp` |
-| `context` | 周辺の値（前後数項） | `"..., 1.2, 3.4, [5.7], 7.8, ..."` |
+| `rank` | Rank by error magnitude | `1`, `2`, ... |
+| `oeis_id` | Sequence ID | `A000045` |
+| `position` | Position, 0-indexed | `10` |
+| `gt_value` | Ground-truth value on the log scale | `5.678` |
+| `pred_value` | Predicted value | `3.210` |
+| `error` | Absolute error | `2.468` |
+| `tag` | Sequence tag | `exp` |
+| `context` | Neighboring values before and after the target | `"..., 1.2, 3.4, [5.7], 7.8, ..."` |
 
-#### Context カラムの生成
+#### Generating the `context` Column
 
-`context` カラムは、対象位置の前後数項を含めることで「なぜそこで間違えたのか？」を定性的に分析可能にする。
+The `context` column includes a few terms before and after the target position so that failures can be inspected qualitatively.
 
 ```python
 def format_context(sequence: List[float], position: int, window: int = 2) -> str:
     """
     Generate context string showing surrounding values.
-    
+
     Args:
         sequence: The full sequence (log scale values)
         position: Target position (0-indexed)
         window: Number of items before/after to include
-    
+
     Returns:
         Formatted string like "..., 1.2, 3.4, [5.6], 7.8, ..."
     """
     start_idx = max(0, position - window)
     end_idx = min(len(sequence), position + window + 1)
-    
+
     parts = []
-    
+
     # Leading ellipsis if truncated
     if start_idx > 0:
         parts.append("...")
-    
+
     # Values before target
     for i in range(start_idx, position):
         parts.append(f"{sequence[i]:.2f}")
-    
-    # Target value (highlighted with brackets)
+
+    # Target value, highlighted with brackets
     parts.append(f"[{sequence[position]:.2f}]")
-    
+
     # Values after target
     for i in range(position + 1, end_idx):
         parts.append(f"{sequence[i]:.2f}")
-    
+
     # Trailing ellipsis if truncated
     if end_idx < len(sequence):
         parts.append("...")
-    
+
     return ", ".join(parts)
 
-# 使用例
+# Example
 # sequence = [0.0, 1.2, 3.4, 5.6, 7.8, 9.0]
 # format_context(sequence, position=3, window=2)
 # => "..., 1.2, 3.4, [5.6], 7.8, ..."
 ```
 
 > [!TIP]
-> Context を見ることで、以下のような定性的分析が可能：
-> - 「急激に増大する特異点だった」（例: `[1.2], 5.0, 15.0, ...`）
-> - 「周期的パターンの中で外れた」（例: `..., 2.0, 2.0, [2.0], 2.0, ...` なのに予測が外れた）
-> - 「符号反転ポイントだった」
+> The context makes qualitative analysis possible, for example:
+> - A singular point with rapid growth, e.g. `[1.2], 5.0, 15.0, ...`.
+> - A failure inside a periodic pattern, e.g. `..., 2.0, 2.0, [2.0], 2.0, ...`.
+> - A sign-flip point.
 
-**目的:** モデルの弱点パターン（特定のタグ、特定のスケールなど）を特定する。
+**Goal:** Identify model weakness patterns by tag, scale, or local sequence structure.
 
 ### 5.5. Sign-Magnitude Consistency Check
 
-Magnitude Head と Sign Head の予測の整合性を検証する。
+Validate consistency between the Magnitude Head and the Sign Head.
 
 ```python
-# 矛盾パターン
+# Inconsistency patterns
 inconsistent = (
-    ((pred_mag > 0) & (pred_sign == SIGN_NEGATIVE)) |  # 正の大きさなのに負符号
-    ((pred_mag < 0) & (pred_sign == SIGN_POSITIVE))    # 負の大きさなのに正符号
+    ((pred_mag > 0) & (pred_sign == SIGN_NEGATIVE)) |  # Positive magnitude but negative sign
+    ((pred_mag < 0) & (pred_sign == SIGN_POSITIVE))    # Negative magnitude but positive sign
 )
 consistency_rate = 1.0 - inconsistent.mean()
 ```
 
 ### 5.6. Bootstrap Confidence Intervals
 
-各指標について 95% 信頼区間を算出する。
+Compute 95% confidence intervals for each metric.
 
 ```python
 def bootstrap_ci(data, metric_fn, n_samples=1000, ci=0.95):
@@ -250,18 +251,18 @@ def bootstrap_ci(data, metric_fn, n_samples=1000, ci=0.95):
     return lower, upper
 ```
 
-### 5.7. Growth Type Analysis (成長タイプ別分析)
+### 5.7. Growth Type Analysis
 
-数列が「指数関数的（Log-Linear）」か「それ以外」かで精度に差があるかを分析する機能。
+Analyze whether accuracy differs between sequences that grow exponentially, meaning log-linear on the log scale, and all other sequences.
 
 #### `analyze_log_linearity(sequence: List[int]) -> bool`
 
-入力数列が「指数関数的（対数スケールで線形）」に成長しているかを判定するヘルパー関数。
+Helper function that determines whether an input sequence grows exponentially, i.e. linearly on the log scale.
 
-**ロジック:**
-1. 系列の絶対値を取り、0 を除外してから log10 をとる。
-2. インデックス [0, 1, ..., L-1] と対数値の間で線形回帰を行う。
-3. 決定係数 r² > 0.95 (閾値は `config.LOG_LINEARITY_R2_THRESHOLD` で定数化) なら `True` (Log-Linear) を返す。
+**Logic:**
+1. Take absolute values, remove zeros, and compute `log10`.
+2. Fit a linear regression between indices `[0, 1, ..., L-1]` and log values.
+3. Return `True` for log-linear growth if `r2 > 0.95`, with the threshold defined by `config.LOG_LINEARITY_R2_THRESHOLD`.
 
 ```python
 # config.py
@@ -270,53 +271,54 @@ LOG_LINEARITY_R2_THRESHOLD = 0.95
 
 #### `compute_growth_type_metrics()`
 
-データセットを走査し、`is_log_linear` でグループ化した MSE/MAE を算出。
+Scan the dataset and compute MSE/MAE grouped by `is_log_linear`.
 
-**出力カラム:** `growth_type`, `count`, `mse`, `mae`, `mse_ci_lower`, `mse_ci_upper`, `is_reliable`
+**Output columns:** `growth_type`, `count`, `mse`, `mae`, `mse_ci_lower`, `mse_ci_upper`, `is_reliable`
 
 #### `plot_growth_type_comparison()`
 
-Log-Linear vs Non-Log-Linear の棒グラフ比較。
+Bar chart comparing Log-Linear and Non-Log-Linear sequences.
 
 ---
 
-## 6. 出力ファイル構成
+## 6. Output Files
 
 ```text
 results/analysis/mag/
-├── overall_metrics.csv        # 全体の MSE, MAE, R², Acc, CI
-├── scale_wise_metrics.csv     # 桁数ごとの MSE 推移 (N列を含む)
-├── tag_wise_metrics.csv       # タグごとの MSE
-├── calibration_data.csv       # Calibration Plot 用データ
-├── error_distribution.csv     # 誤差分布の統計量
-├── worst_k_samples.csv        # 最悪 K サンプル詳細
-├── consistency_report.csv     # Sign-Magnitude 整合性レポート
-├── growth_type_metrics.csv    # 成長タイプ別 MSE/MAE
+├── overall_metrics.csv        # Overall MSE, MAE, R2, accuracy, and CI
+├── scale_wise_metrics.csv     # MSE trend by scale, including N/count columns
+├── tag_wise_metrics.csv       # MSE by tag
+├── calibration_data.csv       # Data for calibration plot
+├── error_distribution.csv     # Error distribution statistics
+├── worst_k_samples.csv        # Details for the worst K samples
+├── consistency_report.csv     # Sign-magnitude consistency report
+├── growth_type_metrics.csv    # MSE/MAE by growth type
+├── analysis_config.json       # Run configuration
 └── figures/
-    ├── error_vs_scale.png     # 横軸: log(y), 縦軸: Error
-    ├── prediction_scatter.png # 横軸: GT, 縦軸: Pred (対角線付き)
-    ├── calibration_plot.png   # 不確実性の信頼性
-    ├── error_histogram.png    # 誤差分布ヒストグラム
-    ├── error_qq_plot.png      # QQプロット
-    └── growth_type_comparison.png  # Log-Linear vs Non-Log-Linear 比較
+    ├── error_vs_scale.png     # X-axis: log(y), Y-axis: error
+    ├── prediction_scatter.png # X-axis: ground truth, Y-axis: prediction, with diagonal
+    ├── calibration_plot.png   # Reliability of uncertainty
+    ├── error_histogram.png    # Error distribution histogram
+    ├── error_qq_plot.png      # QQ plot
+    └── growth_type_comparison.png  # Log-Linear vs Non-Log-Linear comparison
 ```
 
 ---
 
-## 7. 実装のポイント (Vanilla 対応)
+## 7. Implementation Notes for Vanilla Support
 
-Vanilla Transformer の場合、Magnitude Head は存在しますが、Embedding 層での入力制限により、未知語（大きな数）に対して正しく Magnitude をエンコードできていない可能性があります（または `[UNK]` トークンとして処理される）。
+For the Vanilla Transformer, the Magnitude Head exists, but the embedding layer input constraints may prevent correct magnitude encoding for unknown or large numbers. Such numbers may also be processed as `[UNK]`.
 
-`VanillaWrapper` の `predict` メソッドにおいて、以下の処理が必要です：
+The `VanillaWrapper.predict` method should handle the following:
 
-* **入力側:** `[UNK]` トークンが含まれる場合、そのサンプルの予測は信頼できないため、分析から除外するか、あるいは「失敗例」として記録するフラグを立てる。
-* **出力側:** Vanilla にも `mag_head` は実装されている（はずな）ので、そのまま予測値を取得する。
+* **Input side:** If a sample contains `[UNK]` tokens, its prediction is unreliable. Either exclude it from analysis or record a flag marking it as a failure case.
+* **Output side:** Vanilla is expected to have a `mag_head`, so use its prediction directly.
 
 ---
 
-## 8. 使用例
+## 8. Usage Examples
 
-### 8.1. IntSeqBERT の評価
+### 8.1. Evaluate IntSeqBERT
 
 ```bash
 python -m intseq_bert.analysis.analyze_magnitude \
@@ -328,7 +330,7 @@ python -m intseq_bert.analysis.analyze_magnitude \
     --worst_k 100
 ```
 
-### 8.2. Vanilla Transformer との比較
+### 8.2. Compare Against Vanilla Transformer
 
 ```bash
 python -m intseq_bert.analysis.analyze_magnitude \
@@ -339,22 +341,22 @@ python -m intseq_bert.analysis.analyze_magnitude \
     --model_type vanilla
 ```
 
-### 8.3. 結果の比較
+### 8.3. Compare Results
 
-両方の `overall_metrics.csv` を読み込み、指標の差分と信頼区間の重複を確認することで、統計的に有意な差があるかを判断できる。
+Load both `overall_metrics.csv` files and compare metric differences and confidence interval overlap to determine whether the observed difference is statistically significant.
 
 ---
 
-## 9. 実装上の注意点
+## 9. Implementation Caveats
 
-### 9.1. Magnitude の定義
+### 9.1. Definition of Magnitude
 
-モデル出力 `mag_mu` は `1 + log10(|x|)` として学習されている。評価時は **1を引いて純粋な log10(|x|) に戻してから** 比較・可視化を行う。
+The model output `mag_mu` is trained on the same scale as `mag_labels[:, :, 0]`: `0` for zero values and `1 + log10(|x|)` for nonzero values. Evaluation compares `mag_mu` directly against this target scale. When reporting pure order-of-magnitude buckets, use `u = mag_target - 1` for nonzero values and `u = 0` for zero values.
 
-### 9.2. 0 の扱い
+### 9.2. Handling Zero
 
-log10(0) は未定義（-inf）だが、便宜上 0.0 または特別な値（例: -1.0）として扱い、可視化時に除外するか明示する。
+`log10(0)` is undefined (`-inf`). For convenience, treat it as `0.0` or a special value such as `-1.0`, and either exclude it from visualizations or mark it explicitly.
 
-### 9.3. プロットスタイル
+### 9.3. Plot Style
 
-スタイルには `seaborn` を使用し、論文掲載に耐えうる視認性を確保する。
+Use `seaborn` styling and ensure figures are legible enough for inclusion in the paper.

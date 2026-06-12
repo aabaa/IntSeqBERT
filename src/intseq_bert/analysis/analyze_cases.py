@@ -79,6 +79,8 @@ def load_single_sequence(
         {
             "mag_inputs": (1, L, MAG_EXTENDED_DIM),
             "mod_inputs": (1, L, MOD_FEATURE_DIM),
+            "mod_targets": (1, L, NUM_MODULI),
+            "token_ids": (1, L),
             "attention_mask": (1, L),
             "oeis_id": str
         }
@@ -96,6 +98,7 @@ def load_single_sequence(
         result = {
             "mag_inputs": mag_tensor.unsqueeze(0),
             "mod_inputs": data["mod_features"].unsqueeze(0),
+            "mod_targets": data["mod_integers"].unsqueeze(0),
             "attention_mask": torch.ones(1, data["mag_features"].size(0)),
             "oeis_id": oeis_id
         }
@@ -143,13 +146,12 @@ def _find_sequence_in_raw(oeis_id: str, raw_data_path: Path) -> Optional[List[in
 
 def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
     """Convert JSONL record to feature tensors."""
-    from intseq_bert.features import extract_features
+    from intseq_bert.features import process_sequence
     
-    sequence = record["values"]
-    features = extract_features(sequence)
-    
+    sequence = record["sequence"]
+    features = process_sequence(sequence)
 
-    mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
+    mag_tensor = features["mag_features"].float()
     # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
     if mag_tensor.size(-1) == 4:
         padding = torch.zeros(mag_tensor.size(0), 1)
@@ -157,8 +159,9 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
         
     result = {
         "mag_inputs": mag_tensor.unsqueeze(0),
-        "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
-        "attention_mask": torch.ones(1, len(sequence)),
+        "mod_inputs": features["mod_features"].float().unsqueeze(0),
+        "mod_targets": features["mod_integers"].long().unsqueeze(0),
+        "attention_mask": torch.ones(1, mag_tensor.size(0)),
         "oeis_id": record["oeis_id"]
     }
     _add_token_ids(result)
@@ -167,12 +170,11 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
 
 def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str, torch.Tensor]:
     """Convert raw sequence to feature tensors."""
-    from intseq_bert.features import extract_features
+    from intseq_bert.features import process_sequence
     
-    features = extract_features(sequence)
-    
+    features = process_sequence(sequence)
 
-    mag_tensor = torch.tensor(features["mag_features"], dtype=torch.float32)
+    mag_tensor = features["mag_features"].float()
     # Pad to 5 dims: [log, s+, s-, s0] -> [log, s+, s-, s0, is_masked]
     if mag_tensor.size(-1) == 4:
         padding = torch.zeros(mag_tensor.size(0), 1)
@@ -180,8 +182,9 @@ def _convert_sequence_to_features(oeis_id: str, sequence: List[int]) -> Dict[str
         
     result = {
         "mag_inputs": mag_tensor.unsqueeze(0),
-        "mod_inputs": torch.tensor(features["mod_features"], dtype=torch.float32).unsqueeze(0),
-        "attention_mask": torch.ones(1, len(sequence)),
+        "mod_inputs": features["mod_features"].float().unsqueeze(0),
+        "mod_targets": features["mod_integers"].long().unsqueeze(0),
+        "attention_mask": torch.ones(1, mag_tensor.size(0)),
         "oeis_id": oeis_id
     }
     _add_token_ids(result)
@@ -457,7 +460,7 @@ def generate_case_figure(
     # Compute modulo confidences
     mod_confidences = _compute_mod_confidences(
         preds["mod_logits"][0],
-        batch["mod_inputs"][0],
+        batch["mod_targets"][0],
         display_mods
     )
     

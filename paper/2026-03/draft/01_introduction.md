@@ -1,45 +1,32 @@
-# 1. はじめに
+# 1. Introduction
 
-<!-- 目標: ~1.5ページ (~700語) -->
+<!-- Target: ~1.5 pages (~700 words) -->
 
-整数数列のオンライン百科事典 OEIS（On-Line Encyclopedia of Integer Sequences）[cite:sloane1996] は、2026年1月時点で組合せ論・数論・代数学など数学の幅広い分野にまたがる 391,000 件以上の数列エントリを収録した事実上の標準リファレンスである。
-各エントリは整数の有限列とその数学的定義を対応付けており、OEIS は機械可読な数学的知識の体系として他に類を見ない存在である。
-本研究が定式化するタスクは **マスク付き系列モデリング**（masked sequence modelling; 穴埋め）である。
-数列の複数の位置をランダムにマスクし、モデルは周囲の整数の並びから各マスク位置の値を予測するよう学習される。
-このタスクは「モデルが整数数列を支配する算術的・組合せ論的法則をどの程度内在化できているか」を問う直接的な試金石であり、次項予測（next-term prediction）はその特殊ケースとして Solver コンポーネントを介した応用評価として位置づける。
-整数をトークン ID として直接埋め込む先行研究 FACT [cite:zurich-fact] は，穴埋めを含む 6 つのタスクを定義・評価し，素の Transformer でどこまで達成できるかの基準を示したが，学習時に未見の大きな整数値への対応と乗法的構造の習得に根本的な限界を抱えている。
+The On-Line Encyclopedia of Integer Sequences (OEIS) [cite:sloane1996] is the de facto reference for integer sequences in mathematics. As of January 2026, it contains more than 391,000 sequence entries spanning combinatorics, number theory, algebra, and many other areas. Each entry links a finite integer prefix with mathematical descriptions, comments, references, and examples, making OEIS an unusually rich body of machine-readable mathematical knowledge.
 
-このタスクの主要な困難は、整数数列の極端な不均質性にある。
-値の範囲は一桁の定数から天文学的な階乗・指数関数的数列まで及び、単一の学習コーパス内で数十桁以上の桁数差が存在する。
-同時に、多くの数列は素数値数列・組合せパリティ・周期的剰余など、値の大小とは独立した**剰余制約**に従う。
-各整数を離散語彙トークンに割り当てる標準的なトークン化アプローチは、このような状況に根本的に不向きである。学習時に未見の大きな整数値を扱えず、算術的構造を不透明なトークン ID に押し込め、大きな数に対してスケールが破綻する。
+The task studied in this paper is **masked sequence modelling** for integer sequences. Given a finite prefix, we randomly mask several positions and train a model to recover the masked values from the surrounding integer context. This task is a direct test of how well a model internalizes the arithmetic and combinatorial laws governing integer sequences. Next-term prediction is treated as an application-oriented special case, evaluated through a solver component. Prior work such as FACT [cite:zurich-fact] defined and evaluated six OEIS tasks, including unmasking, and established what a plain Transformer can achieve when integers are represented as token IDs. However, token-based models have intrinsic difficulty with large unseen integers and multiplicative structure.
 
-本研究では **IntSeqBERT** を提案する。
-これは OEIS コーパス全体で穴埋め問題により大規模学習（事前学習）された Transformer エンコーダであり、**双ストリーム**入力表現によって上記の課題を克服する。
-整数をトークン化するのではなく、IntSeqBERT は各要素を 2 つの相補的な軸で符号化する：
+The main difficulty is the extreme heterogeneity of integer sequences. Values range from one-digit constants to astronomical factorial and exponential sequences, often differing by dozens or hundreds of decimal digits within one corpus. At the same time, many sequences obey residue constraints that are largely independent of magnitude, such as prime-valued sequences, combinatorial parity, or periodic modular structure. A standard tokenization approach assigns each integer to a discrete vocabulary item, which is poorly suited to this setting: unseen large integers become out-of-vocabulary, arithmetic structure is hidden inside opaque token IDs, and scale generalization breaks down.
 
-- **Magnitude ストリーム**: 対数スケールで絶対値を表現する連続埋め込み。成長挙動とスケールを捉える。
-- **Modulo ストリーム**: 法 2 から 101 まで 100 個の剰余に対する Sin/Cos 埋め込み。周期性と数論的構造を捉える。
+We propose **IntSeqBERT**, a Transformer encoder pretrained on masked OEIS sequence modelling. Instead of tokenizing each integer, IntSeqBERT encodes every element along two complementary axes:
 
-2 つのストリームは FiLM（Feature-wise Linear Modulation：剰余情報が大きさの表現を要素ごとにスケール・シフトする機構）[cite:perez2018film] で融合される。
-学習では、Magnitude 回帰・符号分類・100 個の法に対する Modulo 予測の 3 つの予測器を多目的に同時学習する（マルチタスク事前学習）。
-マスク位置の予測値（大きさ・符号・剰余分布）から具体的な整数値を復元するために、中国剰余定理（CRT）に基づく **IntegerSolver** を用いる（第 3.9 節）。
+- **Magnitude stream:** a continuous embedding of absolute value on the logarithmic scale, capturing growth and numeric scale.
+- **Modulo stream:** sin/cos embeddings of residues modulo the 100 moduli from 2 to 101, capturing periodic and number-theoretic structure.
 
-本研究では OEIS から抽出した274,705件のデータセットに対して、3 モデルサイズ（Small: ~9M・Middle: ~44M・Large: ~110M パラメータ）において IntSeqBERT を 2 つのベースラインと比較した。
-全実験は **GeForce RTX 3070 Ti（VRAM 8 GB）1 枚**で実施しており、コンシューマー GPU のメモリ制約下での結果である点は解釈の際に留意されたい。
-主要な発見は以下の通りである：
+The two streams are fused by FiLM (Feature-wise Linear Modulation) [cite:perez2018film], allowing residue information to scale and shift the magnitude representation elementwise. Training jointly optimizes magnitude regression, sign classification, and modulo prediction for 100 moduli. To recover concrete integers from predicted magnitude, sign, and residue distributions, we use an **IntegerSolver** based on dense search, sieving, and the Chinese Remainder Theorem (CRT).
 
-- Large スケールの IntSeqBERT はテストデータにおいて **Magnitude 精度 95.85%**、**平均 Modulo 精度（MMA）50.38%** を達成し、標準的なトークン化 Transformer（Vanilla Transformer）ベースラインをそれぞれ **+8.9pt**・**+4.5pt** 上回る。
-- 双ストリーム表現により、Solver 評価における次項の完全一致精度が **7.4 倍**に向上する（Top-1: 19.09% vs. 2.59%）。
-- Modulo スペクトル解析により、NIG（正規化情報利得）がオイラーのトーシェント比 $\varphi(m)/m$ と強い負の相関（$r = -0.851$、$p < 10^{-28}$）を持つことを発見した。合成数ほど CRT 集約効果により OEIS 数列の算術構造を効率的に捉えるという数論的規則性の実証的根拠が与えられる。
-- Modulo 予測精度と Solver 精度はモデル規模の拡大に対してより大きく改善し、算術的推論がモデルの大規模化から不均衡に大きな恩恵を受けることが示唆される。
+We evaluate IntSeqBERT on a dataset of 274,705 OEIS sequences and compare three model sizes (Small, Middle, and Large) against two baselines. All experiments are run on a single GeForce RTX 3070 Ti with 8 GB VRAM, so the results should be interpreted under consumer-GPU memory constraints. The main findings are:
 
-**貢献のまとめ。** 本論文の貢献は以下の通りである：
+- Large IntSeqBERT achieves **95.85%** magnitude accuracy and **50.38%** mean modulo accuracy (MMA), outperforming the Vanilla Transformer baseline by **+8.9pt** and **+4.5pt**, respectively.
+- The dual-stream representation improves exact next-term reconstruction through the solver by **7.4x** in Top-1 accuracy (19.09% vs. 2.59%).
+- Modulo spectrum analysis reveals a strong negative correlation between NIG (Normalized Information Gain) and Euler's totient ratio $\varphi(m)/m$ ($r=-0.851$, $p<10^{-28}$). Composite moduli efficiently capture arithmetic structure through CRT aggregation.
+- Modulo prediction and solver accuracy improve more strongly with model scale than magnitude prediction, suggesting that arithmetic reasoning benefits disproportionately from increased capacity.
 
-1. *IntSeqBERT*: Magnitude と剰余算術の特徴埋め込みを FiLM で融合した整数数列向け双ストリーム Transformer アーキテクチャ。
-2. *OEIS へのマルチタスク事前学習*: Magnitude 回帰・符号分類・100 次元 Modulo 予測を組み合わせたマルチタスク事前学習。
-3. *包括的評価*: スケール別 Magnitude 解析・Modulo スペクトル解析・注意機構パターン解析（アテンション可視化）・Solver 統合次項予測の 4 つの評価軸。
-4. *算術構造の習得に関する実証的知見*: NIG と $\varphi(m)/m$ の強い負の相関（$r = -0.851$）という数論的規則性の発見。合成数ほど CRT 集約効果により OEIS 数列の周期的算術構造を効率的に集約することが定量的に示された。
+**Contributions.** This paper makes four contributions:
 
-**論文の構成。** 第 2 節では関連研究を概説する。第 3 節では IntSeqBERT のアーキテクチャを述べる。第 4 節ではデータセットと実験設定を示す。第 5 節では実験結果を報告する。第 6 節ではアブレーションおよびスケーリング解析を行う。第 7 節でまとめる。
+1. *IntSeqBERT*: a dual-stream Transformer architecture for integer sequences, combining magnitude and modular arithmetic features through FiLM.
+2. *Multitask pretraining on OEIS*: a masked modelling objective combining magnitude regression, sign classification, and residue classification for 100 moduli.
+3. *Comprehensive evaluation*: scale-wise magnitude analysis, modulo spectrum analysis, attention-pattern analysis, and solver-integrated next-term prediction.
+4. *Empirical insight into arithmetic structure*: the discovery of a strong negative correlation between NIG and $\varphi(m)/m$, showing that composite moduli aggregate periodic arithmetic structure in OEIS sequences.
 
+**Paper organization.** Section 2 reviews related work. Section 3 presents the IntSeqBERT architecture. Section 4 describes the dataset and experimental setup. Section 5 reports experimental results. Section 6 discusses ablations, scaling behaviour, attention patterns, and limitations. Section 7 concludes.

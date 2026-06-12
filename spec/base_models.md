@@ -1,54 +1,56 @@
-# `src/intseq_bert/base_models.py` 実装仕様書
+# `src/intseq_bert/base_models.py` Implementation Specification
 
-## 1. 概要
+## 1. Overview
 
-**対象ファイル:** `src/intseq_bert/base_models.py`
+**Target file:** `src/intseq_bert/base_models.py`
 
-**目的:**
-IntSeqBERT、Vanilla Transformer、および Ablation Model の共通インフラを提供する。
-公平な比較実験のため、以下のコンポーネントを共有する。
+This module provides shared infrastructure for IntSeqBERT, the Vanilla Transformer, and the Ablation model. The shared components keep comparison experiments fair by reusing the same backbone utilities, initialization, prediction heads, and loss logic where appropriate.
 
-| コンポーネント | 役割 |
-|---------------|------|
-| `ModLogitsMixin` | Modulo logits 分割機能 |
-| `generate_sinusoidal_encoding` | Positional Encoding 生成 |
-| `PositionalEncoding` | PE モジュールクラス |
-| `BasePreTrainedModel` | チェックポイント読み込み基底クラス |
-| `BaseEmbeddings` | 埋め込み層基底クラス |
-| `BaseTransformerModel` | Transformer Encoder 基底クラス |
-| `BaseForPreTraining` | 事前学習モデル基底クラス |
+| Component | Role |
+|-----------|------|
+| `ModLogitsMixin` | Splits concatenated Modulo logits by modulus |
+| `generate_sinusoidal_encoding` | Builds sinusoidal positional encodings |
+| `PositionalEncoding` | Positional-encoding module |
+| `BasePreTrainedModel` | Shared checkpoint loading and weight initialization |
+| `BaseEmbeddings` | Base class for embedding layers |
+| `BaseTransformerModel` | Base Transformer Encoder backbone |
+| `BaseForPreTraining` | Base pre-training wrapper with heads and loss utilities |
 
 ---
 
-## 2. 依存関係
+## 2. Dependencies
 
-### ライブラリ
-- `torch`, `torch.nn`, `math`, `typing`
+Libraries:
 
-### 設定 (`config.py`)
+- `math`
+- `typing`
+- `torch`
+- `torch.nn`
 
-| 定数 | 用途 |
-|------|------|
-| `D_MODEL` | 隠れ層次元 |
-| `NHEAD` | Attention ヘッド数 |
-| `NUM_LAYERS` | Encoder 層数 |
-| `DROPOUT` | ドロップアウト率 |
-| `FEEDFORWARD_MULTIPLIER` | FFN 拡大率 (4) |
-| `POSITIONAL_ENCODING_BASE` | PE 基底 (10000) |
-| `NUM_SIGN_CLASSES` | 符号クラス数 (3) |
-| `MOD_RANGE` | 法のリスト (2〜101) |
-| `LOSS_WEIGHT_MAG/SIGN/MOD` | 固定損失重み |
-| `MAG_LOSS_TYPE` | Magnitude 損失種類 |
-| `USE_HETEROSCEDASTIC_LOSS` | 不確実性推定フラグ |
-| `LOG_VAR_CLIP_MIN/MAX` | log variance クリップ範囲 |
+Config constants:
+
+| Constant | Purpose |
+|----------|---------|
+| `D_MODEL` | Hidden dimension |
+| `NHEAD` | Number of attention heads |
+| `NUM_LAYERS` | Number of encoder layers |
+| `DROPOUT` | Dropout rate |
+| `FEEDFORWARD_MULTIPLIER` | FFN expansion factor, usually 4 |
+| `POSITIONAL_ENCODING_BASE` | Positional-encoding base, usually 10000 |
+| `NUM_SIGN_CLASSES` | Number of sign classes, 3 |
+| `MOD_RANGE` | Moduli from 2 to 101 |
+| `LOSS_WEIGHT_MAG/SIGN/MOD` | Fixed multi-task loss weights |
+| `MAG_LOSS_TYPE` | Magnitude loss type |
+| `USE_HETEROSCEDASTIC_LOSS` | Uncertainty-estimation flag |
+| `LOG_VAR_CLIP_MIN/MAX` | Log-variance clipping range |
 
 ---
 
-## 3. Mixin クラス
+## 3. Mixin
 
-### 3.1. `ModLogitsMixin`
+### 3.1 `ModLogitsMixin`
 
-Modulo logits を法ごとに分割するヘルパー機能を提供。
+Provides a helper for splitting a single concatenated Modulo-logit tensor into per-modulus tensors.
 
 ```python
 class ModLogitsMixin:
@@ -56,72 +58,74 @@ class ModLogitsMixin:
         """
         Args:
             logits: (*, sum(MOD_RANGE)) = (*, 5150)
-        
+
         Returns:
-            List of (*, 2), (*, 3), ..., (*, 101)
+            List of tensors with shapes (*, 2), (*, 3), ..., (*, 101)
         """
         return torch.split(logits, config.MOD_RANGE, dim=-1)
 ```
 
 ---
 
-## 4. 共有コンポーネント
+## 4. Shared Components
 
-### 4.1. `generate_sinusoidal_encoding(max_len, d_model)`
+### 4.1 `generate_sinusoidal_encoding(max_len, d_model)`
 
-Sinusoidal Positional Encoding テーブルを生成。
+Generates a sinusoidal positional-encoding table.
 
-**入力:**
-- `max_len`: 最大系列長
-- `d_model`: モデル次元
+Inputs:
 
-**出力:**
-- `(1, max_len, d_model)` Tensor
+- `max_len`: maximum sequence length.
+- `d_model`: model dimension.
 
-**実装:**
+Output:
+
+- Tensor of shape `(1, max_len, d_model)`.
+
+Core formula:
+
 ```python
 pe[:, 0::2] = sin(position * div_term)
 pe[:, 1::2] = cos(position * div_term)
 ```
 
-### 4.2. `PositionalEncoding`
+### 4.2 `PositionalEncoding`
 
-Positional Encoding を管理するモジュール。
+Module wrapper around fixed sinusoidal positional encodings.
 
-| 引数 | 型 | デフォルト |
-|------|------|------|
+| Argument | Type | Default |
+|----------|------|---------|
 | `d_model` | int | - |
 | `dropout` | float | 0.1 |
 | `max_len` | int | 5000 |
 
-**Forward:**
-- 入力: `(B, L, D)`
-- 出力: `(B, L, D)` (PE 加算 + Dropout)
+Forward:
+
+- Input: `(B, L, D)`
+- Output: `(B, L, D)` after positional encoding and dropout.
 
 ---
 
-## 5. 基底クラス
+## 5. Base Classes
 
-### 5.1. `BasePreTrainedModel`
+### 5.1 `BasePreTrainedModel`
 
-チェックポイント読み込みと重み初期化を提供。
+Provides checkpoint loading and weight initialization.
 
-#### メソッド
+| Method | Description |
+|--------|-------------|
+| `_init_weights(module)` | Initializes Linear, Embedding, and LayerNorm modules |
+| `from_checkpoint(path, device)` | Restores a model from a checkpoint |
 
-| メソッド | 説明 |
-|----------|------|
-| `_init_weights(module)` | Linear/Embedding/LayerNorm の初期化 |
-| `from_checkpoint(path, device)` | チェックポイントからモデル復元 |
+Initialization rules:
 
-#### `_init_weights` 初期化ルール
-
-| モジュール | 初期化 |
-|-----------|--------|
+| Module | Initialization |
+|--------|----------------|
 | `nn.Linear` | weight: N(0, 0.02), bias: 0 |
-| `nn.Embedding` | weight: N(0, 0.02), padding: 0 |
+| `nn.Embedding` | weight: N(0, 0.02), padding row: 0 |
 | `nn.LayerNorm` | weight: 1, bias: 0 |
 
-#### `from_checkpoint` 処理
+Checkpoint loading:
 
 ```python
 @classmethod
@@ -133,32 +137,34 @@ def from_checkpoint(cls, path, device="cpu", **kwargs):
     return model.to(device).eval()
 ```
 
-### 5.2. `BaseEmbeddings`
+### 5.2 `BaseEmbeddings`
 
-埋め込み層の共通構造を定義。
+Defines shared embedding-layer components.
 
-| 引数 | 型 |
-|------|------|
+| Argument | Type |
+|----------|------|
 | `d_model` | int |
 | `dropout` | float |
 | `max_len` | int |
 
-**共通コンポーネント:**
+Shared components:
+
 - `layer_norm`: `nn.LayerNorm(d_model)`
 - `dropout`: `nn.Dropout(dropout)`
 
-### 5.3. `BaseTransformerModel`
+### 5.3 `BaseTransformerModel`
 
-Transformer Encoder バックボーンの共通構造。
+Defines the common Transformer Encoder backbone.
 
-| 引数 | 型 | デフォルト |
-|------|------|------|
+| Argument | Type | Default |
+|----------|------|---------|
 | `d_model` | int | `config.D_MODEL` |
 | `nhead` | int | `config.NHEAD` |
 | `num_layers` | int | `config.NUM_LAYERS` |
 | `dropout` | float | `config.DROPOUT` |
 
-**構成:**
+Architecture:
+
 ```python
 encoder_layer = nn.TransformerEncoderLayer(
     d_model=d_model,
@@ -166,48 +172,47 @@ encoder_layer = nn.TransformerEncoderLayer(
     dim_feedforward=d_model * FEEDFORWARD_MULTIPLIER,
     dropout=dropout,
     batch_first=True,
-    norm_first=True  # Pre-LN
+    norm_first=True,  # Pre-LN
 )
 encoder = nn.TransformerEncoder(encoder_layer, num_layers)
 ```
 
-### 5.4. `BaseForPreTraining`
+### 5.4 `BaseForPreTraining`
 
-事前学習モデルの共通ヘッドと損失計算を提供。
+Provides shared prediction heads and loss utilities for pre-training models.
 
-#### 予測ヘッド
+Prediction heads:
 
-| ヘッド | 構造 | 出力次元 |
-|--------|------|----------|
-| `mag_head` | Linear→ReLU→Linear | 2 (mu, log_var) |
+| Head | Structure | Output dimension |
+|------|-----------|------------------|
+| `mag_head` | Linear -> ReLU -> Linear | 2 (`mu`, `log_var`) |
 | `sign_head` | Linear | 3 |
-| `mod_head` | Linear | sum(MOD_RANGE) ≈ 5150 |
+| `mod_head` | Linear | `sum(MOD_RANGE)` ~= 5150 |
 
-#### 固定損失重み
+Fixed loss weights:
 
 ```python
 loss_weights = register_buffer([LOSS_WEIGHT_MAG, LOSS_WEIGHT_SIGN, LOSS_WEIGHT_MOD])
-# デフォルト: [1.0, 1.0, 2.0]
+# default: [1.0, 1.0, 2.0]
 ```
 
-#### 損失計算メソッド
+Loss helper methods:
 
-| メソッド | 説明 |
-|----------|------|
-| `_compute_mag_loss(pred_mu, pred_log_var, target)` | Magnitude 損失 (FP32強制) |
-| `_compute_mod_loss(pred_logits, target_mods)` | 正規化 Modulo 損失 |
+| Method | Description |
+|--------|-------------|
+| `_compute_mag_loss(pred_mu, pred_log_var, target)` | Magnitude loss, forced to FP32 |
+| `_compute_mod_loss(pred_logits, target_mods)` | Normalized Modulo loss |
 
-**`_compute_mag_loss` 処理:**
+Magnitude loss:
+
 ```python
-# config.MAG_LOSS_TYPE に応じて分岐
-if MAG_LOSS_TYPE == 'huber':
+if MAG_LOSS_TYPE == "huber":
     recon_loss = smooth_l1_loss(pred_mu, target)
-elif MAG_LOSS_TYPE == 'mse':
+elif MAG_LOSS_TYPE == "mse":
     recon_loss = mse_loss(pred_mu, target)
-elif MAG_LOSS_TYPE == 'l1':
+elif MAG_LOSS_TYPE == "l1":
     recon_loss = l1_loss(pred_mu, target)
 
-# 不確実性推定
 if USE_HETEROSCEDASTIC_LOSS:
     log_var = clamp(log_var, LOG_VAR_CLIP_MIN, LOG_VAR_CLIP_MAX)
     loss = 0.5 * log_var + recon_loss * exp(-log_var)
@@ -215,9 +220,9 @@ else:
     loss = recon_loss.mean()
 ```
 
-**`_compute_mod_loss` 処理:**
+Modulo loss:
+
 ```python
-# 各法の損失を log(m) で正規化
 for i, logits in enumerate(split_mod_logits(pred_logits)):
     loss_m = cross_entropy(logits, target_mods[:, i])
     total_loss += loss_m / log(MOD_RANGE[i])
@@ -226,40 +231,40 @@ return total_loss / num_moduli
 
 ---
 
-## 6. クラス継承図
+## 6. Inheritance Sketch
 
 ```mermaid
 classDiagram
     class nn.Module {
         <<PyTorch>>
     }
-    
+
     class ModLogitsMixin {
         +_split_mod_logits(logits)
     }
-    
+
     class BasePreTrainedModel {
         +_init_weights(module)
         +from_checkpoint(path, device)
     }
-    
+
     class BaseEmbeddings {
         +layer_norm
         +dropout
     }
-    
+
     class BaseTransformerModel {
         +encoder
         +d_model, nhead, num_layers
     }
-    
+
     class BaseForPreTraining {
         +mag_head, sign_head, mod_head
         +loss_weights
         +_compute_mag_loss()
         +_compute_mod_loss()
     }
-    
+
     nn.Module <|-- BasePreTrainedModel
     nn.Module <|-- BaseEmbeddings
     BasePreTrainedModel <|-- BaseTransformerModel
@@ -269,19 +274,17 @@ classDiagram
 
 ---
 
-## 7. 使用例
+## 7. Usage Example
 
 ```python
 from intseq_bert.base_models import (
+    BaseForPreTraining,
     ModLogitsMixin,
     generate_sinusoidal_encoding,
-    BaseForPreTraining
 )
 
-# Positional Encoding 生成
 pe = generate_sinusoidal_encoding(max_len=512, d_model=256)
 
-# 子クラスでの継承
 class MyModel(BaseForPreTraining):
     def __init__(self, d_model=256):
         super().__init__(d_model)

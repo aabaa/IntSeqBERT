@@ -1,246 +1,194 @@
-# `src/intseq_bert/features.py` 実装仕様書
+# `src/intseq_bert/features.py` Implementation Specification
 
-## 1. 概要
+## 1. Overview
 
-本モジュールは、生の整数列をモデル学習用のテンソルに変換する**特徴量抽出ロジック**を担当する。
-データパイプラインの最上流に位置し、`preprocess.py` から呼び出される。
+This module converts raw integer sequences into tensors used for model training. It sits at the upstream end of the data pipeline and is called by `preprocess.py`.
 
-### 出力ストリーム
+### Output Streams
 
-| ストリーム | 内容 | 次元 |
-|-----------|------|------|
-| **Magnitude** | Log10 スケール + 符号 One-hot | `(L, 4)` |
-| **Modulo Sin/Cos** | 単位円上の埋め込み | `(L, 200)` |
-| **Modulo Integers** | 整数剰余（分類ラベル用） | `(L, 100)` |
+| Stream | Content | Shape |
+|--------|---------|-------|
+| **Magnitude** | Log10-scale magnitude + sign one-hot | `(L, 4)` |
+| **Modulo Sin/Cos** | Unit-circle residue embeddings | `(L, 200)` |
+| **Modulo Integers** | Integer residues for classification labels | `(L, 100)` |
 
 ---
 
-## 2. 依存関係
+## 2. Dependencies
 
 ```python
 import math
+from typing import Dict, List
+
 import torch
-from typing import List, Dict
+
 from . import config
 ```
 
-### 使用する config 定数
+### Config Constants
 
-| 定数 | 値 | 用途 |
-|------|------|------|
-| `MAX_SEQUENCE_LENGTH` | 128 | 切り詰め上限 |
-| `MAG_RAW_DIM` | 4 | Magnitude 出力次元 |
-| `MOD_FEATURE_DIM` | 200 | Modulo Sin/Cos 出力次元 |
-| `NUM_MODULI` | 100 | 法の数 |
-| `MOD_RANGE` | `list(range(2, 102))` | 法のリスト [2, 3, ..., 101] |
-| `KEY_MAG_FEATURES` | `"mag_features"` | 出力キー |
-| `KEY_MOD_FEATURES` | `"mod_features"` | 出力キー |
-| `KEY_MOD_INTEGERS` | `"mod_integers"` | 出力キー |
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `MAX_SEQUENCE_LENGTH` | 128 | Truncation limit |
+| `MAG_RAW_DIM` | 4 | Magnitude output dimension |
+| `MOD_FEATURE_DIM` | 200 | Modulo Sin/Cos output dimension |
+| `NUM_MODULI` | 100 | Number of moduli |
+| `MOD_RANGE` | `list(range(2, 102))` | Moduli `[2, 3, ..., 101]` |
+| `KEY_MAG_FEATURES` | `"mag_features"` | Output key |
+| `KEY_MOD_FEATURES` | `"mod_features"` | Output key |
+| `KEY_MOD_INTEGERS` | `"mod_integers"` | Output key |
 
 ---
 
-## 3. 関数設計
+## 3. Function Design
 
-### 3.1. `compute_magnitude_features`
+### 3.1 `compute_magnitude_features`
 
-整数列を Magnitude 特徴量に変換する。
-
-#### シグネチャ
+Converts an integer sequence into Magnitude features.
 
 ```python
 def compute_magnitude_features(sequence: List[int]) -> torch.Tensor
 ```
 
-#### 入出力
+| Item | Type | Description |
+|------|------|-------------|
+| Input | `List[int]` | Integer sequence |
+| Output | `Tensor(L, 4)` | Magnitude features |
 
-| 項目 | 型 | 説明 |
-|------|------|------|
-| **入力** | `List[int]` | 整数列 |
-| **出力** | `Tensor(L, 4)` | Magnitude 特徴量 |
+For each integer `x`, the function creates:
 
-#### 特徴量フォーマット
-
-各整数 `x` に対して 4 次元ベクトルを生成:
-
-```
+```text
 [log_val, sign_plus, sign_minus, sign_zero]
 ```
 
-| フィールド | 計算式 | 説明 |
-|-----------|--------|------|
-| `log_val` | `1.0 + log10(\|x\|)` | 対数スケール絶対値 |
-| `sign_plus` | `1.0 if x > 0 else 0.0` | 正符号フラグ |
-| `sign_minus` | `1.0 if x < 0 else 0.0` | 負符号フラグ |
-| `sign_zero` | `1.0 if x == 0 else 0.0` | ゼロフラグ |
+| Field | Formula | Description |
+|-------|---------|-------------|
+| `log_val` | `1.0 + log10(abs(x))` | Log-scale absolute value |
+| `sign_plus` | `1.0 if x > 0 else 0.0` | Positive-sign flag |
+| `sign_minus` | `1.0 if x < 0 else 0.0` | Negative-sign flag |
+| `sign_zero` | `1.0 if x == 0 else 0.0` | Zero flag |
 
-#### 特殊ケース
+Special cases:
 
-| ケース | log_val | signs |
-|--------|---------|-------|
+| Case | `log_val` | Signs |
+|------|-----------|-------|
 | `x = 0` | `0.0` | `[0, 0, 1]` |
 | `x = 1` | `1.0` | `[1, 0, 0]` |
 | `x = -10` | `2.0` | `[0, 1, 0]` |
-| `x = 10^1000` (巨大数) | `1001.0` (フォールバック) | `[1, 0, 0]` |
+| `x = 10^1000` | `1001.0` through fallback | `[1, 0, 0]` |
 
-#### オーバーフロー保護
+Overflow protection:
 
 ```python
 try:
     log_val = 1.0 + math.log10(val_abs)
 except OverflowError:
-    # float64 範囲を超える巨大整数
     log_val = float(len(str(val_abs)))
 ```
 
-#### 空入力
+Empty inputs return `torch.zeros((0, config.MAG_RAW_DIM), dtype=torch.float32)`.
 
-```python
-if not sequence:
-    return torch.zeros((0, config.MAG_RAW_DIM), dtype=torch.float32)
-```
+### 3.2 `compute_modulo_features`
 
----
-
-### 3.2. `compute_modulo_features`
-
-整数列を Modulo 特徴量と整数ラベルに変換する。
-
-#### シグネチャ
+Converts an integer sequence into Modulo features and integer labels.
 
 ```python
 def compute_modulo_features(sequence: List[int]) -> tuple[torch.Tensor, torch.Tensor]
 ```
 
-#### 入出力
+| Item | Type | Description |
+|------|------|-------------|
+| Input | `List[int]` | Integer sequence |
+| Output 1 | `Tensor(L, 200)` | Sin/Cos embeddings |
+| Output 2 | `Tensor(L, 100)` | Integer residue labels |
 
-| 項目 | 型 | 説明 |
-|------|------|------|
-| **入力** | `List[int]` | 整数列 |
-| **出力1** | `Tensor(L, 200)` | Sin/Cos 埋め込み |
-| **出力2** | `Tensor(L, 100)` | 整数剰余ラベル |
+For each integer `x` and modulus `m in [2, 101]`:
 
-#### 計算式
-
-各整数 `x` と各法 `m ∈ [2, 101]` に対して:
-
-```
-r = x % m                    # Python の正剰余
-θ = (2π × r) / m             # 角度
-features = [sin(θ), cos(θ)]  # 単位円埋め込み
+```text
+r = x % m
+theta = (2*pi*r) / m
+features = [sin(theta), cos(theta)]
 ```
 
-#### 出力構造
+`mod_features` has shape `(L, 200)`:
 
-**mod_features (L, 200):**
-
-```
+```text
 [sin_m2, cos_m2, sin_m3, cos_m3, ..., sin_m101, cos_m101]
 ```
 
-100 個の法 × 2 (sin, cos) = 200 次元
+`mod_integers` has shape `(L, 100)`:
 
-**mod_integers (L, 100):**
-
-```
+```text
 [r_m2, r_m3, r_m4, ..., r_m101]
 ```
 
-各法に対する剰余値（分類ラベル用）
-
-#### 負数の剰余
-
-Python の `%` 演算子は正の剰余を返す:
+Python's `%` operator returns a non-negative residue:
 
 ```python
--5 % 3  # => 1 (not -2)
+-5 % 3  # => 1, not -2
 ```
 
-#### 空入力
+Empty inputs return zero tensors with shapes `(0, MOD_FEATURE_DIM)` and `(0, NUM_MODULI)`.
 
-```python
-if not sequence:
-    return (
-        torch.zeros((0, config.MOD_FEATURE_DIM), dtype=torch.float32),
-        torch.zeros((0, config.NUM_MODULI), dtype=torch.long)
-    )
-```
+### 3.3 `process_sequence`
 
----
-
-### 3.3. `process_sequence` (メインエントリポイント)
-
-単一シーケンスの処理パイプライン。
-
-#### シグネチャ
+Main entry point for processing one sequence.
 
 ```python
 def process_sequence(sequence: List[int]) -> Dict[str, torch.Tensor]
 ```
 
-#### 入出力
+Processing flow:
 
-| 項目 | 型 | 説明 |
-|------|------|------|
-| **入力** | `List[int]` | 生の整数列 |
-| **出力** | `Dict[str, Tensor]` | 特徴量辞書 |
+1. Truncate to `MAX_SEQUENCE_LENGTH` if necessary.
+2. Compute Magnitude features.
+3. Compute Modulo features.
+4. Pack the outputs into a dictionary.
 
-#### 処理フロー
-
-```
-1. 切り詰め: len > MAX_SEQUENCE_LENGTH なら先頭 128 要素のみ
-2. Magnitude 特徴量計算
-3. Modulo 特徴量計算
-4. 辞書にパック
-```
-
-#### 出力辞書
+Output:
 
 ```python
 {
-    "mag_features": Tensor(L, 4),    # Magnitude
-    "mod_features": Tensor(L, 200),  # Sin/Cos
-    "mod_integers": Tensor(L, 100)   # Labels
+    "mag_features": Tensor(L, 4),
+    "mod_features": Tensor(L, 200),
+    "mod_integers": Tensor(L, 100),
 }
 ```
 
-> **Note:** パディングは行わない（Collator が担当）
+Padding is intentionally not performed here; the collator handles batching.
 
 ---
 
-## 4. データ型
+## 4. Data Types
 
-| テンソル | dtype | 理由 |
-|---------|-------|------|
-| `mag_features` | `float32` | 連続値 |
-| `mod_features` | `float32` | Sin/Cos 連続値 |
-| `mod_integers` | `long` (int64) | CrossEntropy 用ラベル |
+| Tensor | dtype | Rationale |
+|--------|-------|-----------|
+| `mag_features` | `float32` | Continuous values |
+| `mod_features` | `float32` | Continuous Sin/Cos values |
+| `mod_integers` | `long` (`int64`) | Labels for CrossEntropy |
 
 ---
 
-## 5. 単位円埋め込みの数学的背景
+## 5. Mathematical Background for Unit-Circle Embeddings
 
-### なぜ Sin/Cos を使うか
+If residues are represented as categorical labels, `0` and `m-1` look far apart. Under modular arithmetic they are adjacent because `0 == m (mod m)`.
 
-剰余 `r` をカテゴリカルラベルとして扱うと、`0` と `m-1` が「遠い」と見なされる。
-しかし mod 演算では `0 ≡ m`（周期性）なので、これらは「近い」べきである。
+Sin/Cos embeddings represent periodicity naturally on the unit circle:
 
-**Sin/Cos 埋め込み**により、単位円上で周期性を自然に表現:
-
-```
-r = 0    → θ = 0      → (sin=0, cos=1)
-r = m/4  → θ = π/2    → (sin=1, cos=0)
-r = m/2  → θ = π      → (sin=0, cos=-1)
-r = m-1  → θ ≈ 2π     → (sin≈0, cos≈1)  ← r=0 と近い！
+```text
+r = 0    -> theta = 0      -> (sin=0, cos=1)
+r = m/4  -> theta = pi/2   -> (sin=1, cos=0)
+r = m/2  -> theta = pi     -> (sin=0, cos=-1)
+r = m-1  -> theta ~= 2*pi  -> close to r=0
 ```
 
 ---
 
-## 6. 使用例
+## 6. Usage Example
 
 ```python
 from intseq_bert.features import process_sequence
 
-# Fibonacci sequence
 sequence = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
 result = process_sequence(sequence)
 
@@ -248,18 +196,17 @@ print(result["mag_features"].shape)   # torch.Size([10, 4])
 print(result["mod_features"].shape)   # torch.Size([10, 200])
 print(result["mod_integers"].shape)   # torch.Size([10, 100])
 
-# 最初の要素 (x=0) の Magnitude
 print(result["mag_features"][0])      # tensor([0., 0., 0., 1.])
 ```
 
 ---
 
-## 7. 設計上の決定事項
+## 7. Design Decisions
 
-| 決定 | 理由 |
-|------|------|
-| `1 + log10(\|x\|)` | `x=1` で `log=0` を避け、正の値域を確保 |
-| One-hot 符号 | 符号を明示的に独立したチャネルで表現 |
-| Sin/Cos 埋め込み | 周期性を連続的に表現、mod 間の類似性学習 |
-| 整数ラベル保持 | 分類損失計算で必要 |
-| 切り詰めのみ・パディングなし | 責任分離（Collator がバッチ処理時にパディング） |
+| Decision | Rationale |
+|----------|-----------|
+| `1 + log10(abs(x))` | Avoids `log=0` for `x=1` and keeps positive values positive |
+| One-hot sign | Represents sign as an explicit independent channel |
+| Sin/Cos embedding | Represents periodicity continuously and preserves adjacency across the wrap boundary |
+| Keep integer residues | Required for classification losses |
+| Truncate only; no padding | Keeps feature extraction separate from batching |

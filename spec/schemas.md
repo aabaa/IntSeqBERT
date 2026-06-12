@@ -1,50 +1,47 @@
-# `src/intseq_bert/schemas.py` 実装仕様書
+# `src/intseq_bert/schemas.py` Implementation Specification
 
-## 1. 概要
+## 1. Overview
 
-本モジュールは、OEIS レコードの**唯一の正規データ構造**を定義する。
-パイプライン全体（前処理、特徴抽出、データローダー）で共通のスキーマを強制し、データ不整合を防止する。
+This module defines the single canonical data structure for OEIS records. The same schema is used across preprocessing, feature extraction, and data loading so that malformed or inconsistent data is rejected early.
 
-### 設計原則
+### Design Principles
 
-- **Single Source of Truth**: データ構造の定義はこのモジュールのみ
-- **Strict Validation**: 不正なデータは即座にエラーを発生させる（Fail Fast）
-- **JSONL 互換**: JSON Lines 形式でのシリアライズ/デシリアライズをサポート
+- **Single Source of Truth**: record structure is defined only in this module.
+- **Strict Validation**: invalid records fail immediately.
+- **JSONL Compatible**: records can be serialized to and deserialized from JSON Lines.
 
 ---
 
-## 2. 依存関係
+## 2. Dependencies
 
 ```python
 import json
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, List
 ```
 
-外部ライブラリへの依存なし（標準ライブラリのみ）。
+The module depends only on the Python standard library.
 
 ---
 
-## 3. データ構造
+## 3. Data Structure
 
-### 3.1. `OEISRecord` (Dataclass)
+### 3.1 `OEISRecord` Dataclass
 
-OEIS の単一数列を表す構造体。
+Represents one OEIS integer sequence.
 
-#### フィールド定義
+| Field | Type | Default | Required | Description |
+|-------|------|---------|----------|-------------|
+| `oeis_id` | `str` | - | yes | OEIS ID, e.g. `"A000045"` |
+| `sequence` | `List[int]` | - | yes | Integer sequence |
+| `name` | `str` | `""` | no | Sequence name |
+| `offset_a` | `int` | `0` | no | Starting offset from the OEIS `%O` field |
+| `keywords` | `List[str]` | `[]` | no | OEIS keywords, e.g. `["core", "easy"]` |
+| `related` | `List[str]` | `[]` | no | Related OEIS IDs |
+| `metadata` | `Dict[str, Any]` | `{}` | no | Extension metadata |
 
-| フィールド | 型 | デフォルト | 必須 | 説明 |
-|-----------|-----|-----------|------|------|
-| `oeis_id` | `str` | - | ✅ | OEIS ID (例: `"A000045"`) |
-| `sequence` | `List[int]` | - | ✅ | 整数数列 |
-| `name` | `str` | `""` | | 数列の名称 |
-| `offset_a` | `int` | `0` | | 開始オフセット (OEIS %O フィールド) |
-| `keywords` | `List[str]` | `[]` | | OEIS キーワード (例: `["core", "easy"]`) |
-| `related` | `List[str]` | `[]` | | 関連数列 ID リスト |
-| `metadata` | `Dict[str, Any]` | `{}` | | 拡張用メタデータ |
-
-#### JSON 表現例
+Example JSON representation:
 
 ```json
 {
@@ -60,13 +57,13 @@ OEIS の単一数列を表す構造体。
 
 ---
 
-## 4. メソッド詳細
+## 4. Methods
 
-### 4.1. インスタンスメソッド
+### 4.1 Instance Methods
 
 #### `to_dict() -> Dict[str, Any]`
 
-レコードを辞書に変換。
+Converts a record to a dictionary.
 
 ```python
 record.to_dict()
@@ -75,55 +72,49 @@ record.to_dict()
 
 #### `to_json_line() -> str`
 
-レコードを JSON 文字列（1行）にシリアライズ。
+Serializes a record to one JSON line.
 
 ```python
 record.to_json_line()
 # => '{"oeis_id": "A000045", "sequence": [0, 1, 1, ...], ...}'
 ```
 
-- `ensure_ascii=False` で UTF-8 文字をそのまま出力
+`ensure_ascii=False` is used so UTF-8 text is preserved.
 
 #### `__str__() -> str`
 
-デバッグ用の短縮表現。
+Returns a compact debug representation.
 
 ```python
 str(record)
 # => "[A000045] Fibonacci numbers (Offset:0) Seq:[0, 1, 1, 2, 3]..."
 ```
 
----
-
-### 4.2. クラスメソッド
+### 4.2 Class Methods
 
 #### `from_dict(data: Dict[str, Any]) -> OEISRecord`
 
-辞書からインスタンスを生成。**厳格なバリデーション**を実行。
+Constructs a record from a dictionary and performs strict validation.
 
-**バリデーションルール:**
+| Check | Condition | Exception |
+|-------|-----------|-----------|
+| `oeis_id` exists | required key | `ValueError` |
+| `sequence` exists | required key | `ValueError` |
+| `sequence` type | must be `list` or `str` | `TypeError` |
 
-| チェック | 条件 | 例外 |
-|---------|------|------|
-| `oeis_id` 存在 | `"oeis_id"` キー必須 | `ValueError` |
-| `sequence` 存在 | `"sequence"` キー必須 | `ValueError` |
-| `sequence` 型 | `list` または `str` | `TypeError` |
+Sequence conversion rules:
 
-**sequence の型変換:**
+| Input type | Behavior |
+|------------|----------|
+| `list` | Used as-is |
+| `str` | Parsed as a comma-separated sequence, e.g. `"1, 2, 3"` -> `[1, 2, 3]` |
+| other | `TypeError` |
 
-| 入力型 | 処理 |
-|--------|------|
-| `list` | そのまま使用 |
-| `str` | カンマ区切りでパース (`"1, 2, 3"` → `[1, 2, 3]`) |
-| その他 | `TypeError` |
-
-**Legacy 非サポート:**
-- `"id"` キー（旧形式）は**サポートしない**
-- `"oeis_id"` のみを受け付ける
+Legacy `"id"` keys are not supported. Only `"oeis_id"` is accepted.
 
 #### `from_json_line(line: str) -> OEISRecord`
 
-JSON 文字列（1行）からインスタンスを生成。
+Constructs a record from a one-line JSON string.
 
 ```python
 OEISRecord.from_json_line('{"oeis_id": "A000045", "sequence": [0, 1, 1]}')
@@ -131,88 +122,79 @@ OEISRecord.from_json_line('{"oeis_id": "A000045", "sequence": [0, 1, 1]}')
 
 ---
 
-## 5. I/O ヘルパー関数
+## 5. I/O Helper Functions
 
 ### `save_records(records: List[OEISRecord], filepath: str)`
 
-レコードリストを JSONL ファイルに保存。
+Writes records to a JSONL file, one record per line.
 
 ```python
 save_records([record1, record2], "data.jsonl")
 ```
 
-**出力形式:** 1行1レコードの JSON Lines
-
 ### `load_records(filepath: str) -> List[OEISRecord]`
 
-JSONL ファイルからレコードリストを読み込み。
+Loads records from a JSONL file.
 
 ```python
 records = load_records("data.jsonl")
 ```
 
-**動作:**
-- ファイルが存在しない場合: 空リスト `[]` を返す
-- 不正な行が含まれる場合: 例外を発生させる（Strict Mode）
+Behavior:
+
+- Missing files return an empty list.
+- Invalid lines raise exceptions in strict mode.
 
 ---
 
-## 6. エラーハンドリング
+## 6. Error Handling
 
-| 状況 | 例外 | メッセージ例 |
-|------|------|-------------|
-| `oeis_id` 欠落 | `ValueError` | `"Missing required key: 'oeis_id'"` |
-| `sequence` 欠落 | `ValueError` | `"Missing required key: 'sequence' for ID A000045"` |
-| `sequence` 型不正 | `TypeError` | `"Invalid type for 'sequence' in ID A000045: <class 'int'>"` |
-| `sequence` 文字列パース失敗 | `ValueError` | `"Malformed sequence string for ID A000045: ..."` |
+| Situation | Exception | Example message |
+|-----------|-----------|-----------------|
+| Missing `oeis_id` | `ValueError` | `"Missing required key: 'oeis_id'"` |
+| Missing `sequence` | `ValueError` | `"Missing required key: 'sequence' for ID A000045"` |
+| Invalid `sequence` type | `TypeError` | `"Invalid type for 'sequence' in ID A000045: <class 'int'>"` |
+| Malformed sequence string | `ValueError` | `"Malformed sequence string for ID A000045: ..."` |
 
 ---
 
-## 7. 使用例
-
-### 基本的な使用
+## 7. Usage Examples
 
 ```python
-from intseq_bert.schemas import OEISRecord, save_records, load_records
+from intseq_bert.schemas import OEISRecord, load_records, save_records
 
-# 作成
 record = OEISRecord(
     oeis_id="A000045",
     sequence=[0, 1, 1, 2, 3, 5, 8],
     name="Fibonacci numbers",
-    keywords=["core", "easy"]
+    keywords=["core", "easy"],
 )
 
-# シリアライズ
 json_line = record.to_json_line()
-
-# デシリアライズ
 restored = OEISRecord.from_json_line(json_line)
 
-# ファイル I/O
 save_records([record], "output.jsonl")
 records = load_records("output.jsonl")
 ```
 
-### パイプラインでの使用
+Pipeline usage:
 
 ```python
-# preprocess.py 内
 from intseq_bert.schemas import OEISRecord
 
 with open("data.jsonl") as f:
     for line in f:
         record = OEISRecord.from_json_line(line)
-        # record.sequence, record.keywords などにアクセス
+        # Access record.sequence, record.keywords, etc.
 ```
 
 ---
 
-## 8. 設計上の決定事項
+## 8. Design Decisions
 
-| 決定 | 理由 |
-|------|------|
-| `dataclass` 使用 | ボイラープレート削減、`asdict()` による簡易シリアライズ |
-| Legacy `id` キー非サポート | データ移行完了後の明確な境界線 |
-| `sequence` 文字列パース対応 | 外部データソース（CSV等）との互換性 |
-| `load_records` での Strict Mode | 不正データの早期検出 |
+| Decision | Rationale |
+|----------|-----------|
+| Use `dataclass` | Reduces boilerplate and enables simple serialization through `asdict()` |
+| Do not support legacy `id` | Keeps a clear boundary after data migration |
+| Accept string sequences | Improves compatibility with external sources such as CSV files |
+| Strict `load_records` | Detects malformed data early |

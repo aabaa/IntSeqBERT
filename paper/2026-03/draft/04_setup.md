@@ -1,86 +1,77 @@
-# 4. データセットと実験設定
+# 4. Dataset and Experimental Setup
 
-<!-- 目標: ~1ページ (~450語) -->
+<!-- Target: ~1 page (~450 words) -->
 
-## 4.1 データセット
+## 4.1 Dataset
 
-2026年1月時点で OEIS には合計 391,710 件の数列が登録されているが、系列長 10 未満の数列ならびに整数列予測タスクに不適切な 11 タグを持つ数列を除去し、274,705 件（全体の 70.1%）を標準データセット（`std`）として使用する。
-除外理由は三種類に大別される：
-（i）**スコープ外の表現**——`cons`/`cofr`/`frac`（数学定数の桁展開・分数値）、`base`（十進表記依存）、`word`（言語由来）；
-（ii）**予測タスクの定義不能**——`fini`（有限列：末尾以降に次項が存在しない）、`tabl`（二次元配列を1次元に平坦化した系列：文脈構造が歪む）；
-（iii）**品質・完全性**——`dead`（廃止済み）、`unkn`/`less`（不完全）、`dumb`（OEIS 編集者が数学的に自明または低品質と判断した数列）。
-`dumb` の除外により、本コーパスは編集者が承認した数学的に意味のある整数列に限定される。
+As of January 2026, OEIS contains 391,710 sequences. We remove sequences shorter than 10 terms and sequences carrying any of 11 tags unsuitable for integer-sequence prediction, leaving 274,705 sequences (70.1%) as the standard dataset (`std`). The excluded tags fall into three categories: (i) **out-of-scope representations**, including `cons` for decimal expansions of constants, `cofr` for continued fractions, `frac` for fractional values, `base` for notation-dependent sequences, and `word` for language-derived sequences; (ii) **undefined prediction targets**, including `fini` for finite sequences and `tabl` for flattened two-dimensional arrays; and (iii) **quality or completeness issues**, including `dead`, `unkn`, `less`, and `dumb`. Excluding `dumb` restricts the corpus to mathematically meaningful sequences accepted by OEIS editors.
 
-コーパスはシード 42 で固定したランダムシャッフル後に数列レベルで重複のない 8:1:1（train/val/test）に分割される：
+After a random shuffle with seed 42, the corpus is split at the sequence level into non-overlapping 8:1:1 train/validation/test splits:
 
-| 分割       | 数列数    |
+| Split | Number of Sequences |
 |------------|----------:|
-| 学習       | 219,765   |
-| 検証       |  27,470   |
-| テスト     |  27,470   |
+| Train      | 219,765   |
+| Validation | 27,470    |
+| Test       | 27,470    |
 
-各サンプルは最大 $L = 128$ 要素の数列プレフィックスに対応する（それ以上の系列はプレフィックスに切り詰める）。データセットに含まれる系列長の実測値はテストデータで最短 10 項・最長 168 項（平均 42.5 項）であり、Solver 評価においては先行文脈として常に 9 項以上が利用される（第 5.4 節）。
-数列には OEIS キーワードタグ（`easy`・`hard`・`nonn`・`sign`・`core` など）が付与されており、第 5 節の層別解析に用いる。
+Each sample is a sequence prefix of at most $L=128$ elements; longer raw sequences are truncated to this prefix length before model input. Before truncation, observed test-sequence lengths range from 10 to 168 terms, with a mean of 42.5 terms. Therefore, solver evaluation always has at least 9 preceding context terms. OEIS keyword tags such as `easy`, `hard`, `nonn`, `sign`, and `core` are used for stratified analyses.
 
-スケール別評価のため、
-$
+For scale-wise evaluation, define
+$$
 u =
 \begin{cases}
 0 & (x=0), \\
-\log_{10}(|x|) & (x \neq 0)
+\log_{10}(|x|) & (x \neq 0),
 \end{cases}
-$
-に基づく 5 つの Magnitude バケットを定義する（学習ターゲット $v$ とは $v=u+1$（$x\neq0$）の関係）：
+$$
+where the training target satisfies $v=u+1$ for $x\neq0$. We use five magnitude buckets:
 
-| バケット     | $u$ の範囲          | 元の値の目安                       | 延べ要素数の割合 |
+| Bucket | Range of $u$ | Approximate Original Value | Share of Elements |
 |--------------|--------------------|------------------------------------|:----------------:|
-| Small        | $u < 2$            | $\|x\| < 10^2$                       | 52.7%            |
-| Medium       | $2 \leq u < 5$     | $10^2 \leq \|x\| < 10^5$             | 29.9%            |
-| Large        | $5 \leq u < 20$    | $10^5 \leq \|x\| < 10^{20}$          | 16.2%            |
-| Huge         | $20 \leq u < 50$   | $10^{20} \leq \|x\| < 10^{50}$       |  1.1%            |
-| Astronomical | $u \geq 50$        | $\|x\| \geq 10^{50}$                 |  0.0%            |
+| Small        | $u < 2$            | $|x| < 10^2$                       | 52.7%            |
+| Medium       | $2 \leq u < 5$     | $10^2 \leq |x| < 10^5$             | 29.9%            |
+| Large        | $5 \leq u < 20$    | $10^5 \leq |x| < 10^{20}$          | 16.2%            |
+| Huge         | $20 \leq u < 50$   | $10^{20} \leq |x| < 10^{50}$       | 1.1%             |
+| Astronomical | $u \geq 50$        | $|x| \geq 10^{50}$                 | 0.0%             |
 
-※延べ要素数の割合は `std` split（274,705 数列）の延べ 11,667,163 要素に対する比率（整数値 1 個を 1 要素として集計）。
-参考までに、OEIS 全体（391,710 数列、延べ 17,347,470 要素）での比率は Small 58.3%、Medium 27.4%、Large 13.3%、Huge 0.9%、Astronomical 0.0% である。
+The shares are computed over 11,667,163 total elements in the `std` split. For the full OEIS corpus (391,710 sequences and 17,347,470 elements), the corresponding shares are Small 58.3%, Medium 27.4%, Large 13.3%, Huge 0.9%, and Astronomical 0.0%.
 
-**分割の限界。** ランダムシャッフルに基づく分割では、数学的に類似した数列（例：A000045 Fibonacci と A000032 Lucas）が train と test に分かれて出現しうる。この関連数列間リークは OEIS を用いる研究全般に共通する困難であり、数列ファミリーを考慮した系統的な分割設計は今後の課題である（第 7 節）。
+**Split limitation.** A random split can place mathematically related sequences, such as Fibonacci A000045 and Lucas A000032, in different splits. Leakage across related sequence families is a general challenge in OEIS-based work. Family-aware splitting is left for future work.
 
-## 4.2 学習設定
+## 4.2 Training Setup
 
-全モデルで共通のハイパーパラメータを用いる：
+All models use the same hyperparameters:
 
-| ハイパーパラメータ   | 値                                       |
+| Hyperparameter | Value |
 |--------------------|------------------------------------------|
-| エポック数          | 200（早期停止なし）                       |
-| バッチサイズ        | 32（勾配累積 2 ステップ、実効 64）         |
-| 学習率              | $5 \times 10^{-5}$                       |
-| ウォームアップ比率  | 10%                                      |
-| オプティマイザ      | AdamW、weight decay $0.01$               |
-| 数値精度            | FP32（AMP 無効）                         |
-| マスク確率          | 0.15                                     |
-| フレームワーク      | PyTorch 2.9.1、CUDA 12.8                |
-| GPU                 | GeForce RTX 3070 Ti（VRAM 8 GB）× 1     |
-| CPU                 | AMD Ryzen 9 5900X 12-Core               |
-| メインメモリ        | 128 GB                                  |
+| Epochs | 200, no early stopping |
+| Batch size | 32, with 2 gradient accumulation steps, effective 64 |
+| Learning rate | $5 \times 10^{-5}$ |
+| Warmup ratio | 10% |
+| Optimizer | AdamW, weight decay $0.01$ |
+| Numeric precision | FP32, AMP disabled |
+| Mask probability | 0.15 |
+| Framework | PyTorch 2.9.1, CUDA 12.8 |
+| GPU | One GeForce RTX 3070 Ti, 8 GB VRAM |
+| CPU | AMD Ryzen 9 5900X 12-Core |
+| Main memory | 128 GB |
 
-OEIS の値には $\log_{10}(|x|) \approx 210$（すなわち $|x| \approx 10^{210}$）に達するものが存在し、生の値 $|x|$ は FP16 表現で桁あふれする。
-このため全計算に FP32 を強制する。
+Some OEIS values reach $\log_{10}(|x|) \approx 210$, so raw values overflow FP16. We therefore force FP32 throughout.
 
-**学習時間**: ログより実測した 1 エポックあたりの学習時間（訓練フェーズ + 検証フェーズ合計）は、Small 約 5 分、Middle 約 10 分、Large 約 24 分であった。全 200 エポックの総学習時間は Large で約 80 時間に相当する。
+**Training time.** Based on logs, one epoch including training and validation takes about 5 minutes for Small, 10 minutes for Middle, and 24 minutes for Large. Training Large for all 200 epochs takes about 80 hours.
 
-**メモリ制約**: VRAM 8 GB というコンシューマー GPU の制約の下、バッチサイズ 32・勾配累積 2 ステップ（実効バッチサイズ 64）に設定した。
-Large モデル（~110M パラメータ）の FP32 学習は本構成の VRAM 容量の上限に近く、バッチサイズやモデル規模のスケールアップによる性能向上は今後の課題として残る。
+**Memory constraints.** Under the 8 GB consumer-GPU limit, we use batch size 32 with 2 gradient accumulation steps. FP32 training of the Large model is close to the VRAM limit, so larger batch sizes and larger model scales remain future work.
 
-全結果は固定 200 エポック完了時の学習済みモデルをテストデータに適用して報告する。
+All reported results use models after the full 200 epochs.
 
-## 4.3 評価指標
+## 4.3 Evaluation Metrics
 
-**Magnitude 精度（Acc$_{0.5}$）**: マスク位置のうち $|\hat{v}_i - v_i| < 0.5$ を満たす割合。元の整数スケールでは $\sqrt{10} \approx 3.16$ 倍の許容誤差に相当する。
+**Magnitude accuracy (Acc$_{0.5}$):** fraction of masked positions satisfying $|\hat{v}_i-v_i|<0.5$. On the original integer scale, this corresponds to a tolerance of about $\sqrt{10}\approx3.16$ times.
 
-**符号精度（Sign Accuracy）**: マスク位置のうち予測符号クラスが正解と一致する割合。
+**Sign accuracy:** fraction of masked positions whose predicted sign class matches the ground truth.
 
-**平均 Modulo 精度（MMA：Mean Modulo Accuracy）**: 100 個の法すべてに対する分類精度の平均（マスク位置のみ）。
+**Mean Modulo Accuracy (MMA):** mean classification accuracy across all 100 moduli, computed only at masked positions.
 
-**Solver Top-$k$ 精度**: 真の次項が、Solver モジュールが生成した上位 $k$ 件の候補に含まれる割合（第 5.4 節）。
+**Solver Top-$k$ accuracy:** fraction of samples for which the true next term is included in the top-$k$ candidates generated by the solver.
 
-**正規化情報利得（NIG：Normalised Information Gain）**: 法 $m$ に対して $\text{NIG} = 1 - \mathcal{L}_{\text{CE}}^{(m)} / \ln m$ で定義される。一様事前分布と比較して $x \bmod m$ についてどれだけの情報を獲得しているかを測る。NIG が高いほど、そのモジュラスに対して強い周期構造が学習されていることを示す。
+**Normalized Information Gain (NIG):** for modulus $m$, $\text{NIG}=1-\mathcal{L}_{\text{CE}}^{(m)}/\ln m$. It measures how much information the model gains about $x \bmod m$ relative to a uniform prior. Higher NIG indicates stronger learned periodic structure for that modulus.

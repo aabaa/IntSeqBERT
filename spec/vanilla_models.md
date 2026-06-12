@@ -1,189 +1,170 @@
-# `VanillaTransformer` 実装仕様書
+# `src/intseq_bert/vanilla_models.py` Implementation Specification
 
-## 目次
+## 1. Overview
 
-1. [概要](#1-概要)
-2. [依存関係](#2-依存関係)
-3. [クラス設計](#3-クラス設計)
-4. [入出力形状](#4-入出力形状)
-5. [損失計算](#5-損失計算)
-6. [ヘルパーメソッド](#6-ヘルパーメソッド)
+**Target file:** `src/intseq_bert/vanilla_models.py`
 
----
+This module implements the Vanilla Transformer baseline used for comparison with IntSeqBERT. It follows the FACT-style approach of representing integers as discrete token IDs.
 
-## 1. 概要
+Shared base classes, loss helpers, and `_split_mod_logits` are documented in [base_models.md](./base_models.md).
 
-**対象ファイル:** `src/intseq_bert/vanilla_models.py`
-
-> **関連仕様:** 共通コンポーネント（基底クラス、損失計算、`_split_mod_logits`）は [base_models.md](./base_models.md) を参照。
-
-**目的:**
-IntSeqBERT との比較実験（Baseline）用として、以下の3つのクラスを実装する。
-これらは FACT 論文のアプローチ（数値をトークンIDとして扱う）に基づく。
-
-| クラス | 役割 |
-|--------|------|
-| `VanillaEmbeddings` | 数値IDの埋め込みと位置エンコーディング |
-| `VanillaModel` | Transformer Encoder バックボーン |
-| `VanillaTransformerForPreTraining` | 学習用ヘッド（ID予測 + 診断用ヘッド） |
+| Class | Role |
+|-------|------|
+| `VanillaEmbeddings` | Integer-token embedding plus positional encoding |
+| `VanillaModel` | Transformer Encoder backbone |
+| `VanillaTransformerForPreTraining` | Pre-training wrapper with LM and diagnostic heads |
 
 ---
 
-## 2. 依存関係
+## 2. Config Constants
 
-### 2.1. config.py への追加定数
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `VANILLA_VOCAB_SIZE` | 20003 | Token vocabulary size: integers 0..19,999 plus three special tokens |
+| `VANILLA_PAD_TOKEN_ID` | 0 | Padding token ID |
+| `VANILLA_MASK_TOKEN_ID` | 1 | Mask token ID |
+| `VANILLA_UNK_TOKEN_ID` | 2 | Unknown token ID |
 
-| 定数 | デフォルト値 | 説明 |
-|------|------------|------|
-| `VANILLA_VOCAB_SIZE` | 20003 | トークン語彙サイズ（0..19,999 + 特殊トークン3種） |
-| `VANILLA_PAD_TOKEN_ID` | 0 | パディングトークンID |
-| `VANILLA_UNK_TOKEN_ID` | 2 | 未知トークンID |
-| `VANILLA_MASK_TOKEN_ID` | 1 | マスクトークンID |
-
-### 2.2. 既存の使用定数
-
-`D_MODEL`, `NHEAD`, `NUM_LAYERS`, `DROPOUT`, `MOD_RANGE`, `MAX_SEQUENCE_LENGTH`
+Existing constants used: `D_MODEL`, `NHEAD`, `NUM_LAYERS`, `DROPOUT`, `MOD_RANGE`, and `MAX_SEQUENCE_LENGTH`.
 
 ---
 
-## 3. クラス設計
+## 3. Class Design
 
-### 3.1. `VanillaEmbeddings`
+### 3.1 `VanillaEmbeddings`
 
 ```python
 class VanillaEmbeddings(BaseEmbeddings):
     """Token embedding with positional encoding for Vanilla Transformer."""
 ```
 
-| 引数 | 型 | デフォルト |
-|------|------|------|
+| Argument | Type | Default |
+|----------|------|---------|
 | `vocab_size` | int | `config.VANILLA_VOCAB_SIZE` |
 | `d_model` | int | `config.D_MODEL` |
 | `dropout` | float | `config.DROPOUT` |
 | `max_len` | int | `config.MAX_SEQUENCE_LENGTH` |
+| `pad_token_id` | Optional[int] | `None` |
 
-**構成:**
+Components:
 
-| コンポーネント | 定義 |
-|---------------|------|
-| `token_embedding` | `nn.Embedding(vocab_size, d_model, padding_idx=PAD_TOKEN_ID)` |
-| `pos_encoding` | Sinusoidal Encoding (加算) |
+| Component | Definition |
+|-----------|------------|
+| `token_embedding` | `nn.Embedding(vocab_size, d_model, padding_idx=config.VANILLA_PAD_TOKEN_ID)` |
+| `pos_encoding` | Sinusoidal encoding added to token embeddings |
 | `layer_norm` | `nn.LayerNorm(d_model)` |
 | `dropout` | `nn.Dropout(dropout)` |
 
-### 3.2. `VanillaModel`
+### 3.2 `VanillaModel`
 
 ```python
 class VanillaModel(BaseTransformerModel):
-    """Transformer Encoder backbone for Vanilla model."""
+    """Transformer Encoder backbone for the Vanilla model."""
 ```
 
-| 引数 | 型 | デフォルト |
-|------|------|------|
+| Argument | Type | Default |
+|----------|------|---------|
 | `d_model` | int | `config.D_MODEL` |
 | `nhead` | int | `config.NHEAD` |
 | `num_layers` | int | `config.NUM_LAYERS` |
 | `dropout` | float | `config.DROPOUT` |
+| `vocab_size` | Optional[int] | `None` |
+| `pad_token_id` | Optional[int] | `None` |
 
-**構成:**
+Components:
 
-| コンポーネント | 定義 |
-|---------------|------|
+| Component | Definition |
+|-----------|------------|
 | `embeddings` | `VanillaEmbeddings(...)` |
 | `encoder_layer` | `nn.TransformerEncoderLayer(batch_first=True, norm_first=True)` |
 | `encoder` | `nn.TransformerEncoder(encoder_layer, num_layers)` |
 
-### 3.3. `VanillaTransformerForPreTraining`
+### 3.3 `VanillaTransformerForPreTraining`
 
 ```python
 class VanillaTransformerForPreTraining(BaseForPreTraining):
     """Vanilla Transformer with multi-task heads for pre-training."""
 ```
 
-**構成:**
+Components:
 
-| コンポーネント | 定義 | 説明 |
-|---------------|------|------|
-| `backbone` | `VanillaModel(...)` | バックボーン |
-| `lm_head` | `nn.Linear(d_model, vocab_size)` | **メイン**: トークン予測 |
-| `mag_head` | `nn.Linear(d_model, 2)` | 診断用: Magnitude |
-| `sign_head` | `nn.Linear(d_model, 3)` | 診断用: 符号 |
-| `mod_head` | `nn.Linear(d_model, sum(MOD_RANGE))` | 診断用: Modulo (5150) |
+| Component | Definition | Description |
+|-----------|------------|-------------|
+| `backbone` | `VanillaModel(...)` | Encoder backbone |
+| `lm_head` | `nn.Linear(d_model, vocab_size)` | Main token-prediction head |
+| `mag_head` | `nn.Linear(d_model, 2)` | Diagnostic Magnitude head |
+| `sign_head` | `nn.Linear(d_model, 3)` | Diagnostic Sign head |
+| `mod_head` | `nn.Linear(d_model, sum(MOD_RANGE))` | Diagnostic Modulo head |
 
 ---
 
-## 4. 入出力形状
+## 4. Input and Output Shapes
 
-### 4.1. Forward 引数
+Forward arguments:
 
-| クラス | 引数 | 形状 |
-|--------|------|------|
+| Class | Arguments | Shapes |
+|-------|-----------|--------|
 | `VanillaEmbeddings` | `input_ids` | `(B, L)` LongTensor |
 | `VanillaModel` | `input_ids`, `src_key_padding_mask` | `(B, L)`, `(B, L)` Bool |
-| `VanillaTransformerForPreTraining` | `input_ids`, `src_key_padding_mask`, `labels` | 同上 + Optional Dict |
+| `VanillaTransformerForPreTraining` | `input_ids`, `src_key_padding_mask`, `labels` | same plus optional label dict |
 
-### 4.2. Forward 出力
+Forward outputs:
 
 ```python
 # VanillaEmbeddings
 embeddings: (B, L, d_model)
 
-# VanillaModel  
+# VanillaModel
 last_hidden_state: (B, L, d_model)
 
 # VanillaTransformerForPreTraining
 {
     "predictions": {
-        "logits": (B, L, vocab_size),      # メイン出力
-        "mag_mu": (B, L),                  # 診断用
-        "mag_log_var": (B, L),             # 診断用
-        "mod_logits": (B, L, 5150),        # 診断用
-        "sign_logits": (B, L, 3)           # 診断用
+        "logits": (B, L, vocab_size),
+        "mag_mu": (B, L),
+        "mag_log_var": (B, L),
+        "mod_logits": (B, L, 5150),
+        "sign_logits": (B, L, 3),
     },
     "loss": Tensor or None,
-    "loss_breakdown": {...} or None
+    "loss_breakdown": {...} or None,
 }
 ```
 
 ---
 
-## 5. 損失計算
+## 5. Loss Computation
 
-### 5.1. 損失関数
+| Head | Loss | Weight | Notes |
+|------|------|--------|-------|
+| `lm_head` | `CrossEntropyLoss(ignore_index=self.pad_token_id)` | 1.0 | Main objective |
+| `mag_head` | `BaseForPreTraining._compute_mag_loss` | 0.1 | Diagnostic |
+| `sign_head` | `CrossEntropyLoss` | 0.1 | Diagnostic |
+| `mod_head` | Per-modulus `CrossEntropyLoss` | 0.2 effective | Diagnostic; `0.1 * w_mod` with `w_mod=2.0` |
 
-| ヘッド | 損失関数 | 重み | 備考 |
-|--------|----------|------|------|
-| `lm_head` | `CrossEntropyLoss(ignore_index=PAD_TOKEN_ID)` | 1.0 | **メイン** |
-| `mag_head` | `BaseForPreTraining._compute_mag_loss` | 0.1 | 診断用（`config.MAG_LOSS_TYPE` と `USE_HETEROSCEDASTIC_LOSS` に従う） |
-| `sign_head` | `CrossEntropyLoss` | 0.1 | 診断用 |
-| `mod_head` | `CrossEntropyLoss` (per modulus) | 0.1 | 診断用 |
+Setting the diagnostic-head weights to `0.0` turns the model into a pure language-model baseline.
 
-> 診断用ヘッドの重みは 0.0 にすれば純粋な LM として学習可能。
+Masking follows the same masked language modelling strategy as IntSeqBERT:
 
-### 5.2. マスキング戦略
-
-IntSeqBERT と同じ **Masked Language Model (MLM)** 方式:
-
-1. 入力の 15% をマスク (`VANILLA_MASK_TOKEN_ID` に置換)
-2. マスク位置のトークンを予測
-3. 非マスク位置は損失計算から除外
+1. Replace 15% of inputs with `VANILLA_MASK_TOKEN_ID`.
+2. Predict the original token at masked positions.
+3. Exclude unmasked positions from the LM loss.
 
 ---
 
-## 6. ヘルパーメソッド
+## 6. Helper Methods
 
-### 6.1. `from_checkpoint`
+### `from_checkpoint`
 
-`BasePreTrainedModel.from_checkpoint` を継承。詳細は [base_models.md](./base_models.md) 参照。
+Inherited from `BasePreTrainedModel.from_checkpoint`; see [base_models.md](./base_models.md).
 
-### 6.2. トークン化
+### Tokenization
 
-数値 → トークンID 変換:
+Integer-to-token mapping:
 
 ```python
 def tokenize_number(n: int) -> int:
-    # PAD/MASK/UNK の 3 トークンぶんをオフセット
     if 0 <= n <= VANILLA_VOCAB_SIZE - 4:
-        return n + 3
-    return VANILLA_UNK_TOKEN_ID  # 範囲外は UNK
+        return n + 3  # offset for PAD, MASK, UNK
+    return VANILLA_UNK_TOKEN_ID
 ```

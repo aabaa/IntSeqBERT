@@ -1,12 +1,12 @@
 """
-Fig.4 学習曲線スクリプト
+Fig.4 learning-curve script
 CICM 2026 paper — Figure 4
 
-出力: experiment/cicm2026/fig4_learning_curves.pdf
-      experiment/cicm2026/fig4_learning_curves.png
+Output: paper/2026-03/figures/fig4_learning_curves.pdf
+      paper/2026-03/figures/fig4_learning_curves.png
 
-データソース: checkpoints/{size}_std/{model}/history.csv
-  列: epoch, train_loss, val_loss
+Data source: checkpoints/{size}_std/{model}/history.csv
+  Columns: epoch, train_loss, val_loss
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-# ── パス設定 ──────────────────────────────────────────────────────────────
+# ── Paths ────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT_ROOT = REPO_ROOT / "checkpoints"
 OUT_DIR = Path(__file__).resolve().parent.parent / "figures"
@@ -28,14 +28,14 @@ LABELS  = {"intseq": "IntSeqBERT", "vanilla": "Vanilla", "ablation": "Ablation"}
 COLORS  = {"intseq": "#1f77b4", "vanilla": "#ff7f0e", "ablation": "#2ca02c"}
 STYLES  = {"intseq": "-",        "vanilla": "--",     "ablation": "-."}
 
-# ── データ読み込み ────────────────────────────────────────────────────────
+# ── Data loading ─────────────────────────────────────────────────────────
 def load_history(size_key: str, model: str) -> pd.DataFrame:
     path = CHECKPOINT_ROOT / SIZE_DIRS[size_key] / model / "history.csv"
     df = pd.read_csv(path, usecols=["epoch", "train_loss", "val_loss"])
     return df.sort_values("epoch")
 
 
-# ── プロット ──────────────────────────────────────────────────────────────
+# ── Plot ─────────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 3, figsize=(13, 4.0), sharey=False)
 fig.subplots_adjust(left=0.06, right=0.99, top=0.96, bottom=0.13, wspace=0.32)
 
@@ -58,13 +58,13 @@ for ax, size in zip(axes, SIZES):
     ax.grid(which="major", linestyle=":", linewidth=0.6, alpha=0.7)
     ax.grid(which="minor", linestyle=":", linewidth=0.3, alpha=0.4)
 
-# Y 軸ラベルは左パネルのみ
+# Use a y-axis label only on the left panel.
 axes[0].set_ylabel("Validation Loss", fontsize=11)
 
-# 凡例は Large パネルの右上
+# Place the legend in the upper right of the Large panel.
 axes[2].legend(loc="upper right", fontsize=10, framealpha=0.8)
 
-# ── 保存 ──────────────────────────────────────────────────────────────────
+# ── Save ─────────────────────────────────────────────────────────────────
 for ext in ("pdf", "png"):
     out_path = OUT_DIR / f"fig4_learning_curves.{ext}"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
