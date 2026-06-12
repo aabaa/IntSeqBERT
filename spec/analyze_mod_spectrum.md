@@ -2,12 +2,12 @@
 
 ## 1. Overview
 
-This script performs **Modulo Spectrum Analysis** for a trained model. It compares all moduli `m` from 2 to 101 under equal conditions and ranks the structures the model handles well. It supports **IntSeqBERT**, **Vanilla Transformer**, and **Ablation (No-Mod)** model types.
+This script performs **modulo-spectrum analysis** for a trained model. It compares all moduli `m` from 2 to 101 under equal conditions and ranks the structures the model handles well. It supports **IntSeqBERT**, **Vanilla Transformer**, and **Ablation (No-Mod)** model types.
 
 ### Key Features
 
 1. **Global Ranking:** Compute NIG (Normalized Information Gain) for each modulus `m` and rank them.
-2. **Tag-Stratified Analysis:** Stratified analysis by OEIS tag.
+2. **Tag-stratified analysis:** Stratified analysis by OEIS tag.
 3. **Bootstrap CI:** 95% confidence interval estimation for statistical significance.
 
 ---
@@ -34,7 +34,11 @@ from torch.utils.data import DataLoader
 from intseq_bert import config
 from intseq_bert.loader import load_dataset, OEISDataset
 from intseq_bert.collator import OEISCollator
-from intseq_bert.analysis.common import create_model_wrapper, ModelWrapper
+from intseq_bert.analysis.common import (
+    create_model_wrapper,
+    ModelWrapper,
+    split_mod_logits,
+)
 ```
 
 ---
@@ -65,13 +69,15 @@ python -m intseq_bert.analysis.analyze_mod_spectrum \
 | `--jsonl_path` | str | | `data/oeis/data.jsonl` | OEIS JSONL path for tag metadata |
 | `--batch_size` | int | | `64` | Batch size |
 | `--bootstrap_samples` | int | | `1000` | Number of bootstrap samples |
+| `--seed` | int | | `42` | Random seed for bootstrap resampling |
+| `--quiet` | flag | | `False` | Suppress progress bars where supported |
 | `--device` | str | | `auto` | Device (`cuda`, `cpu`, `auto`) |
 
 ---
 
 ## 4. Model Abstraction
 
-Introduce a `ModelWrapper` class to handle different model types uniformly.
+Use the shared `ModelWrapper` utilities from `analysis/common.py` to handle different model types uniformly.
 
 ### 4.1. `ModelWrapper` (Abstract Base)
 
@@ -119,7 +125,7 @@ class IntSeqWrapper(ModelWrapper):
         return outputs["predictions"]
 
     def get_mod_log_probs(self, mod_logits: torch.Tensor) -> List[torch.Tensor]:
-        split_logits = self.model._split_mod_logits(mod_logits)
+        split_logits = split_mod_logits(mod_logits)
         return [F.log_softmax(logits, dim=-1) for logits in split_logits]
 ```
 
@@ -180,7 +186,7 @@ def compute_nig(ce_loss: float, modulus: int) -> float:
     Formula: R(m) = 1.0 - (Loss / log(m))
 
     Args:
-        ce_loss: Mean CrossEntropy loss
+        ce_loss: Mean cross-entropy loss
         modulus: Modulus m
 
     Returns:
@@ -197,7 +203,7 @@ Compute the following for each modulus:
 | Metric | Computation | Description |
 |------|------|------|
 | `accuracy` | `(pred == target).mean()` | Classification accuracy (%) |
-| `ce_loss` | `CrossEntropy(logits, targets).mean()` | Mean loss |
+| `ce_loss` | `CrossEntropy(logits, targets).mean()` | Mean cross-entropy loss |
 | `nig_score` | `1 - ce_loss / log(m)` | Normalized Information Gain |
 
 ---
@@ -265,7 +271,7 @@ def compute_mod_metrics_from_stats(
     loss_sum = stats["loss_sum"]  # (N, 100)
     acc_sum = stats["acc_sum"]    # (N, 100)
     counts = stats["counts"]      # (N,)
-    # Aggregate over sequences, then compute CE, accuracy, and NIG per modulus.
+    # Aggregate over sequences, then compute cross-entropy, accuracy, and NIG per modulus.
 ```
 
 ### 6.4. `bootstrap_ci_from_stats`

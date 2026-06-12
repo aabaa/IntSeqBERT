@@ -6,9 +6,9 @@ This script generates **case study visualizations** for representative integer s
 
 ### Key Features
 
-1. **Magnitude & Uncertainty Plot:** Visualization of growth trajectory and uncertainty.
-2. **Sign Probability Plot:** Visualization of sign-class probability transitions.
-3. **Modulo Spectrum Heatmap:** Visualization of periodicity fingerprints.
+1. **Magnitude and uncertainty plot:** Growth trajectory with predictive uncertainty.
+2. **Sign-probability plot:** Sign-class probability transitions.
+3. **Modulo-spectrum heatmap:** Periodicity fingerprints by modulus.
 4. **Attention / Summary Panel:** Attention heatmap for supported models; summary panel otherwise.
 
 ---
@@ -100,13 +100,13 @@ DEFAULT_ARCHETYPES = {
 
 Use a 2x2 layout containing four panels in one image.
 
-### 5.1. Panel 1: Magnitude & Uncertainty
+### 5.1. Panel 1: Magnitude and Uncertainty
 
 ```python
 def plot_magnitude_uncertainty(
     ax: plt.Axes,
     positions: np.ndarray,      # (L,)
-    ground_truth: np.ndarray,   # (L,) log10(|x|)
+    ground_truth: np.ndarray,   # (L,) model magnitude scale
     pred_mu: np.ndarray,        # (L,)
     pred_sigma: np.ndarray,     # (L,) = sqrt(exp(log_var))
     mask: np.ndarray            # (L,) prediction target positions
@@ -114,7 +114,7 @@ def plot_magnitude_uncertainty(
     """
     Visualize the growth trajectory and uncertainty.
 
-    - Blue solid line: ground truth
+    - Blue solid line: ground-truth magnitude target
     - Red dashed line: predicted mean mu
     - Red band: uncertainty band of +/-2 sigma
     """
@@ -130,7 +130,7 @@ def plot_magnitude_uncertainty(
     )
 
     ax.set_xlabel('Position n')
-    ax.set_ylabel('log10(|x|)')
+    ax.set_ylabel('log₁₀(|x|)')
     ax.set_title('Magnitude & Uncertainty')
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -174,7 +174,7 @@ def plot_sign_probability(
     ax.set_ylim(0, 1)
 ```
 
-### 5.3. Panel 3: Modulo Spectrum Heatmap
+### 5.3. Panel 3: Modulo-Spectrum Heatmap
 
 ```python
 def plot_modulo_heatmap(
@@ -391,7 +391,7 @@ def _convert_record_to_features(record: Dict) -> Dict[str, torch.Tensor]:
 DEFAULT_DISPLAY_MODS = [
     # Primes (Number Theory)
     2, 3, 5, 7, 11, 13,
-    # Composites / Highly Composite
+    # Composites / highly composite numbers
     4, 6, 12,
     # Base-10 related, for bias detection
     10, 100
@@ -415,7 +415,7 @@ def generate_case_figure(
     preds = model.predict_with_details(batch)
 
     # Extract ground truth
-    gt_mag = batch["mag_inputs"][0, :, 0].numpy()  # log10(|x|)
+    gt_mag = batch["mag_inputs"][0, :, 0].numpy()  # model magnitude scale
     gt_sign = batch["mag_inputs"][0, :, 1:4].argmax(dim=-1).numpy()
 
     # Extract predictions
@@ -438,13 +438,13 @@ def generate_case_figure(
     positions = np.arange(L)
     mask = np.ones(L, dtype=bool)  # Show all positions
 
-    # Panel 1: Magnitude & Uncertainty
+    # Panel 1: magnitude and uncertainty
     plot_magnitude_uncertainty(axes[0, 0], positions, gt_mag, pred_mu, pred_sigma, mask)
 
-    # Panel 2: Sign Probability
+    # Panel 2: sign probability
     plot_sign_probability(axes[0, 1], positions, sign_probs, gt_sign)
 
-    # Panel 3: Modulo Heatmap
+    # Panel 3: modulo heatmap
     plot_modulo_heatmap(axes[1, 0], positions, mod_confidences, display_mods, None, fig=fig)
 
     # Panel 4: Attention or Summary

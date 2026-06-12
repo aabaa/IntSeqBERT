@@ -2,13 +2,13 @@
 
 ## 1. Overview
 
-This module performs dynamic masking and batch construction for IntSeqBERT and the Vanilla Transformer. It pads variable-length samples loaded by `OEISDataset` and applies masking for masked sequence modelling.
+This module performs dynamic masking and batch construction for IntSeqBERT and the Vanilla Transformer. It pads variable-length samples loaded by `OEISDataset` and applies masking for masked sequence modeling.
 
 ### Design Principles
 
 - **Dynamic Masking**: generate different mask patterns every epoch.
-- **Mask Flag Strategy**: distinguish real zero values from masked Magnitude values.
-- **Origin Shift Strategy**: use the origin `(0, 0)` as the mask representation for Sin/Cos streams.
+- **Mask-flag strategy**: distinguish real zero values from masked magnitude values.
+- **Origin-shift strategy**: use the origin `(0, 0)` as the mask representation for sin/cos streams.
 - **Dual Model Support**: support both IntSeqBERT and Vanilla Transformer inputs.
 
 ---
@@ -32,9 +32,9 @@ from . import config
 | `MASK_PROB` | 0.15 | Mask probability |
 | `PAD_VALUE_FEATURE` | -9999.0 | Sentinel padding value for features |
 | `IGNORE_INDEX` | -100 | Label value ignored by loss functions |
-| `MAG_RAW_DIM` | 4 | Input Magnitude dimension |
+| `MAG_RAW_DIM` | 4 | Input magnitude dimension |
 | `MAG_EXTENDED_DIM` | 5 | Magnitude dimension with mask flag |
-| `MOD_FEATURE_DIM` | 200 | Modulo Sin/Cos dimension |
+| `MOD_FEATURE_DIM` | 200 | Modulo sin/cos dimension |
 | `NUM_MODULI` | 100 | Number of moduli |
 | `KEY_MAG_FEATURES` | `"mag_features"` | Data key |
 | `KEY_MOD_FEATURES` | `"mod_features"` | Data key |
@@ -133,7 +133,7 @@ mask_matrix = torch.bernoulli(prob_matrix).bool()
 
 ### Step 5: Magnitude Stream
 
-Mask Flag Strategy:
+Mask-flag strategy:
 
 ```text
 Unmasked (valid): [log_val, sign+, sign-, sign0, 0]
@@ -155,7 +155,7 @@ mag_inputs[..., :4] *= content_keep_mask
 
 ### Step 6: Modulo Stream
 
-Origin Shift Strategy:
+Origin-shift strategy:
 
 ```text
 Unmasked: [sin(theta), cos(theta), ...]  # on the unit circle
@@ -222,7 +222,7 @@ The fifth channel `is_masked` solves this:
 
 ### 5.2 Why Origin Shift Works
 
-Sin/Cos embeddings live on the unit circle. The zero vector is the origin and is never a valid unit-circle point. Setting masked positions to `(0, 0)` therefore creates an unambiguous mask representation.
+Sin/cos embeddings live on the unit circle. The zero vector is the origin and is never a valid unit-circle point. Setting masked positions to `(0, 0)` therefore creates an unambiguous mask representation.
 
 ---
 
@@ -267,8 +267,8 @@ for batch in dataloader:
 | `dataclass` | Simple state management; only `mask_prob` is stored |
 | Dynamic masking | Improves generalization compared with static masking |
 | Never mask padding positions | Predicting padding is meaningless |
-| `IGNORE_INDEX` for unmasked Modulo labels | Lets CrossEntropy ignore those positions automatically |
-| Keep all Magnitude labels | Regression loss filters with `mask_matrix` |
+| `IGNORE_INDEX` for unmasked modulo labels | Lets cross-entropy ignore those positions automatically |
+| Keep all magnitude labels | Regression loss filters with `mask_matrix` |
 | Vectorized token ID generation | Avoids Python loops |
 | Integer fallback from log magnitude | Provides approximate behavior when raw integers are unavailable |
 | `VOCAB_SIZE = 20003` | Practical upper bound for an 8 GB GPU environment |

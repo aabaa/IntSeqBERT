@@ -8,7 +8,7 @@ This module is the CLI entry point for the OEIS data pipeline. It parses raw dat
 
 | Layer | Responsibility | Characteristics |
 |-------|----------------|-----------------|
-| **Layer 1** | Pure logic functions | Side-effect free and unit-testable |
+| **Layer 1** | Pure functions | Side-effect-free and unit-testable |
 | **Layer 2** | Workers and helpers | File I/O and parallel processing |
 | **Layer 3** | Command handlers | CLI flow control |
 
@@ -37,7 +37,7 @@ from . import config, features, schemas
 
 | Constant | Purpose |
 |----------|---------|
-| `MIN_SEQUENCE_LENGTH` | Minimum sequence-length filter |
+| `MIN_SEQUENCE_LENGTH` | Minimum sequence length |
 | `SEED` | Deterministic shuffle |
 | `TEST_RATIO`, `VAL_RATIO` | Split ratios |
 | `KEY_OEIS_ID` | Output key |

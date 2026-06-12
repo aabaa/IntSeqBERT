@@ -4,9 +4,9 @@
 
 `IntegerSolver` reconstructs candidate integers from diagnostic model outputs:
 
-- Magnitude mean and variance,
-- Sign prediction,
-- Modulo probability distributions.
+- magnitude mean and variance,
+- sign prediction,
+- modulo probability distributions.
 
 The solver uses a hybrid algorithm that switches among three search modes according to the width of the inferred integer range. The module also provides `VanillaSolver`, which reconstructs integers from Vanilla Transformer `lm_head` token predictions.
 
@@ -99,8 +99,8 @@ Arguments:
 
 | Argument | Description |
 |----------|-------------|
-| `mag_mu` | Predicted Magnitude mean on the `1 + log10(abs(x))` scale |
-| `mag_log_var` | Predicted Magnitude log variance |
+| `mag_mu` | Predicted magnitude mean on the `1 + log10(abs(x))` scale |
+| `mag_log_var` | Predicted magnitude log variance |
 | `sign_idx` | Sign index: 0=Positive, 1=Negative, 2=Zero |
 | `mod_log_probs` | List of log-probability tensors, one per modulus |
 | `top_k` | Number of candidates to return |

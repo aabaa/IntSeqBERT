@@ -11,7 +11,7 @@ This script analyzes the model's ability to predict numeric magnitude from sever
 3. **Tag-Stratified Analysis:** Comparison by sequence category such as `poly` and `exp`.
 4. **Vanilla Comparison:** Limit-performance comparison against the token-based Vanilla Transformer.
 5. **Error Distribution Analysis:** Identification of error distribution shape and outlier patterns.
-6. **Sign Consistency Check:** Consistency validation between magnitude and sign predictions.
+6. **Sign-consistency report:** Placeholder report for future consistency validation between magnitude and sign predictions.
 
 ---
 
@@ -82,11 +82,11 @@ Compute the fraction of samples within a tolerance `delta`.
 | **Negative Log Likelihood (NLL)** | Gaussian negative log likelihood; lower is better |
 | **Expected Calibration Error (ECE)** | Weighted average calibration error over bins |
 
-### 4.4. Consistency Metrics
+### 4.4. Consistency Report
 
 | Metric | Description |
 |------|------|
-| **Sign-Magnitude Consistency** | Fraction of inconsistent samples, such as positive magnitude with negative sign prediction, or the reverse |
+| **Sign-Magnitude Consistency** | Placeholder report in the current implementation; actual consistency scoring requires sign predictions to be collected in this analysis path |
 
 ---
 
@@ -222,9 +222,9 @@ def format_context(sequence: List[float], position: int, window: int = 2) -> str
 
 **Goal:** Identify model weakness patterns by tag, scale, or local sequence structure.
 
-### 5.5. Sign-Magnitude Consistency Check
+### 5.5. Sign-Magnitude Consistency Report
 
-Validate consistency between the Magnitude Head and the Sign Head.
+The current implementation writes `consistency_report.csv` with `N/A - requires sign predictions`. The following check documents the intended future validation once sign predictions are collected in this analysis path.
 
 ```python
 # Inconsistency patterns
@@ -253,7 +253,7 @@ def bootstrap_ci(data, metric_fn, n_samples=1000, ci=0.95):
 
 ### 5.7. Growth Type Analysis
 
-Analyze whether accuracy differs between sequences that grow exponentially, meaning log-linear on the log scale, and all other sequences.
+Analyze whether accuracy differs between sequences that grow exponentially, meaning approximately linear on the log scale, and all other sequences.
 
 #### `analyze_log_linearity(sequence: List[int]) -> bool`
 
@@ -277,7 +277,7 @@ Scan the dataset and compute MSE/MAE grouped by `is_log_linear`.
 
 #### `plot_growth_type_comparison()`
 
-Bar chart comparing Log-Linear and Non-Log-Linear sequences.
+Bar chart comparing log-linear and non-log-linear sequences.
 
 ---
 
@@ -291,7 +291,7 @@ results/analysis/mag/
 ├── calibration_data.csv       # Data for calibration plot
 ├── error_distribution.csv     # Error distribution statistics
 ├── worst_k_samples.csv        # Details for the worst K samples
-├── consistency_report.csv     # Sign-magnitude consistency report
+├── consistency_report.csv     # Placeholder sign-magnitude consistency report
 ├── growth_type_metrics.csv    # MSE/MAE by growth type
 ├── analysis_config.json       # Run configuration
 └── figures/
@@ -300,14 +300,14 @@ results/analysis/mag/
     ├── calibration_plot.png   # Reliability of uncertainty
     ├── error_histogram.png    # Error distribution histogram
     ├── error_qq_plot.png      # QQ plot
-    └── growth_type_comparison.png  # Log-Linear vs Non-Log-Linear comparison
+    └── growth_type_comparison.png  # Log-linear vs non-log-linear comparison
 ```
 
 ---
 
 ## 7. Implementation Notes for Vanilla Support
 
-For the Vanilla Transformer, the Magnitude Head exists, but the embedding layer input constraints may prevent correct magnitude encoding for unknown or large numbers. Such numbers may also be processed as `[UNK]`.
+For the Vanilla Transformer, the magnitude head exists, but the embedding layer input constraints may prevent correct magnitude encoding for unknown or large numbers. Such numbers may also be processed as `[UNK]`.
 
 The `VanillaWrapper.predict` method should handle the following:
 

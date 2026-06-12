@@ -40,17 +40,17 @@ class VanillaEmbeddings(BaseEmbeddings):
 
 | Argument | Type | Default |
 |----------|------|---------|
-| `vocab_size` | int | `config.VANILLA_VOCAB_SIZE` |
 | `d_model` | int | `config.D_MODEL` |
 | `dropout` | float | `config.DROPOUT` |
 | `max_len` | int | `config.MAX_SEQUENCE_LENGTH` |
+| `vocab_size` | Optional[int] | `None` |
 | `pad_token_id` | Optional[int] | `None` |
 
 Components:
 
 | Component | Definition |
 |-----------|------------|
-| `token_embedding` | `nn.Embedding(vocab_size, d_model, padding_idx=config.VANILLA_PAD_TOKEN_ID)` |
+| `token_embedding` | `nn.Embedding(self.vocab_size, d_model, padding_idx=self.pad_token_id)` |
 | `pos_encoding` | Sinusoidal encoding added to token embeddings |
 | `layer_norm` | `nn.LayerNorm(d_model)` |
 | `dropout` | `nn.Dropout(dropout)` |
@@ -91,10 +91,10 @@ Components:
 | Component | Definition | Description |
 |-----------|------------|-------------|
 | `backbone` | `VanillaModel(...)` | Encoder backbone |
-| `lm_head` | `nn.Linear(d_model, vocab_size)` | Main token-prediction head |
-| `mag_head` | `nn.Linear(d_model, 2)` | Diagnostic Magnitude head |
-| `sign_head` | `nn.Linear(d_model, 3)` | Diagnostic Sign head |
-| `mod_head` | `nn.Linear(d_model, sum(MOD_RANGE))` | Diagnostic Modulo head |
+| `lm_head` | `nn.Linear(d_model, self.vocab_size)` | Main token-prediction head |
+| `mag_head` | `nn.Linear(d_model, 2)` | Diagnostic magnitude head |
+| `sign_head` | `nn.Linear(d_model, 3)` | Diagnostic sign head |
+| `mod_head` | `nn.Linear(d_model, sum(MOD_RANGE))` | Diagnostic modulo head |
 
 ---
 
@@ -144,7 +144,7 @@ last_hidden_state: (B, L, d_model)
 
 Setting the diagnostic-head weights to `0.0` turns the model into a pure language-model baseline.
 
-Masking follows the same masked language modelling strategy as IntSeqBERT:
+Masking follows the same masked language modeling strategy as IntSeqBERT:
 
 1. Replace 15% of inputs with `VANILLA_MASK_TOKEN_ID`.
 2. Predict the original token at masked positions.

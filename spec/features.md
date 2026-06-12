@@ -8,9 +8,9 @@ This module converts raw integer sequences into tensors used for model training.
 
 | Stream | Content | Shape |
 |--------|---------|-------|
-| **Magnitude** | Log10-scale magnitude + sign one-hot | `(L, 4)` |
-| **Modulo Sin/Cos** | Unit-circle residue embeddings | `(L, 200)` |
-| **Modulo Integers** | Integer residues for classification labels | `(L, 100)` |
+| **Magnitude features** | Log10-scale magnitude and one-hot sign channels | `(L, 4)` |
+| **Modulo sin/cos features** | Unit-circle residue embeddings | `(L, 200)` |
+| **Modulo integer labels** | Integer residues for classification labels | `(L, 100)` |
 
 ---
 
@@ -30,8 +30,8 @@ from . import config
 | Constant | Value | Purpose |
 |----------|-------|---------|
 | `MAX_SEQUENCE_LENGTH` | 128 | Truncation limit |
-| `MAG_RAW_DIM` | 4 | Magnitude output dimension |
-| `MOD_FEATURE_DIM` | 200 | Modulo Sin/Cos output dimension |
+| `MAG_RAW_DIM` | 4 | Magnitude-feature dimension |
+| `MOD_FEATURE_DIM` | 200 | Modulo sin/cos feature dimension |
 | `NUM_MODULI` | 100 | Number of moduli |
 | `MOD_RANGE` | `list(range(2, 102))` | Moduli `[2, 3, ..., 101]` |
 | `KEY_MAG_FEATURES` | `"mag_features"` | Output key |
@@ -44,7 +44,7 @@ from . import config
 
 ### 3.1 `compute_magnitude_features`
 
-Converts an integer sequence into Magnitude features.
+Converts an integer sequence into magnitude features.
 
 ```python
 def compute_magnitude_features(sequence: List[int]) -> torch.Tensor
@@ -90,7 +90,7 @@ Empty inputs return `torch.zeros((0, config.MAG_RAW_DIM), dtype=torch.float32)`.
 
 ### 3.2 `compute_modulo_features`
 
-Converts an integer sequence into Modulo features and integer labels.
+Converts an integer sequence into modulo features and integer labels.
 
 ```python
 def compute_modulo_features(sequence: List[int]) -> tuple[torch.Tensor, torch.Tensor]
@@ -99,7 +99,7 @@ def compute_modulo_features(sequence: List[int]) -> tuple[torch.Tensor, torch.Te
 | Item | Type | Description |
 |------|------|-------------|
 | Input | `List[int]` | Integer sequence |
-| Output 1 | `Tensor(L, 200)` | Sin/Cos embeddings |
+| Output 1 | `Tensor(L, 200)` | Sin/cos embeddings |
 | Output 2 | `Tensor(L, 100)` | Integer residue labels |
 
 For each integer `x` and modulus `m in [2, 101]`:
@@ -141,8 +141,8 @@ def process_sequence(sequence: List[int]) -> Dict[str, torch.Tensor]
 Processing flow:
 
 1. Truncate to `MAX_SEQUENCE_LENGTH` if necessary.
-2. Compute Magnitude features.
-3. Compute Modulo features.
+2. Compute magnitude features.
+3. Compute modulo features.
 4. Pack the outputs into a dictionary.
 
 Output:
@@ -164,8 +164,8 @@ Padding is intentionally not performed here; the collator handles batching.
 | Tensor | dtype | Rationale |
 |--------|-------|-----------|
 | `mag_features` | `float32` | Continuous values |
-| `mod_features` | `float32` | Continuous Sin/Cos values |
-| `mod_integers` | `long` (`int64`) | Labels for CrossEntropy |
+| `mod_features` | `float32` | Continuous sin/cos values |
+| `mod_integers` | `long` (`int64`) | Labels for cross-entropy |
 
 ---
 
@@ -173,7 +173,7 @@ Padding is intentionally not performed here; the collator handles batching.
 
 If residues are represented as categorical labels, `0` and `m-1` look far apart. Under modular arithmetic they are adjacent because `0 == m (mod m)`.
 
-Sin/Cos embeddings represent periodicity naturally on the unit circle:
+Sin/cos embeddings represent periodicity naturally on the unit circle:
 
 ```text
 r = 0    -> theta = 0      -> (sin=0, cos=1)
@@ -207,6 +207,6 @@ print(result["mag_features"][0])      # tensor([0., 0., 0., 1.])
 |----------|-----------|
 | `1 + log10(abs(x))` | Avoids `log=0` for `x=1` and keeps positive values positive |
 | One-hot sign | Represents sign as an explicit independent channel |
-| Sin/Cos embedding | Represents periodicity continuously and preserves adjacency across the wrap boundary |
+| Sin/cos embedding | Represents periodicity continuously and preserves adjacency across the wrap boundary |
 | Keep integer residues | Required for classification losses |
 | Truncate only; no padding | Keeps feature extraction separate from batching |

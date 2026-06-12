@@ -15,14 +15,14 @@
 
 ## 1. Overview
 
-This script combines a trained model with `solver.py`, reconstructs the value of the next term for test data, and measures **Exact Match Accuracy**.
+This script combines a trained model with `solver.py`, reconstructs the value of the next term for test data, and measures **exact-match accuracy**.
 
 ### Evaluation Points
 
-1. **Exact Match:** Whether the predicted integer exactly matches the target, which is the strongest differentiator against systems such as GPT-4.
-2. **Top-K Accuracy:** Whether the correct answer appears in the Top-5 candidates.
-3. **Performance by Solver Mode:** Performance for Dense, Sieve, and CRT modes.
-4. **Performance by Magnitude:** Which numeric ranges are solved well, from small values to huge integers.
+1. **Exact match:** Whether the predicted integer exactly matches the target.
+2. **Top-k accuracy:** Whether the correct answer appears within the configured top-k candidates.
+3. **Performance by solver mode:** Performance for dense, sieve, and CRT modes.
+4. **Performance by magnitude:** Which numeric ranges are solved well, from small values to huge integers.
 
 ---
 
@@ -106,7 +106,7 @@ python -m intseq_bert.analysis.analyze_solver \
 
 ### 4.2. Step 1: Data Preparation
 
-The normal `DataLoader` converts values into tensors such as Magnitude and Mod features, but exact-match evaluation requires the **raw integer before conversion**.
+The normal `DataLoader` converts values into tensors such as magnitude and modulo features, but exact-match evaluation requires the **raw integer before conversion**.
 
 For this reason, read JSONL directly and perform the following:
 
@@ -212,7 +212,7 @@ Aggregate all sample-level results and compute summary statistics.
 | Metric | Formula | Description |
 |------|----------|------|
 | `top1_acc` | `(match_rank == 1).mean() x 100` | Top-1 exact match accuracy (%) |
-| `top5_acc` | `(match_rank > 0).mean() x 100` | Fraction where the answer appears in Top-5 (%) |
+| `top{top_k}_acc` | `(1 <= match_rank <= top_k).mean() x 100` | Fraction where the answer appears in the top-k candidates (%) |
 | `sign_acc` | `(sign_pred == sign_true).mean() x 100` | Sign prediction accuracy (%) |
 | `valid_rate` | `(match_rank != -1 or candidates not empty)` | Rate at which the solver returns a solution |
 
@@ -228,7 +228,7 @@ Classification based on `config.MAGNITUDE_BUCKETS`:
 | Huge | 20 ~ 50 | `10^20 ~ 10^50` |
 | Astronomical | 50+ | `10^50+` |
 
-Compute Top-1 accuracy and Top-5 accuracy for each bucket.
+Compute top-1 accuracy and top-k accuracy for each bucket.
 
 ### 5.3. By Solver Mode
 
@@ -288,7 +288,7 @@ Detailed results for individual samples.
 | `target` | int | Ground-truth integer |
 | `target_str` | str | String representation of the ground truth, for very large numbers |
 | `pred_top1` | int | Top-1 predicted value |
-| `match_rank` | int | Rank of the ground truth, 1-5 or -1 for incorrect |
+| `match_rank` | int | Rank of the ground truth, `1..top_k` or `-1` for incorrect |
 | `solver_mode` | str | Solver mode used |
 | `mag_log10` | float | Target magnitude in `log10` |
 | `score_top1` | float | Top-1 score |
@@ -303,6 +303,8 @@ A123456,12345678901234567890,12345678901234567890,12345678901234567890,1,crt,19.
 ```
 
 ### 6.3. `summary.json`
+
+The example below assumes the default `--top_k 5`; for other values, the dynamic key is `top{top_k}_acc`.
 
 ```json
 {
@@ -335,6 +337,8 @@ A123456,12345678901234567890,12345678901234567890,12345678901234567890,1,crt,19.
 
 ### 6.4. `magnitude_breakdown.csv`
 
+The example below assumes the default `--top_k 5`; for other values, the dynamic columns are `top{top_k}_acc` and `top{top_k}_count`.
+
 ```csv
 bucket,count,top1_acc,top5_acc,top1_count,top5_count
 Small,450,72.3,85.1,325,383
@@ -345,6 +349,8 @@ Astronomical,5,0.0,0.0,0,0
 ```
 
 ### 6.5. `mode_breakdown.csv`
+
+The example below assumes the default `--top_k 5`; for other values, the dynamic column is `top{top_k}_acc`.
 
 ```csv
 mode,count,usage_rate,top1_acc,top5_acc

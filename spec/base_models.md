@@ -8,7 +8,7 @@ This module provides shared infrastructure for IntSeqBERT, the Vanilla Transform
 
 | Component | Role |
 |-----------|------|
-| `ModLogitsMixin` | Splits concatenated Modulo logits by modulus |
+| `ModLogitsMixin` | Splits concatenated modulo logits by modulus |
 | `generate_sinusoidal_encoding` | Builds sinusoidal positional encodings |
 | `PositionalEncoding` | Positional-encoding module |
 | `BasePreTrainedModel` | Shared checkpoint loading and weight initialization |
@@ -50,7 +50,7 @@ Config constants:
 
 ### 3.1 `ModLogitsMixin`
 
-Provides a helper for splitting a single concatenated Modulo-logit tensor into per-modulus tensors.
+Provides a helper for splitting a single concatenated modulo-logit tensor into per-modulus tensors.
 
 ```python
 class ModLogitsMixin:
@@ -201,7 +201,7 @@ Loss helper methods:
 | Method | Description |
 |--------|-------------|
 | `_compute_mag_loss(pred_mu, pred_log_var, target)` | Magnitude loss, forced to FP32 |
-| `_compute_mod_loss(pred_logits, target_mods)` | Normalized Modulo loss |
+| `_compute_mod_loss(pred_logits, target_mods)` | Normalized modulo loss |
 
 Magnitude loss:
 

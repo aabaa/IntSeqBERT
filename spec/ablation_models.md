@@ -2,12 +2,12 @@
 
 ## 1. Overview
 
-This module implements the Ablation model, which removes the Modulo stream and FiLM fusion from IntSeqBERT v3.
+This module implements the Ablation model, which removes the modulo stream and FiLM fusion from IntSeqBERT v3.
 
 Purpose:
 
-- Measure how much performance drops when only Magnitude information is provided.
-- Quantify the contribution of the Modulo stream, especially for number-theoretic reasoning.
+- Measure how much performance drops when only magnitude information is provided.
+- Quantify the contribution of the modulo stream, especially for number-theoretic reasoning.
 
 File:
 
@@ -26,13 +26,13 @@ The Ablation model keeps the Transformer backbone and pre-training heads compara
 
 ### 2.1 `AblationEmbeddings`
 
-Receives only Magnitude features and projects them to `d_model`. No Modulo projection and no FiLM fusion are used.
+Receives only magnitude features and projects them to `d_model`. No modulo projection and no FiLM fusion are used.
 
 ```python
 class AblationEmbeddings(nn.Module):
     """
     Magnitude-only embedding.
-    No Modulo stream and no FiLM fusion.
+    No modulo stream and no FiLM fusion.
     """
 ```
 
@@ -69,7 +69,7 @@ Output:
 |--------|-------|
 | `embeddings` | `(B, L, d_model)` |
 
-Magnitude projection is run with autocast disabled for FP32 stability.
+The magnitude projection runs with autocast disabled for FP32 stability.
 
 ### 2.2 `AblationModel`
 
@@ -77,7 +77,7 @@ Transformer Encoder backbone that uses `AblationEmbeddings`.
 
 ```python
 class AblationModel(BasePreTrainedModel):
-    """Transformer Encoder with Magnitude-only embeddings."""
+    """Transformer encoder with magnitude-only embeddings."""
 ```
 
 Architecture:
@@ -106,7 +106,7 @@ Forward output:
 
 ### 2.3 `AblationForPreTraining`
 
-Pre-training wrapper. For fair comparison, it uses the same prediction heads as `IntSeqForPreTraining`, including the diagnostic Modulo head.
+Pre-training wrapper. For fair comparison, it uses the same prediction heads as `IntSeqForPreTraining`, including the diagnostic modulo head.
 
 ```python
 class AblationForPreTraining(BaseForPreTraining):
@@ -212,12 +212,12 @@ class AblationWrapper(ModelWrapper):
 
 | Metric | Expected behavior | Rationale |
 |--------|-------------------|-----------|
-| **Mod Accuracy** | Severe drop toward random | No Modulo information is provided |
-| **Sign Accuracy** | Drop, especially for parity-related structure | `mod 2` information is removed |
+| **Modulo accuracy** | Severe drop toward random | No modulo information is provided |
+| **Sign accuracy** | Drop, especially for parity-related structure | `mod 2` information is removed |
 | **Magnitude MAE** | Similar to IntSeqBERT | Magnitude is directly provided |
-| **Solver Accuracy** | Drop | Periodic constraints are harder to recover |
+| **Solver accuracy** | Drop | Periodic constraints are harder to recover |
 
-The model separates "magnitude prediction" from "number-theoretic structure understanding" and provides evidence for the role of the Modulo stream.
+The model separates "magnitude prediction" from "number-theoretic structure understanding" and provides evidence for the role of the modulo stream.
 
 ---
 

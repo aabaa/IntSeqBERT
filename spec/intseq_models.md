@@ -12,9 +12,9 @@ Shared infrastructure such as base classes, heads, checkpoint loading, and loss 
 
 Key features:
 
-- **Dual-stream input**: Magnitude and Modulo streams.
-- **FiLM fusion**: Modulo features modulate Magnitude representations.
-- **FP32 critical paths**: Magnitude-related computations are forced to FP32 for numerical stability.
+- **Dual-stream input**: separate magnitude and modulo streams.
+- **FiLM fusion**: modulo features modulate magnitude representations.
+- **FP32 critical paths**: magnitude-related computations are forced to FP32 for numerical stability.
 - **Fixed multi-task loss weights**: `w_mag=1.0`, `w_sign=1.0`, `w_mod=2.0`.
 
 ---
@@ -32,7 +32,7 @@ Config constants:
 | Constant | Value | Purpose |
 |----------|-------|---------|
 | `MAG_EXTENDED_DIM` | 5 | Magnitude input dimension, including `is_masked` |
-| `MOD_FEATURE_DIM` | 200 | Modulo Sin/Cos input dimension |
+| `MOD_FEATURE_DIM` | 200 | Modulo sin/cos input dimension |
 | `MOD_RANGE` | `list(range(2, 102))` | Moduli 2 through 101 |
 | `NUM_MODULI` | 100 | Number of moduli |
 | `INPUT_PROJ_TYPE` | `"mlp"` | Magnitude projection type: `"linear"` or `"mlp"` |
@@ -55,7 +55,7 @@ SIGN_ZERO = 2
 
 ### 3.1 `IntSeqEmbeddings`
 
-Input layer that fuses magnitude and periodicity. The Modulo stream generates FiLM scale and shift parameters that modulate the Magnitude stream.
+Input layer that fuses magnitude and periodicity. The modulo stream generates FiLM scale and shift parameters that modulate the magnitude stream.
 
 Constructor arguments:
 
@@ -88,7 +88,7 @@ nn.init.zeros_(self.film_scale.weight)
 nn.init.zeros_(self.film_scale.bias)
 ```
 
-Zero-initializing the FiLM scale prevents early training from destroying the Magnitude representation.
+Zero-initializing the FiLM scale prevents early training from destroying the magnitude representation.
 
 Forward input:
 
@@ -102,10 +102,10 @@ Forward output:
 Processing flow:
 
 ```text
-1. Project Magnitude features in FP32.
-2. Project Modulo features and apply ReLU.
+1. Project magnitude features in FP32.
+2. Project modulo features and apply ReLU.
 3. Optionally apply pre-FiLM dropout to both streams.
-4. Generate gamma and beta from the Modulo stream.
+4. Generate gamma and beta from the modulo stream.
 5. Fuse: h_fused = (1 + gamma) * h_mag + beta.
 6. Add positional encoding, LayerNorm, and dropout.
 ```
@@ -162,7 +162,7 @@ Prediction heads:
 |------|-----------|--------|-----------|
 | `mag_head` | `Linear(d_model, d_model) -> ReLU -> Linear(d_model, 2)` | `[mu, log(sigma^2)]` | FP32 |
 | `sign_head` | `Linear(d_model, 3)` | `[Positive, Negative, Zero]` logits | FP16/FP32 |
-| `mod_head` | `Linear(d_model, sum(MOD_RANGE))` | Concatenated Modulo logits | FP16/FP32 |
+| `mod_head` | `Linear(d_model, sum(MOD_RANGE))` | Concatenated modulo logits | FP16/FP32 |
 
 The sign class order follows `SIGN_POSITIVE=0`, `SIGN_NEGATIVE=1`, and `SIGN_ZERO=2`.
 
@@ -172,14 +172,14 @@ Fixed loss weights:
 loss_weights = register_buffer(torch.tensor([1.0, 1.0, 2.0]))
 ```
 
-The Modulo task receives double weight to encourage periodic-structure learning. Earlier experiments used Automatic Weighted Loss, but fixed weights were adopted after task collapse in the Modulo objective.
+The modulo task receives double weight to encourage periodic-structure learning. Earlier experiments used automatic weighted loss, but fixed weights were adopted after task collapse in the modulo objective.
 
 Forward arguments:
 
 | Argument | Shape | Required | Description |
 |----------|-------|----------|-------------|
-| `mag_features` | `(B, L, 5)` | yes | Magnitude stream |
-| `mod_features` | `(B, L, 200)` | yes | Modulo stream |
+| `mag_features` | `(B, L, 5)` | yes | magnitude stream input |
+| `mod_features` | `(B, L, 200)` | yes | modulo stream input |
 | `src_key_padding_mask` | `(B, L)` | yes | Padding mask |
 | `labels` | dict | no | Training labels |
 
@@ -187,7 +187,7 @@ Forward arguments:
 
 | Key | Shape | Description |
 |-----|-------|-------------|
-| `mag_targets` | `(B, L)` Float | Original Magnitude target |
+| `mag_targets` | `(B, L)` Float | Original magnitude target |
 | `sign_targets` | `(B, L)` Long | Class index: Pos, Neg, Zero |
 | `mod_targets` | `(B, L, 100)` Long | Residues for each modulus |
 | `mask_map` | `(B, L)` Bool | `True` for positions included in loss |
