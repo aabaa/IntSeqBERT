@@ -1,0 +1,9 @@
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+
+slides_draft.md
+talk_simulation.md
