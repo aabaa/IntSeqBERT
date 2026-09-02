@@ -11,6 +11,12 @@
 \usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{pgfpages}
+
+% Keep the 16:9 slide layout, but emit each page on A4 landscape paper.
+% This also makes printer-driver n-up layouts (such as 4 pages per sheet)
+% handle the document at the intended physical size.
+\pgfpagesuselayout{resize to}[a4paper,landscape]
 
 \graphicspath{{../figures/}}
 
