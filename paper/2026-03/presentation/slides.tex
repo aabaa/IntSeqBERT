@@ -35,23 +35,44 @@
   \titlepage
 \end{frame}
 
+\begin{frame}{Why Finding Good Problems Matters}
+  \small
+  \textbf{Terence Tao's concern:}
+  We may solve fruitful open problems faster than we develop new ones.
+  \begin{quote}
+    ``a country or region can suffer a critical shortage of drinking water
+    while simultaneously being surrounded by a massive ocean.''
+  \end{quote}
+  \begin{itemize}\tightlist
+    \item We can ask \textbf{infinitely many mathematical questions}.
+    \item But \alert{good problems may still become scarce}:
+          many questions lead to few new ideas or connections.
+    \item A useful problem should help us \textbf{understand more mathematics}.
+  \end{itemize}
+  \begin{alertblock}{Our motivation}
+    Can AI help us find new mathematical connections and promising conjectures?
+  \end{alertblock}
+  {\scriptsize Source: Terence Tao, Mastodon, post 1/4. Quote above; other text is a summary.\\
+  \href{https://mathstodon.xyz/@tao/117237320796901560}{\texttt{mathstodon.xyz/@tao/117237320796901560}}}
+\end{frame}
+
 \begin{frame}{Long-Term Goal --- AI for Mathematical Discovery}
   \small
   \begin{itemize}\tightlist
-    \item Many deep conjectures began with a \alert{numerical observation}:
+    \item Many important conjectures began with a \alert{numerical observation}:
       \begin{itemize}
         \item $196{,}884 = 196{,}883 + 1$ --- McKay's observation $\to$ \emph{Monstrous Moonshine}
         \item The BSD conjecture and mirror symmetry ($317{,}206{,}375$ rational curves)
-              also began with numerics
+              also began with numerical patterns
       \end{itemize}
     \item Today, AI systems take part in this kind of discovery:\\
           \textbf{AlphaProof}, the \textbf{Ramanujan Machine}, \textbf{FunSearch}
     \item \alert{Our long-term goal}: an AI that finds \emph{hidden number-theoretic
           similarities} between integer sequences from different fields ---
           and supports \alert{conjecture generation}
-    \item The natural corpus is the \textbf{OEIS}: 391{,}710 sequences, each with a precise
-          definition --- a uniquely machine-readable corpus of mathematics
-    \item The missing piece: a machine \alert{representation} that captures
+    \item Our data source is the \textbf{OEIS}: 391{,}710 sequences, each with a precise
+          definition --- a collection of mathematics that computers can read
+    \item We need a machine \alert{representation} that captures
           number-theoretic structure
     \item \textbf{This paper is the first step}: we propose such a representation,
           and we \emph{measure} how much arithmetic structure it actually captures
@@ -61,62 +82,62 @@
 \begin{frame}{Why Multiplication Is Hard for Deep Learning}
   \footnotesize
   \begin{itemize}\tightlist
-    \item The central difficulty: standard neural models do not reliably learn
+    \item The main problem: standard neural models have difficulty learning
           \alert{multiplication-like rules}.
     \item \textbf{Spectral bias}: networks learn low-frequency, addition-like structure
           first (Rahaman+ 2019)
     \item How many layers does multiplication need?
       \begin{itemize}
-        \item \textbf{In theory}: not hard --- \alert{depth-3 threshold circuits} suffice for
-              $n$-bit multiplication, and this depth is optimal (Siu \& Roychowdhury 1994)
+        \item \textbf{In theory}: \alert{depth-3 threshold circuits} are enough for
+              $n$-bit multiplication, and fewer layers are not enough (Siu \& Roychowdhury 1994)
         \item \textbf{In practice}: gradient descent does not find these circuits ---
               GPT-4 scores 59\% on $3{\times}3$-digit, and only \alert{4\% on
               $4{\times}4$-digit} multiplication (Dziri+ 2023)
         \item Even \textbf{mod-$p$ multiplication in a 2-layer Transformer} generalises only
-              after extreme training delay --- the \emph{grokking} phenomenon (Power+ 2022)
-        \item The known success needs \textbf{12 layers \emph{plus} a special curriculum}
+              after a very long training period --- the \emph{grokking} phenomenon (Power+ 2022)
+        \item One successful method uses \textbf{12 layers \emph{plus} a special training method}
               (implicit chain-of-thought) to reach 15-digit products (Yao+ 2025)
       \end{itemize}
-    \item \textbf{Tokenisation makes it worse}: out-of-vocabulary values collapse into
-          \texttt{UNK}, and arithmetic structure is buried in opaque token IDs
-    \item The OEIS is a \alert{stress test}: a single corpus spanning
+    \item \textbf{Tokenisation makes it worse}: values outside the vocabulary become
+          \texttt{UNK}, and token IDs do not directly show arithmetic structure
+    \item The OEIS is a \alert{difficult test}: its values range from
           single digits \dots\ to $10^{210}$
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Key Idea --- Modular Arithmetic Makes Multiplication Shallow}
+\begin{frame}{Key Idea --- Show Multiplicative Structure in the Input}
   \begin{itemize}\tightlist
-    \item Our key idea is not a new neural trick --- it is \alert{classical number theory}.
+    \item Our key idea comes from \alert{classical number theory}.
     \item Reduction mod $m$ is a \alert{ring homomorphism}
           $\mathbb{Z} \to \mathbb{Z}/m\mathbb{Z}$:
           it preserves \textbf{both addition and multiplication}
     \item So the residue sequence $(x_i \bmod m)$ keeps the multiplicative structure ---
-          \textbf{regardless of magnitude}: even for $10^{210}$, the residue stays in
+          \textbf{even for very large values}: for $10^{210}$, the residue stays in
           $\{0,\dots,m-1\}$
-    \item Number theory gives us periodicity \textbf{for free}:
+    \item Number theory explains these \textbf{periodic patterns}:
       \begin{itemize}
         \item \textbf{Fermat's little theorem}: powers are periodic mod $p$
               (period divides $p-1$)
         \item \textbf{Quadratic reciprocity}: links residue information across primes
-        \item \textbf{CRT}: composite moduli aggregate several prime powers at once
+        \item \textbf{CRT}: composite moduli combine information from several prime powers
       \end{itemize}
-    \item \alert{Hypothesis}: supply the network with the \emph{modulo spectrum} as explicit
+    \item \alert{Hypothesis}: give the network the \emph{modulo spectrum} as
           input --- then it sees multiplicative structure \alert{at depth zero},
-          instead of re-discovering it across many layers
+          without having to learn it across many layers
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Task --- Masked Sequence Modelling on OEIS}
   \begin{itemize}\tightlist
     \item The task is \alert{masked sequence modelling} --- BERT-style, but for integers.
-    \item We take a prefix of an OEIS sequence (up to 128 terms), mask 15\% of the
+    \item We take up to the first 128 terms of an OEIS sequence, mask 15\% of the
           positions, and train the model to predict each masked value from context
-    \item This directly probes whether the model has internalised the \emph{law} of the
+    \item This tests how well the model has learned the \emph{rule} of the
           sequence; \textbf{next-term prediction} is the special case where the last term
           is masked
     \item Prior benchmark: \textbf{FACT} (NeurIPS 2022) --- a plain Transformer on five OEIS
           tasks; \emph{unmasking} was the hardest; our \textbf{Vanilla baseline}
-          corresponds to that architecture
+          uses that architecture
     \item Instead of predicting one token, we predict \alert{three quantities} per masked
           position:
       \begin{enumerate}
@@ -135,9 +156,9 @@
           $\to$ MLP
     \item The \alert{modulo stream} ($\mathbb{R}^{200}$) embeds each residue on the
           \textbf{unit circle}: $\phi_m(r) = [\sin(2\pi r/m), \cos(2\pi r/m)]$
-          --- the Transformer's sinusoidal \emph{positional} encoding, repurposed for
+          --- we use the Transformer's sinusoidal \emph{positional} encoding for
           \emph{residues of values}; residues $m{-}1$ and $0$ stay neighbours
-    \item \alert{FiLM fusion}: the modulo stream modulates the magnitude stream:
+    \item \alert{FiLM fusion}: the modulo stream scales and shifts the magnitude stream:
           $\mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\mathrm{mag}}
            + \boldsymbol{\beta}_i$
     \item Then a standard \textbf{pre-LN Transformer encoder} ---
@@ -147,7 +168,7 @@
 
 \begin{frame}{Training --- Multi-Task Objective}
   \begin{itemize}\tightlist
-    \item Three prediction heads sit on top of the encoder:
+    \item Three prediction heads use the encoder output:
       \begin{itemize}
         \item The \textbf{magnitude head} also predicts its own \alert{uncertainty}
               $(\mu_i, \sigma_i^2)$ --- remember this: the Solver will use it
@@ -160,8 +181,8 @@
            + 2\,\mathcal{L}_{\mathrm{mod}}$
     \item Trained on \textbf{219{,}765 OEIS sequences}, 200 epochs, in \textbf{FP32} ---
           because values near $10^{210}$ overflow FP16
-    \item All experiments run on a \alert{single commodity GPU}
-          (RTX 3070\,Ti, 8\,GB), keeping the setting modest and reproducible
+    \item All experiments run on a \alert{single consumer GPU}
+          (RTX 3070\,Ti, 8\,GB), so other researchers can repeat the experiments
   \end{itemize}
 \end{frame}
 
@@ -169,18 +190,18 @@
   \begin{itemize}\tightlist
     \item The network outputs \textbf{distributions} --- magnitude, sign, 100 residues ---
           \alert{not integers}
-    \item The \alert{Solver} reconstructs concrete integers \textbf{symbolically}:
+    \item The \alert{Solver} produces integer candidates using \textbf{symbolic rules}:
       \begin{itemize}
         \item The magnitude and its uncertainty give a $3\sigma$ \textbf{search interval}
-        \item \textbf{Dense} ($\Delta n \le 10^6$): enumerate every candidate in the interval
-        \item \textbf{Sieve} ($\le 10^{14}$): CRT beam search anchored on the most
-              confident moduli
+        \item \textbf{Dense} ($\Delta n \le 10^6$): check every candidate in the interval
+        \item \textbf{Sieve} ($\le 10^{14}$): CRT beam search based on the moduli with the
+              most confident predictions
         \item \textbf{CRT} ($> 10^{14}$): sparse CRT generates very large candidates directly
       \end{itemize}
-    \item The design philosophy: a \alert{neural-symbolic} system ---
-          residue arithmetic and the Chinese Remainder Theorem are \textbf{built in},
-          not left for the network to discover end-to-end
-    \item Is that a feature, or a limitation? ---
+    \item We combine neural prediction and symbolic rules in a \alert{neural-symbolic} system ---
+          residue arithmetic and the Chinese Remainder Theorem are \textbf{built in};
+          the network does not have to learn these rules from data
+    \item Is this a strength or a limitation? ---
           \alert{I will come back to this with the results.}
   \end{itemize}
 \end{frame}
@@ -190,17 +211,17 @@
     \item From 391{,}710 OEIS entries we keep \alert{274{,}705 (70.1\%)}, split 8:1:1
     \item Eleven tags are excluded, in \textbf{three groups}:
       \begin{itemize}
-        \item \textbf{representation-dependent} (\texttt{cons}, \texttt{cofr},
+        \item \textbf{depend on how values are written} (\texttt{cons}, \texttt{cofr},
               \texttt{frac}, \texttt{base}, \texttt{word}):
-              their structure lives in the \emph{encoding}, not in the integer values
-        \item \textbf{incompatible task setting} (\texttt{fini}, \texttt{tabl})
+              their patterns depend on the \emph{encoding} of the values
+        \item \textbf{do not fit this task} (\texttt{fini}, \texttt{tabl})
         \item \textbf{quality labels} (\texttt{dead}, \texttt{unkn}, \texttt{less},
               \texttt{dumb})
       \end{itemize}
-    \item These are task-design choices:
+    \item These choices define our task:
           \texttt{less}/\texttt{dumb} are subjective labels, and \texttt{tabl} could be
-          linearised --- future benchmarks can revisit this boundary
-    \item For evaluation, five \textbf{magnitude buckets}:\\
+          converted into sequences. Future benchmarks may use different choices
+    \item For evaluation, five \textbf{magnitude buckets} (groups by size):\\
           Small ($<10^2$, 52.7\%) $\to$ Medium $\to$ Large $\to$ Huge $\to$
           Astronomical ($\ge 10^{50}$)
   \end{itemize}
@@ -214,13 +235,13 @@
       \begin{itemize}
         \item Example: true value $10^6$ $\to$ anything in
               $[3.2 \times 10^5,\ 3.2 \times 10^6]$ counts
-        \item Its only job: set a \textbf{realistic search range} for the Solver
+        \item Its purpose: help set a \textbf{realistic search range} for the Solver
       \end{itemize}
     \item \textbf{Exact} integer match is measured separately, by \textbf{Solver Top-$k$}
     \item \textbf{MMA}: mean classification accuracy over all 100 moduli
     \item \textbf{NIG} (normalised information gain)
           $= 1 - \mathcal{L}_{\mathrm{CE}}^{(m)}/\ln m$:
-          0 = nothing learned, 1 = perfect periodic structure
+          0 = no gain over uniform prediction, 1 = perfect prediction
   \end{itemize}
   \begin{alertblock}{Three questions for the results}
     \textbf{Q1} --- Does the dual stream help?\quad
@@ -248,9 +269,9 @@
     \item The \alert{ablation row} is the important one: remove the modulo stream $\to$
           MMA drops \alert{$-15.2$\,pt} --- and magnitude accuracy \textbf{also} drops
           \textbf{$-6.2$\,pt}
-    \item Knowing the residues constrains what the value can be: the modulo stream acts as
-          an \alert{arithmetic constraint on the whole representation}
-    \item (The same pattern holds at Small and Middle scale --- full table in backup)
+    \item The residues limit the possible integer values. This helps the model learn
+          \alert{both magnitude and modulo information}
+    \item (The same pattern holds at Small and Middle scale --- scaling results in backup)
   \end{itemize}
 \end{frame}
 
@@ -273,12 +294,12 @@
     \begin{column}{0.62\textwidth}
       \scriptsize
       \begin{itemize}\setlength{\itemsep}{0.2em}
-        \item Above its vocabulary limit, Vanilla collapses into \texttt{UNK} ---
+        \item Above its vocabulary limit, Vanilla uses \texttt{UNK} ---
               its Large-bucket error is \alert{13$\times$ ours}; overall
               $R^2$: \alert{0.988} vs 0.943
         \item This is why bucketed evaluation matters: most OEIS sequences grow slowly,
-              so \emph{overall} numbers are dominated by easier cases
-        \item The real contribution shows up in the \alert{hard buckets --- Large and
+              so easier cases have a large effect on the \emph{overall} scores
+        \item The clearest gains are in the \alert{hard buckets --- Large and
               above} --- where the baseline stops working
       \end{itemize}
     \end{column}
@@ -299,34 +320,34 @@
     \end{tabular}
   \end{center}
   \begin{itemize}\tightlist
-    \item The end-to-end test: predict the \textbf{exact last term} of 10{,}000 held-out
-          sequences
+    \item We test the full system: predict the \textbf{exact last term} of 10{,}000
+          sequences kept separate for testing
     \item The tokenised Transformer gets \textbf{2.59\%}; IntSeqBERT gets \textbf{19.09\%}
           --- a \alert{7.4-fold improvement}
     \item By bucket: Small \textbf{68.3\%}, Medium \textbf{20.8\%} ---
           while Vanilla is at \textbf{0\%} for everything beyond its vocabulary
     \item But for the Large buckets and above, our model also drops to near zero:
-          CRT reconstruction needs \textbf{exact residues for many moduli simultaneously}
+          CRT reconstruction needs \textbf{exact residues for many moduli at the same time}
           --- and at MMA $\approx 50\%$, that almost never happens
-    \item This raises the main interpretation question: \alert{how should we read 19\%?}
+    \item The next question: \alert{is 19\% a success or a failure?}
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Interpreting 19\% --- a Useful Negative Result}
+\begin{frame}{What Does 19\% Mean? --- A Useful Negative Result}
   \begin{itemize}\tightlist
-    \item The answer: \alert{both --- and both readings are informative.}
+    \item There are \alert{two useful ways to understand this result.}
     \item Even with number-theoretic structure \textbf{built into} the representation,
           exact prediction of OEIS terms \textbf{remains hard};
           a purely tokenised Transformer performs poorly (2.59\%)
-    \item \textbf{Reading 1}: a quantified \alert{limit of pure end-to-end learning}
-          on arithmetic
-    \item \textbf{Reading 2}: a case \alert{for neural-symbolic design} ---
-          the symbolic CRT solver supplies exact constraints that the network
-          \emph{demonstrably} cannot learn alone
-    \item And my answer to the earlier question --- feature or limitation?\\
-          Handcrafted features are the \alert{measurement instrument} of this study:
-          because the features are explicit, the ablation tells us \emph{exactly} how much
-          arithmetic structure each representational choice captures ($-15.2$\,pt MMA)
+    \item \textbf{Point 1}: the results measure \alert{how limited end-to-end learning is}
+          for arithmetic in this setting
+    \item \textbf{Point 2}: the results support \alert{neural-symbolic design} ---
+          the CRT solver provides exact rules that the network
+          does not learn well on its own
+    \item And my answer to the earlier question --- strength or limitation?\\
+          We use features based on number theory as a \alert{tool for measurement}:
+          removing the modulo stream shows how much these features help
+          the model learn arithmetic structure ($-15.2$\,pt MMA)
   \end{itemize}
 \end{frame}
 
@@ -334,20 +355,20 @@
   \centering
   \includegraphics[width=0.72\textwidth]{fig2_nig_spectrum.pdf}
   \begin{itemize}\tightlist\footnotesize
-    \item Prediction accuracy is one lens. The more interesting question:
+    \item Prediction accuracy is one way to evaluate the model. We also ask:
           \alert{what did the network actually learn about number theory?}
     \item NIG for every modulus $m = 2, \dots, 101$: IntSeqBERT is above both baselines
           across the \textbf{entire spectrum} --- and the shape is not flat:
-          \alert{the peaks are systematic}
+          \alert{the peaks follow a clear pattern}
     \item Best modulus across \emph{all} models and scales:
-          $m = 96 = 2^5 \times 3$ (NIG\,$=0.629$); runner-up: $m = 2$ ---
+          $m = 96 = 2^5 \times 3$ (NIG\,$=0.629$); second best: $m = 2$ ---
           \textbf{parity is everywhere} in the OEIS
-    \item Parity also stratifies the models: mod-2 accuracy
+    \item Parity also shows differences between the models: mod-2 accuracy
           \textbf{85.7} (IntSeq) / 81.4 (Vanilla) / 72.1 (Ablation)
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Finding --- NIG Anti-Correlates with Euler's Totient Ratio}
+\begin{frame}{Finding --- Higher NIG with a Lower Totient Ratio}
   \begin{columns}[T]
     \begin{column}{0.46\textwidth}
       \centering
@@ -357,17 +378,17 @@
       \footnotesize
       \begin{itemize}\setlength{\itemsep}{0.4em}
         \item Why 96? Why composites?
-              \alert{One quantity explains the shape}:
+              \alert{One quantity helps explain this pattern}:
               Euler's totient ratio $\varphi(m)/m = \prod_{p \mid m}(1 - 1/p)$
         \item NIG vs $\varphi(m)/m$: Pearson \alert{$r = -0.851$} ($p < 10^{-28}$)
-        \item The interpretation is the \alert{CRT aggregation effect}:
-              $x \bmod 96$ \emph{simultaneously} encodes
-              $x \bmod 2, 4, 8, 16, 32$ --- \emph{and} $x \bmod 3$
-        \item An empirical observation, not a theorem --- but with a
-              \textbf{design implication}: to extend beyond 101, add
+        \item We explain this using the \alert{CRT aggregation effect}:
+              $x \bmod 96$ gives us
+              $x \bmod 2, 4, 8, 16, 32$ --- \emph{and} $x \bmod 3$ --- at the same time
+        \item This is an experimental result, not a theorem. It suggests a
+              \textbf{design choice}: to extend beyond 101, add
               \alert{highly composite numbers}, not more primes
-        \item This spectrum is a \alert{fingerprint} of the arithmetic structure of a
-              corpus --- sequences (or corpora) can be \textbf{compared by their spectra}
+        \item This spectrum describes the \alert{arithmetic patterns} in a dataset.
+              We can use spectra to \textbf{compare sequences or datasets}
       \end{itemize}
     \end{column}
   \end{columns}
@@ -376,38 +397,38 @@
 \begin{frame}{Positioning in Computer Mathematics}
   \small
   \begin{itemize}\tightlist
-    \item That fingerprint idea brings me back to where I started:
+    \item Comparing sequences brings us back to our original goal:
           \alert{what is this work for?}
     \item \textbf{Program synthesis on the OEIS} --- Alien Coding, QSynt, Learning
           Conjecturing --- describes each sequence's \textbf{generation rule}
-    \item We are \alert{complementary}: we learn \alert{shared arithmetic structure}
+    \item Our work can \alert{support these methods}: we learn \alert{shared arithmetic structure}
           across the whole corpus
       \begin{itemize}
         \item Synthesis asks: \emph{``What program generates this sequence?''}
         \item Our representation asks: \emph{``Which sequences are number-theoretically
               \textbf{similar} --- even if generated in completely different ways?''}
       \end{itemize}
-    \item Pretrained embeddings can serve synthesis as a \textbf{search heuristic},
-          or stand alone as a \alert{retrieval index} for similar sequences
-    \item That retrieval capability is the bridge toward \alert{conjecture generation} ---
-          the Ramanujan-Machine spirit we began with
+    \item Pretrained embeddings could \textbf{guide the search} in program synthesis,
+          or help us \alert{find similar sequences}
+    \item Finding similar sequences could help us \alert{generate conjectures} ---
+          our long-term goal
     \item Code, preprocessing, and evaluation: \texttt{github.com/aabaa/IntSeqBERT}
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Conclusion}
   \small
-  \textbf{Four takeaways:}
+  \textbf{Four main points:}
   \begin{enumerate}\tightlist
-    \item The modulo spectrum is \alert{principled} feature engineering:
+    \item The modulo spectrum uses features \alert{based on number theory}:
           a \textbf{ring homomorphism} makes multiplicative structure visible
           \alert{at depth zero}
     \item It works: consistent gains at every scale, and a \alert{7.4$\times$}
           improvement in exact next-term prediction
-    \item \textbf{Composite moduli aggregate arithmetic information}:
-          NIG anti-correlates with $\varphi(m)/m$ ($r = -0.851$)
+    \item \textbf{Composite moduli combine arithmetic information}:
+          NIG has a negative correlation with $\varphi(m)/m$ ($r = -0.851$)
     \item At the same time: pure neural prediction of OEIS terms \textbf{remains hard} ---
-          the future is \alert{neural-symbolic}
+          this supports further work on \alert{neural-symbolic methods}
   \end{enumerate}
   \medskip
   \textbf{Future work:} approximate CRT for large integers \,$\cdot$\,
@@ -427,11 +448,11 @@
   \includegraphics[width=0.75\textwidth]{fig3_scaling.pdf}
   \begin{itemize}\tightlist\footnotesize
     \item The same ranking holds at every scale: IntSeqBERT $>$ Vanilla $>$ Ablation
-    \item \alert{Scaling is differential}: from Small to Large, MMA improves
+    \item \alert{Model size helps modulo prediction more}: from Small to Large, MMA improves
           \textbf{+10.0\,pt} while Mag Acc improves only \textbf{+1.1\,pt} ---
-          arithmetic reasoning benefits \emph{disproportionately} from capacity
-    \item Solver Top-1 follows the modulo trend: \textbf{+5.0\,pt} (14.05 $\to$ 19.09)
-    \item No overfitting: Train 1.00 / Val 1.01 at epoch 200;
+          larger models improve modulo prediction more than magnitude prediction
+    \item Solver Top-1 also improves: \textbf{+5.0\,pt} (14.05 $\to$ 19.09)
+    \item No clear sign of overfitting: Train 1.00 / Val 1.01 at epoch 200;
           larger-scale retraining is planned as future work
   \end{itemize}
 \end{frame}
@@ -445,25 +466,25 @@
           \alert{number-theoretic structure of the integer itself}:
       \begin{itemize}
         \item the modulo stream supplies residues \textbf{directly};
-              from a digit sequence they are only \textbf{indirectly} recoverable
+              with digit tokens, the model must \textbf{calculate} them from the digits
       \end{itemize}
     \item Digit-by-digit generation also \textbf{changes the problem setting}:
           sequential prediction of a digit string vs.\ predicting one integer value
-    \item A controlled comparison between the two settings is an interesting direction
+    \item We plan to compare the two settings under the same conditions
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Backup --- Limitations}
   \begin{itemize}\tightlist
     \item \textbf{Large integers}: CRT reconstruction needs exact residues for many moduli
-          simultaneously; 13.4\% of Solver calls return no valid candidate
-          (\texttt{none} mode); approximate CRT / relaxed residue constraints are the
-          natural remedy
-    \item \textbf{Dataset bias}: \texttt{nonn} dominance $\to$ high sign accuracy;
-          sub-linear growth dominance $\to$ high overall Mag Acc
+          at the same time; 13.4\% of Solver calls return no valid candidate
+          (\texttt{none} mode); approximate CRT / less strict residue constraints are
+          possible next steps
+    \item \textbf{Dataset bias}: many \texttt{nonn} sequences $\to$ high sign accuracy;
+          many slowly growing sequences $\to$ high overall Mag Acc
     \item \textbf{Compute}: a single 8\,GB GPU, single seed (42), vocabulary 20{,}003 ---
-          our Vanilla is a \emph{FACT-equivalent architecture under our constraints},
-          not a reproduction of FACT's reported numbers
+          Vanilla uses the \emph{same architecture as FACT} with our settings.
+          We do not reproduce FACT's reported results
   \end{itemize}
 \end{frame}
 
@@ -477,15 +498,15 @@
           iterated products: depth 4
     \item \textbf{Transformers $\approx$ TC$^0$}: log-precision transformers are
           upper-bounded by uniform TC$^0$ (Merrill \& Sabharwal 2023) ---
-          multiplication sits right at the edge of their expressive power
-    \item \textbf{LLM empirics} (Dziri+, \emph{Faith and Fate}, NeurIPS 2023):
+          this connects multiplication to the limits of these models
+    \item \textbf{LLM experiments} (Dziri+, \emph{Faith and Fate}, NeurIPS 2023):
           GPT-4 zero-shot --- $3{\times}3$-digit: \textbf{59\%},
           $4{\times}4$-digit: \alert{4\%}
     \item \textbf{Grokking} (Power+ 2022, arXiv:2201.02177): a 2-layer transformer on
-          modular arithmetic generalises only after long delayed training
+          modular arithmetic generalises only after a very long training period
     \item \textbf{Mechanistic analysis} (arXiv:2510.00184, 2025): standard training fails
           at multi-digit multiplication even at 90B parameters; a 12-layer model succeeds
-          at 15-digit products only with implicit-CoT training, self-organising a
+          at 15-digit products only with implicit-CoT training, forming a
           \alert{binary tree of partial products} in attention
   \end{itemize}
 \end{frame}
