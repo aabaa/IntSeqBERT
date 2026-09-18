@@ -13,6 +13,8 @@
 \usepackage{array}
 \usepackage{graphicx}
 \usepackage{pgfpages}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 
 % Keep the 16:9 slide layout, but emit each page on A4 landscape paper.
 % This also makes printer-driver n-up layouts (such as 4 pages per sheet)
@@ -150,7 +152,7 @@
           This is \alert{masked sequence modelling}: BERT-style learning for integers.
     \item We take up to the first \textbf{128 terms} and mask \textbf{15\%} of the positions.
           The remaining terms provide the context.
-    \item \readout{This tests whether the model has learned the rule of the sequence.}
+    \item \readout{This tests how well the model captures patterns in the sequence.}
           In \textbf{next-term prediction}, only the last term is masked.
     \item The \textbf{FACT} benchmark (NeurIPS 2022) tested a plain Transformer on five OEIS
           tasks. Unmasking was the hardest task. Our \textbf{Vanilla baseline} uses that architecture.
@@ -161,6 +163,71 @@
         \item \textbf{Residues} are $x_i \bmod m$ for every $m \in \{2, \dots, 101\}$.
       \end{enumerate}
   \end{itemize}
+\end{frame}
+
+\begin{frame}{A Worked Example --- Predicting a Missing Integer}
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,
+  flow/.style={-{Stealth[length=2mm]},thick,draw=mDarkTeal},
+  term/.style={rounded corners=2pt,fill=mDarkTeal!8,
+    minimum width=0.85cm,minimum height=0.48cm,font=\large},
+  card/.style={rounded corners=3pt,draw=mDarkTeal!30,fill=mDarkTeal!4,
+    text width=3.65cm,minimum height=1.12cm,align=center,font=\footnotesize}]
+  \useasboundingbox (0,0) rectangle (14,6.25);
+  \node[anchor=west,font=\small\bfseries] at (0,6.05)
+    {1. Hide a term; use the surrounding terms as context.};
+  \foreach \entry [count=\i from 0] in {1,2,4,8,?,32,64} {
+    \ifnum\i=4
+      \node[term,fill=mLightBrown!20,draw=mLightBrown,thick] (t\i)
+        at ({3.1+1.15*\i},5.45) {$\entry$};
+    \else
+      \node[term] (t\i) at ({3.1+1.15*\i},5.45) {$\entry$};
+    \fi
+  }
+  \node[anchor=west,font=\footnotesize] at (0,4.88) {Visible terms mod 3:};
+  \foreach \entry [count=\i from 0] in {1,2,1,2,?,2,1} {
+    \node[font=\footnotesize,text=mDarkTeal] at ({3.1+1.15*\i},4.88) {$\entry$};
+  }
+  \node[anchor=west,align=left,font=\scriptsize,text=mLightBrown] at (10.7,4.88)
+    {A simple periodic\\pattern};
+  \draw[flow] (7,4.62) -- (7,4.33);
+  \node[rounded corners=3pt,fill=mDarkTeal,text=white,
+    minimum width=4.4cm,minimum height=0.48cm,font=\small\bfseries]
+    (model) at (7,4.05) {IntSeqBERT};
+  \node[anchor=west,align=left,font=\small\bfseries] at (0,4.05)
+    {2. Predict three properties\\of the hidden term.};
+  \node[card] (mag) at (2.25,2.70)
+    {\textbf{Magnitude}\\$1+\log_{10}16 \approx 2.204$\\
+     {\scriptsize Model: size + uncertainty}};
+  \node[card] (sign) at (7,2.70)
+    {\textbf{Sign}\\$+$\\
+     {\scriptsize Model: class probabilities}};
+  \node[card] (res) at (11.75,2.70)
+    {\textbf{Residues} {\scriptsize ($m=2,\ldots,101$)}\\
+     {\scriptsize mod 2: 0; mod 3: 1; mod 5: 1}\\
+     {\scriptsize Model: residue probabilities}};
+  \draw[flow] (model.south) -- (7,3.55) -| (mag.north);
+  \draw[flow] (model.south) -- (7,3.55) -| (res.north);
+  \draw[flow] (model.south) -- (sign.north);
+  \node[rounded corners=3pt,draw=mDarkTeal,fill=mDarkTeal!8,
+    minimum width=3.4cm,minimum height=0.52cm,font=\small]
+    (solver) at (7,1.04) {CRT Solver};
+  \draw[flow] (mag.south) -- (2.25,1.48) -| (solver.north);
+  \draw[flow] (sign.south) -- (solver.north);
+  \draw[flow] (res.south) -- (11.75,1.48) -| (solver.north);
+  \node[anchor=west,align=left,font=\small\bfseries] at (0,0.97)
+    {3. Combine predictions\\to recover an integer.};
+  \node[term,fill=mLightBrown!20,draw=mLightBrown,minimum width=1.1cm]
+    (answer) at (10.6,1.04) {$16$};
+  \draw[flow] (solver.east) -- (answer.west);
+  \node[anchor=west,align=left,font=\scriptsize] at (11.4,1.04)
+    {Illustrative\\reconstruction};
+  \node[font=\scriptsize,text=mLightBrown] at (7,0.43)
+    {Values shown are training targets for 16, not measured model outputs.};
+  \node[font=\scriptsize,align=center] at (7,0.06)
+    {\textbf{Training:} compare the three predictions with the hidden term's targets
+     $\;\longrightarrow\;$ update IntSeqBERT.};
+\end{tikzpicture}
 \end{frame}
 
 \begin{frame}{IntSeqBERT --- Dual-Stream Architecture}
