@@ -231,8 +231,9 @@
 \end{frame}
 
 \begin{frame}{IntSeqBERT --- Dual-Stream Architecture}
+\setlength{\parskip}{0pt}
 \centering
-  \includegraphics[width=0.8\textwidth]{fig1_architecture.png}
+  \includegraphics[width=0.58\textwidth]{fig1_architecture.png}
   \begin{itemize}\tightlist\footnotesize
     \item \readout{The model uses two input streams: magnitude and modulo.}
           The magnitude stream sends log-scale size and sign ($\mathbb{R}^4$) through an MLP.
@@ -244,8 +245,18 @@
           With \textbf{FiLM}, the modulo stream scales and shifts the magnitude stream:
           $\mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\mathrm{mag}} + \boldsymbol{\beta}_i$.
     \item We use a standard \textbf{pre-LN Transformer encoder}.
-          Model sizes are Small 6.4M, Middle 29.0M, and \textbf{Large 91.5M} parameters.
   \end{itemize}
+  {\footnotesize\setlength{\tabcolsep}{8pt}
+  \begin{tabular}{@{}lcccr@{}}
+    \toprule
+    \textbf{Model size} & Layers & Hidden dim. $d$ & Attention heads & Parameters \\
+    \midrule
+    Small  & 6  & 256 & 4  & 6.4M \\
+    Middle & 8  & 512 & 8  & 29.0M \\
+    Large  & 12 & 768 & 12 & 91.5M \\
+    \bottomrule
+  \end{tabular}\par}
+  {\footnotesize Model sizes describe network capacity; value buckets describe $|x|$.\par}
 \end{frame}
 
 \begin{frame}{Training --- Multi-Task Objective}
@@ -302,7 +313,8 @@
 \end{frame}
 
 \begin{frame}{Dataset --- 274{,}705 OEIS Sequences}
-\small
+\footnotesize
+\setlength{\parskip}{0pt}
   \begin{itemize}\tightlist
     \item \readout{We keep about 70 percent of the OEIS entries for this task.}
           From 391{,}710 entries, we retain \alert{274{,}705 (70.1\%)} and split them 8:1:1.
@@ -310,17 +322,27 @@
       \begin{itemize}
         \item Five tags depend on \textbf{how values are written}:
               \texttt{cons}, \texttt{cofr}, \texttt{frac}, \texttt{base}, \texttt{word}.
-              Their patterns depend on the encoding.
         \item Two tags \textbf{do not fit this task}: \texttt{fini}, \texttt{tabl}.
         \item Four are \textbf{quality labels}:
               \texttt{dead}, \texttt{unkn}, \texttt{less}, \texttt{dumb}.
       \end{itemize}
     \item These choices define our task. The labels \texttt{less}/\texttt{dumb} are subjective,
           and \texttt{tabl} could be converted into sequences. Future benchmarks may choose differently.
-    \item \readout{We also group values by magnitude to compare easier and harder cases.}\\
-          The five \textbf{value buckets} are Small ($<10^2$, 52.7\%), Medium, Large, Huge,
-          and Astronomical ($\ge 10^{50}$).
+    \item \readout{We group individual terms by their absolute value $|x|$.}
+          These value buckets are separate from model sizes.
   \end{itemize}
+  {\centering\footnotesize\setlength{\tabcolsep}{12pt}
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    \textbf{Value bucket} & \textbf{Range of each term $x$} \\
+    \midrule
+    Small        & $0 \le |x| < 10^2$ \\
+    Medium       & $10^2 \le |x| < 10^5$ \\
+    Large        & $10^5 \le |x| < 10^{20}$ \\
+    Huge         & $10^{20} \le |x| < 10^{50}$ \\
+    Astronomical & $|x| \ge 10^{50}$ \\
+    \bottomrule
+  \end{tabular}\par}
 \end{frame}
 
 \begin{frame}{Metrics --- and Three Questions}
