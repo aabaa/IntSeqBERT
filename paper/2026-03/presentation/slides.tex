@@ -359,7 +359,7 @@
 
 \begin{frame}{The Whole Pipeline in 1 Slide}
 \small
-  \readout{In the full system, the model predicts a missing term's properties, and the Solver recovers its value.}
+  \readout{The full system has 2 main parts: a neural network and a probabilistic CRT Solver.}
   \par\medskip
   \centering
   \begin{tikzpicture}[x=1cm,y=1cm,
@@ -423,7 +423,7 @@
 \begin{frame}{Training --- Multi-Task Objective}
 \small
   \begin{itemize}\tightlist
-    \item \readout{We train these models to predict all 3 outputs together, including uncertainty in magnitude.}
+    \item \readout{We train each model to predict magnitude, sign, and residues together, including uncertainty in magnitude.}
       \begin{itemize}
         \item The \textbf{magnitude head} predicts size and its \alert{uncertainty},
               $(\mu_i, \sigma_i^2)$. The Solver uses both.
@@ -445,7 +445,7 @@
 \small
   \setlength{\parskip}{0pt}
   \begin{itemize}\small\tightlist
-    \item \readout{The Solver first generates candidates in the predicted magnitude range.}
+    \item \readout{Using these predictions, the Solver first generates candidates in the predicted magnitude range.}
           It searches the $3\sigma$ interval, using its size to choose a method:
       \begin{itemize}
         \item \textbf{Dense} ($\Delta n \le 10^6$) checks every integer in the interval.
@@ -769,7 +769,7 @@
     \item \readout{Finding related sequences could also help with program synthesis.}
     \item \readout{Program synthesis seeks a rule that generates a sequence.}
           Examples include \textbf{Alien Coding}, \textbf{QSynt}, and \textbf{Learning Conjecturing}.
-    \item \readout{Related sequences could provide clues about which rules to try.}
+    \item \readout{Known formulas for similar sequences could provide clues about which rules to try.}
           The representations are learned across the whole corpus.
       \begin{itemize}
         \item Synthesis asks: \emph{``What program generates this sequence?''}
