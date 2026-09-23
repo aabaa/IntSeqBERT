@@ -5,6 +5,12 @@
 
 \usetheme[progressbar=frametitle,numbering=fraction]{metropolis}
 
+% Blue identifies spoken sentences; emphasis uses black bold text.
+\setbeamercolor{alerted text}{fg=black}
+\setbeamerfont{alerted text}{series=\bfseries}
+\setbeamercolor{block title alerted}{fg=black}
+\setbeamerfont{block title alerted}{series=\bfseries}
+
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{amsmath}
@@ -26,8 +32,9 @@
 % slightly tighter itemize spacing for text-rich slides
 \newcommand{\tightlist}{\setlength{\itemsep}{0.2em}}
 
-% Complete bold sentences form a reading path; details remain available below.
-\newcommand{\readout}[1]{\textbf{#1}}
+% Read the dark-blue sentences in order; bold marks emphasis within or outside them.
+\definecolor{readoutblue}{HTML}{174EA6}
+\newcommand{\readout}[1]{\textcolor{readoutblue}{{\mdseries #1}}}
 
 \title{IntSeqBERT: Learning Arithmetic Structure in OEIS\texorpdfstring{\\}{ }via Modulo-Spectrum Embeddings}
 \author{Kazuhisa Nakasho}
@@ -44,89 +51,103 @@
   \usebeamertemplate*{author}
   \usebeamertemplate*{date}
   \usebeamertemplate*{institute}
+  \medskip
+  {\small\readout{Today I will introduce IntSeqBERT, a model that learns arithmetic patterns in integer sequences.}}
 \end{frame}
 
 \begin{frame}{Why Finding Good Problems Matters}
-  \small
-  \textbf{Terence Tao on mathematical problems}
+\small
+\setlength{\parskip}{0pt}
+  \textbf{A recent Mathstodon thread by Terence Tao}\hfill{\footnotesize 8 September 2026}
+  \par\smallskip
+  {\scriptsize Summary of the thread, with context from his earlier posts on AI evaluation.}
+  \begin{itemize}\tightlist
+    \item \readout{Terence Tao worries that AI may use up good open problems
+          as benchmarks without helping us create new ones.}
+    \item \readout{Studying good problems helps us \textbf{understand more and find connections to other questions}.}
+    \item \readout{He warns that focusing only on answers may harm this process and make it harder
+          to develop \textbf{new ideas and good problems}.}
+  \end{itemize}
   \smallskip
-
-  I wrote recently about how the collection of \alert{\textbf{good, fruitful open problems}} is now being mined in a non-renewable fashion, leading to the potential scenario of \alert{\textbf{these problems becoming scarce}}.  This may seem unintuitive at first, since the set of possible problems one could ask is infinite.  Perhaps the following analogy can help: a country or region can suffer a \alert{\textbf{critical shortage of drinking water}} while simultaneously being \alert{\textbf{surrounded by a massive ocean}}.
-  \par\smallskip
-  One can easily generate any number of open problems in mathematics at will, such as working out the $10^{10^{10}}$th digit of pi.  But the vast majority of such problems are not worth focusing attention on: they show no particular propensity to \alert{\textbf{reveal any further insights or connections to other questions}}, or may either be too easy or too impossible relative to known techniques to learn anything from the exercise.  (1/4)
-  \par\smallskip
-  {\scriptsize Source: Terence Tao, Mathstodon, post 1/4 (quoted in full; emphasis added).\\
-  \href{https://mathstodon.xyz/@tao/117237320796901560}{\texttt{mathstodon.xyz/@tao/117237320796901560}}}
+  \begin{quote}\footnotesize
+    ``reveal any further insights or connections to other questions''
+  \end{quote}
+  {\footnotesize His example: there are many possible questions, but few useful ones,
+  just as there is plenty of sea water but not always enough drinking water.}
+  \par\medskip
+  {\scriptsize Sources (paraphrased above; excerpt from post 1/4):\\
+    \href{https://mathstodon.xyz/@tao/117237320796901560}{Mathstodon, 8 September 2026: fruitful open problems, insights, and the research ecosystem (thread 1--4).}\\
+    \href{https://mathstodon.xyz/@tao/117204929023813310}{Related thread: AI evaluation and open problems as a non-renewable resource.}}
 \end{frame}
 
 \begin{frame}{Long-Term Goal --- AI for Mathematical Discovery}
 \small
   \begin{itemize}\tightlist
-    \item \readout{New mathematical connections often begin with numerical patterns.}
+    \item \readout{Our goal is to help find new problems by looking for connections in numerical patterns.}
       \begin{itemize}
         \item McKay noticed $196{,}884 = 196{,}883 + 1$; this led to \emph{Monstrous Moonshine}.
+        \item \readout{The \textbf{Taniyama--Shimura conjecture} links elliptic curves and modular forms.
+              This link was key to the proof of \textbf{Fermat's Last Theorem}.}
+              {\footnotesize\href{https://annals.math.princeton.edu/1995/141-3/p01}{Wiles (1995): the semistable case.}}
         \item The BSD conjecture and mirror symmetry also began with numerical patterns
               ($317{,}206{,}375$ rational curves in the mirror symmetry example).
       \end{itemize}
     \item AI now takes part in this kind of discovery. Examples include
           \textbf{AlphaProof}, the \textbf{Ramanujan Machine}, and \textbf{FunSearch}.
-    \item \readout{Our long-term goal is to find similar arithmetic patterns across sequences
-          and use them to suggest new conjectures.}
+    \item \readout{We want to find sequences with similar arithmetic patterns
+          and use those similarities to suggest conjectures.}
           The sequences may come from different fields of mathematics.
-    \item We use the \textbf{OEIS}: 391{,}710 sequences, each with a precise definition.
-          These definitions make mathematics accessible to computers.
-    \item \readout{As a first step, we build a representation that captures arithmetic structure.}
+    \item \readout{We use the \textbf{OEIS}, the Online Encyclopedia of Integer Sequences.}
+          Our snapshot contains 391{,}710 sequences.
+    \item \readout{To work towards that goal, we first need a model that captures arithmetic structure.}
           We then measure how much structure it learns.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Why Multiplication Is Hard for Deep Learning}
+\begin{frame}{Multiplication --- Theory and Practice}
 \footnotesize
   \setlength{\parskip}{0pt}
-  \readout{However, standard neural models struggle to learn multiplication rules.}\\
-  With \textbf{spectral bias}, they learn low-frequency, addition-like patterns first (Rahaman+ 2019).
-  \smallskip
-
-  {\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.0}
-  \begin{tabular}{@{}p{0.40\textwidth}p{0.56\textwidth}@{}}
+  \readout{For such a model, multiplication is a challenge: simple in theory, but hard to learn.}
+  \par\smallskip
+  {\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.1}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.64\textwidth}@{}}
     \toprule
-    \textbf{Model and task} & \textbf{What the result shows} \\
+    \textbf{Setting and study} & \textbf{Main result} \\
     \midrule
-    \textbf{Threshold circuits}: $n$-bit multiplication\newline
-    (Siu \& Roychowdhury 1994)
-      & \alert{3 layers} are sufficient and minimal. A small circuit exists;
-        training need not find it. \\
-    \addlinespace[0.1em]
-    \textbf{GPT-4}: decimal multiplication\newline
-    (Dziri+ 2023)
+    \textbf{Theory: threshold circuits}\newline
+    \href{https://doi.org/10.1137/S0895480192228619}{Siu \& Roychowdhury (1994)}
+      & \readout{In theory, multiplication can be implemented with just \textbf{3 layers}.}\newline
+        Polynomial-size threshold circuits; depth 3 is optimal in this class. \\
+    \addlinespace[0.3em]
+    \textbf{Practice: trained Transformer}\newline
+    \href{https://arxiv.org/abs/2311.14737}{Shen et al.\ (2023), Sec.\ 2 / Table 5}
+      & \readout{In practice, even a \textbf{12-layer model} got only \textbf{84\%} of 15-digit multiplications right.}\newline
+        $15{\times}15$-digit task; zero-padding and reversed product digits. \\
+    \addlinespace[0.3em]
+    \textbf{GPT-4: decimal multiplication}\newline
+    Dziri et al.\ (2023)
       & Accuracy falls from \textbf{59\%} for $3{\times}3$-digit products
-        to \alert{4\%} for $4{\times}4$-digit products. \\
-    \addlinespace[0.1em]
-    \textbf{2-layer Transformer}: multiplication mod $p$\newline
-    (Power+ 2022)
-      & It generalises only after a very long training period
-        (\textbf{grokking}). \\
-    \addlinespace[0.1em]
-    \textbf{12-layer model}: implicit chain-of-thought\newline
-    (Yao+ 2025)
-      & It succeeds on \textbf{15-digit products} with a special training method. \\
+        to \textbf{4\%} for $4{\times}4$-digit products. \\
+    \addlinespace[0.3em]
+    \textbf{2-layer Transformer: mod $p$}\newline
+    Power et al.\ (2022)
+      & Generalisation appears only after prolonged training (\textbf{grokking}). \\
     \bottomrule
   \end{tabular}}
-  \smallskip
-
-  These models and tasks differ, so their layer counts are not directly comparable.
-  \begin{itemize}\setlength{\itemsep}{0.1em}
-    \item \readout{Tokenisation also hides arithmetic structure.}
-          Token IDs do not show it directly; values outside the vocabulary become \texttt{UNK}.
-    \item This matters for the OEIS: values range from single digits to $10^{210}$.
-  \end{itemize}
+  \par\smallskip
+  {\scriptsize Different model classes and tasks; the experiment does not establish a minimum depth.}\par\smallskip
+  \readout{Having enough layers does not guarantee that the model will learn multiplication.}
+  \par\smallskip
+  \readout{For OEIS sequences, input representation is another challenge: a fixed vocabulary cannot cover all integers.}\\
+  Token IDs hide arithmetic structure; out-of-vocabulary values share \texttt{UNK}.
+  OEIS values can reach $10^{210}$.
 \end{frame}
 
 \begin{frame}{Key Idea --- Show Multiplicative Structure in the Input}
 \small
   \begin{itemize}\tightlist
-    \item \readout{So we give the model residues, which preserve addition and multiplication.}
-          A residue is the remainder after division.
+    \item \readout{To address these challenges, we represent each integer by its remainders under several moduli.}
+          \readout{These remainders, or residues, \textbf{preserve addition and multiplication}.}
           Reduction mod $m$ is a \alert{ring homomorphism}:
           $\mathbb{Z} \to \mathbb{Z}/m\mathbb{Z}$.
     \item \readout{The residues stay small, even when the original values are very large.}
@@ -139,48 +160,115 @@
         \item \textbf{Quadratic reciprocity} links residue information across primes.
         \item The \textbf{CRT} combines information from several prime powers.
       \end{itemize}
-    \item \readout{Our hypothesis is that these inputs make multiplication easier to learn.}
-          We call them the \emph{modulo spectrum}. They show multiplicative structure
-          \alert{at depth zero}, before the network learns it across layers.
+    \item \readout{We call this the \textbf{modulo spectrum} and expect it to make arithmetic patterns easier to learn.}
+          It exposes multiplicative structure \alert{at depth 0}, before the network learns it across layers.
   \end{itemize}
 \end{frame}
 
 \begin{frame}{What Does the Modulo Spectrum Reveal?}
 \small
-  \readout{Large values become small periodic patterns under different moduli.}
-  \par\medskip
+  \readout{Powers of 2 and squares give repeating patterns modulo 3 and 5.}
+  \par\smallskip
   \centering
   \begin{tikzpicture}[x=1cm,y=1cm,
-    group/.style={rounded corners=2pt,draw=mDarkTeal!30,fill=mDarkTeal!8},
-    labeltext/.style={anchor=west,font=\small}]
-    \useasboundingbox (0,0) rectangle (14,3.55);
-    \node[labeltext] at (0,3.1) {Original $2^n$};
-    \node[labeltext] at (0,1.95) {Modulo 3};
-    \node[labeltext] at (0,0.65) {Modulo 5};
-    \foreach \x in {2.8,4.9,7.0,9.1} {
-      \draw[group] (\x,1.63) rectangle +(1.9,0.64);
-    }
-    \foreach \x in {2.8,7.0} {
-      \draw[group,draw=mLightBrown,fill=mLightBrown!15]
-        (\x,0.33) rectangle +(4.0,0.64);
-    }
-    \foreach \entry [count=\i from 0] in {1,2,4,8,16,32,64,128} {
-      \node[font=\large] at ({3.225+1.05*\i},3.1) {$\entry$};
-    }
-    \foreach \entry [count=\i from 0] in {1,2,1,2,1,2,1,2} {
-      \node[font=\large] at ({3.225+1.05*\i},1.95) {$\entry$};
-    }
-    \foreach \entry [count=\i from 0] in {1,2,4,3,1,2,4,3} {
-      \node[font=\large] at ({3.225+1.05*\i},0.65) {$\entry$};
-    }
-    \foreach \y in {3.1,1.95,0.65} {
-      \node at (11.55,\y) {$\cdots$};
-    }
-    \node[labeltext,font=\footnotesize] at (12,1.95) {Period 2};
-    \node[labeltext,font=\footnotesize] at (12,0.65) {Period 4};
+    cycle/.style={rounded corners=2pt,draw=mDarkTeal!30,fill=mDarkTeal!7},
+    labeltext/.style={anchor=west,font=\footnotesize}]
+    \useasboundingbox (0,0) rectangle (14,4.65);
+    \node[labeltext,font=\scriptsize] at (0,4.5) {$n=0,1,\ldots,9$ in both examples};
+    \node[labeltext] at (0,3.98) {$2^n$};
+    \node[font=\small] at (2.85,3.98) {$1$};
+    \node[font=\small] at (3.75,3.98) {$2$};
+    \node[font=\small] at (4.65,3.98) {$4$};
+    \node[font=\small] at (5.55,3.98) {$8$};
+    \node[font=\small] at (6.45,3.98) {$16$};
+    \node[font=\small] at (7.35,3.98) {$32$};
+    \node[font=\small] at (8.25,3.98) {$64$};
+    \node[font=\small] at (9.15,3.98) {$128$};
+    \node[font=\small] at (10.05,3.98) {$256$};
+    \node[font=\small] at (10.95,3.98) {$512$};
+    \node at (11.7,3.98) {$\cdots$};
+    \node[labeltext] at (0,3.4) {Modulo 3};
+    \draw[cycle] (2.45,3.19) rectangle +(1.70,0.42);
+    \draw[cycle] (4.25,3.19) rectangle +(1.70,0.42);
+    \draw[cycle] (6.05,3.19) rectangle +(1.70,0.42);
+    \draw[cycle] (7.85,3.19) rectangle +(1.70,0.42);
+    \draw[cycle] (9.65,3.19) rectangle +(1.70,0.42);
+    \node[labeltext] at (12,3.4) {Period 2};
+    \node[font=\small] at (2.85,3.4) {$1$};
+    \node[font=\small] at (3.75,3.4) {$2$};
+    \node[font=\small] at (4.65,3.4) {$1$};
+    \node[font=\small] at (5.55,3.4) {$2$};
+    \node[font=\small] at (6.45,3.4) {$1$};
+    \node[font=\small] at (7.35,3.4) {$2$};
+    \node[font=\small] at (8.25,3.4) {$1$};
+    \node[font=\small] at (9.15,3.4) {$2$};
+    \node[font=\small] at (10.05,3.4) {$1$};
+    \node[font=\small] at (10.95,3.4) {$2$};
+    \node at (11.7,3.4) {$\cdots$};
+    \node[labeltext] at (0,2.82) {Modulo 5};
+    \draw[cycle] (2.45,2.61) rectangle +(3.50,0.42);
+    \draw[cycle] (6.05,2.61) rectangle +(3.50,0.42);
+    \node[labeltext] at (12,2.82) {Period 4};
+    \node[font=\small] at (2.85,2.82) {$1$};
+    \node[font=\small] at (3.75,2.82) {$2$};
+    \node[font=\small] at (4.65,2.82) {$4$};
+    \node[font=\small] at (5.55,2.82) {$3$};
+    \node[font=\small] at (6.45,2.82) {$1$};
+    \node[font=\small] at (7.35,2.82) {$2$};
+    \node[font=\small] at (8.25,2.82) {$4$};
+    \node[font=\small] at (9.15,2.82) {$3$};
+    \node[font=\small] at (10.05,2.82) {$1$};
+    \node[font=\small] at (10.95,2.82) {$2$};
+    \node at (11.7,2.82) {$\cdots$};
+    \node[labeltext] at (0,1.84) {$n^2$};
+    \node[font=\small] at (2.85,1.84) {$0$};
+    \node[font=\small] at (3.75,1.84) {$1$};
+    \node[font=\small] at (4.65,1.84) {$4$};
+    \node[font=\small] at (5.55,1.84) {$9$};
+    \node[font=\small] at (6.45,1.84) {$16$};
+    \node[font=\small] at (7.35,1.84) {$25$};
+    \node[font=\small] at (8.25,1.84) {$36$};
+    \node[font=\small] at (9.15,1.84) {$49$};
+    \node[font=\small] at (10.05,1.84) {$64$};
+    \node[font=\small] at (10.95,1.84) {$81$};
+    \node at (11.7,1.84) {$\cdots$};
+    \node[labeltext] at (0,1.26) {Modulo 3};
+    \draw[cycle] (2.45,1.05) rectangle +(2.60,0.42);
+    \draw[cycle] (5.15,1.05) rectangle +(2.60,0.42);
+    \draw[cycle] (7.85,1.05) rectangle +(2.60,0.42);
+    \node[labeltext] at (12,1.26) {Period 3};
+    \node[font=\small] at (2.85,1.26) {$0$};
+    \node[font=\small] at (3.75,1.26) {$1$};
+    \node[font=\small] at (4.65,1.26) {$1$};
+    \node[font=\small] at (5.55,1.26) {$0$};
+    \node[font=\small] at (6.45,1.26) {$1$};
+    \node[font=\small] at (7.35,1.26) {$1$};
+    \node[font=\small] at (8.25,1.26) {$0$};
+    \node[font=\small] at (9.15,1.26) {$1$};
+    \node[font=\small] at (10.05,1.26) {$1$};
+    \node[font=\small] at (10.95,1.26) {$0$};
+    \node at (11.7,1.26) {$\cdots$};
+    \node[labeltext] at (0,0.68) {Modulo 5};
+    \draw[cycle] (2.45,0.47) rectangle +(4.40,0.42);
+    \draw[cycle] (6.95,0.47) rectangle +(4.40,0.42);
+    \node[labeltext] at (12,0.68) {Period 5};
+    \node[font=\small] at (2.85,0.68) {$0$};
+    \node[font=\small] at (3.75,0.68) {$1$};
+    \node[font=\small] at (4.65,0.68) {$4$};
+    \node[font=\small] at (5.55,0.68) {$4$};
+    \node[font=\small] at (6.45,0.68) {$1$};
+    \node[font=\small] at (7.35,0.68) {$0$};
+    \node[font=\small] at (8.25,0.68) {$1$};
+    \node[font=\small] at (9.15,0.68) {$4$};
+    \node[font=\small] at (10.05,0.68) {$4$};
+    \node[font=\small] at (10.95,0.68) {$1$};
+    \node at (11.7,0.68) {$\cdots$};
+    \draw[mDarkTeal!20] (0,2.35) -- (14,2.35);
   \end{tikzpicture}
-  \par\medskip
-  \readout{Different moduli give different arithmetic views of the same sequence.}
+  \par\smallskip
+  \readout{Modulo 3, powers of 2 repeat every 2 terms, while squares repeat every 3.}
+  \par\smallskip
+  \readout{These different patterns give the model clues about each sequence's arithmetic structure.}
 \end{frame}
 
 \begin{frame}{Task --- Masked Sequence Modelling on OEIS}
@@ -190,15 +278,16 @@
           This is \alert{masked sequence modelling}: BERT-style learning for integers.
     \item We take up to the first \textbf{128 terms} and mask \textbf{15\%} of the positions.
           The remaining terms provide the context.
-    \item \readout{This tests how well the model captures patterns in the sequence.}
-          In \textbf{next-term prediction}, only the last term is masked.
-    \item The \textbf{FACT} benchmark (NeurIPS 2022) tested a plain Transformer on five OEIS
-          tasks. Unmasking was the hardest task. Our \textbf{Vanilla baseline} uses that architecture.
-    \item \readout{For each hidden term, we predict its magnitude, sign, and residues.}
+    \item \readout{We also test next-term prediction, where the model sees only the preceding terms.}
+          Only the last term is masked in this setting.
+    \item The \textbf{FACT} benchmark (NeurIPS 2022) tested a plain Transformer on 5 OEIS
+          tasks. Unmasking was the hardest task.
+          Our \textbf{Vanilla baseline} uses that architecture.
+    \item \readout{For each hidden term, we predict its \textbf{magnitude, sign, and residues}.}
       \begin{enumerate}
-        \item \textbf{Magnitude} measures log-scale size: $v_i = 1 + \log_{10}|x_i|$.
-        \item \textbf{Sign} has three classes: $s_i \in \{+, -, 0\}$.
-        \item \textbf{Residues} are $x_i \bmod m$ for every $m \in \{2, \dots, 101\}$.
+        \item \readout{Magnitude measures size on a logarithmic scale.} $v_i = 1 + \log_{10}|x_i|$.
+        \item \readout{Sign is positive, negative, or 0.} $s_i \in \{+, -, 0\}$.
+        \item \readout{We predict residues for 100 moduli, from 2 to 101.} $x_i \bmod m$, $m \in \{2, \dots, 101\}$.
       \end{enumerate}
   \end{itemize}
 \end{frame}
@@ -213,7 +302,7 @@
     text width=3.65cm,minimum height=1.12cm,align=center,font=\footnotesize}]
   \useasboundingbox (0,0) rectangle (14,6.25);
   \node[anchor=west,font=\small\bfseries] at (0,6.05)
-    {1. Hide a term; use the surrounding terms as context.};
+    {\readout{Here we hide 16 in the powers of 2 and use the surrounding terms as context.}};
   \foreach \entry [count=\i from 0] in {1,2,4,8,?,32,64} {
     \ifnum\i=4
       \node[term,fill=mLightBrown!20,draw=mLightBrown,thick] (t\i)
@@ -226,14 +315,14 @@
   \foreach \entry [count=\i from 0] in {1,2,1,2,?,2,1} {
     \node[font=\footnotesize,text=mDarkTeal] at ({3.1+1.15*\i},4.88) {$\entry$};
   }
-  \node[anchor=west,align=left,font=\scriptsize,text=mLightBrown] at (10.7,4.88)
+  \node[anchor=west,align=left,font=\scriptsize\bfseries,text=black] at (10.7,4.88)
     {A simple periodic\\pattern};
   \draw[flow] (7,4.62) -- (7,4.33);
   \node[rounded corners=3pt,fill=mDarkTeal,text=white,
     minimum width=4.4cm,minimum height=0.48cm,font=\small\bfseries]
     (model) at (7,4.05) {IntSeqBERT};
   \node[anchor=west,align=left,font=\small\bfseries] at (0,4.05)
-    {2. Predict three properties\\of the hidden term.};
+    {\readout{The model predicts}\\\readout{3 properties.}};
   \node[card] (mag) at (2.25,2.70)
     {\textbf{Magnitude}\\$1+\log_{10}16 \approx 2.204$\\
      {\scriptsize Model: size + uncertainty}};
@@ -254,23 +343,23 @@
   \draw[flow] (sign.south) -- (solver.north);
   \draw[flow] (res.south) -- (11.75,1.48) -| (solver.north);
   \node[anchor=west,align=left,font=\small\bfseries] at (0,0.97)
-    {3. Combine predictions\\to recover an integer.};
+    {\readout{The Solver combines them}\\\readout{to recover an integer.}};
   \node[term,fill=mLightBrown!20,draw=mLightBrown,minimum width=1.1cm]
     (answer) at (10.6,1.04) {$16$};
   \draw[flow] (solver.east) -- (answer.west);
   \node[anchor=west,align=left,font=\scriptsize] at (11.4,1.04)
-    {Illustrative\\reconstruction};
-  \node[font=\scriptsize,text=mLightBrown] at (7,0.43)
-    {Values shown are training targets for 16, not measured model outputs.};
+    {Example with\\correct predictions};
+  \node[font=\scriptsize\bfseries,text=black] at (7,0.43)
+    {\readout{Here, correct predictions allow the Solver to recover 16.}};
   \node[font=\scriptsize,align=center] at (7,0.06)
-    {\textbf{Training:} compare the three predictions with the hidden term's targets
+    {\textbf{Training:} compare the 3 predictions with the hidden term's targets
      $\;\longrightarrow\;$ update IntSeqBERT.};
 \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{The Whole Pipeline in One Slide}
+\begin{frame}{The Whole Pipeline in 1 Slide}
 \small
-  \readout{IntSeqBERT learns arithmetic features; the CRT Solver converts them back into integers.}
+  \readout{In the full system, the model predicts a missing term's properties, and the Solver recovers its value.}
   \par\medskip
   \centering
   \begin{tikzpicture}[x=1cm,y=1cm,
@@ -288,7 +377,7 @@
       {\textbf{Magnitude / Sign / Residues}\\
        {\footnotesize Size + uncertainty\\Sign / residue probabilities}};
     \node[card,draw=mDarkTeal,fill=mDarkTeal!8] (solver) at (7,1.15)
-      {\textbf{CRT Solver}\\{\footnotesize Combine and score candidates}};
+      {\textbf{Probabilistic CRT Solver}\\{\footnotesize Combine and score candidates}};
     \node[card,draw=mLightBrown,fill=mLightBrown!20] (output) at (2,1.15)
       {\textbf{Integer prediction}};
     \draw[flow] (input) -- (features);
@@ -297,6 +386,8 @@
     \draw[flow] (heads) -- (solver);
     \draw[flow] (solver) -- (output);
   \end{tikzpicture}
+  \par\smallskip
+  {\footnotesize\readout{The Solver uses a \textbf{probabilistic} approach based on the Chinese Remainder Theorem, or CRT. It uses the predicted probabilities to score candidate integers.}}
 \end{frame}
 
 \begin{frame}{IntSeqBERT --- Dual-Stream Architecture}
@@ -304,16 +395,17 @@
 \centering
   \includegraphics[width=0.58\textwidth]{fig1_architecture.png}
   \begin{itemize}\tightlist\footnotesize
-    \item \readout{The model uses two input streams: magnitude and modulo.}
+    \item \readout{Let us look at the neural network architecture. One stream encodes magnitude and sign; the other encodes residues.}
           The magnitude stream sends log-scale size and sign ($\mathbb{R}^4$) through an MLP.
-    \item The modulo stream ($\mathbb{R}^{200}$) places residues on the \textbf{unit circle}:
+    \item \readout{The modulo stream places residues on a circle using sine and cosine.}
+          For the $\mathbb{R}^{200}$ input,
           $\phi_m(r) = [\sin(2\pi r/m), \cos(2\pi r/m)]$.
-          This uses sinusoidal positional encoding for values' residues;
-          residues $m{-}1$ and $0$ stay neighbours.
-    \item \readout{We combine the streams and pass the result to a Transformer.}
+          Residues $m{-}1$ and $0$ stay neighbours.
+    \item \readout{We then combine these 2 streams and pass the result to a Transformer.}
           With \textbf{FiLM}, the modulo stream scales and shifts the magnitude stream:
           $\mathbf{e}_i = (1 + \boldsymbol{\gamma}_i) \odot \mathbf{h}_i^{\mathrm{mag}} + \boldsymbol{\beta}_i$.
-    \item We use a standard \textbf{pre-LN Transformer encoder}.
+    \item \readout{We test 3 model sizes: Small, Middle, and Large.}
+          Each uses a standard pre-LN Transformer encoder.
   \end{itemize}
   {\footnotesize\setlength{\tabcolsep}{8pt}
   \begin{tabular}{@{}lcccr@{}}
@@ -331,20 +423,20 @@
 \begin{frame}{Training --- Multi-Task Objective}
 \small
   \begin{itemize}\tightlist
-    \item \readout{We train the model to predict all three quantities together.}
+    \item \readout{We train these models to predict all 3 outputs together, including uncertainty in magnitude.}
       \begin{itemize}
         \item The \textbf{magnitude head} predicts size and its \alert{uncertainty},
               $(\mu_i, \sigma_i^2)$. The Solver uses both.
-        \item The \textbf{sign head} predicts one of three classes.
+        \item The \textbf{sign head} predicts 1 of 3 classes.
         \item The \textbf{modulo head} has 100 independent classifiers.
               Each loss is normalised by the maximum entropy $\ln m$,
               so mod 2 and mod 101 contribute fairly.
       \end{itemize}
     \item We combine the losses with these weights:
           $\mathcal{L} = \mathcal{L}_{\mathrm{mag}} + \mathcal{L}_{\mathrm{sign}} + 2\,\mathcal{L}_{\mathrm{mod}}$.
-    \item We train on \textbf{219{,}765 OEIS sequences} for \textbf{200 epochs}.
-          We use \textbf{FP32}, because values near $10^{210}$ overflow FP16.
-    \item \readout{All experiments run on a single consumer GPU.}
+    \item \readout{Training uses about 220,000 OEIS sequences over 200 epochs.}
+          The exact training count is \textbf{219{,}765}. We use \textbf{FP32} for training.
+    \item \readout{All experiments run on a \textbf{single consumer GPU}.}
           We use an RTX 3070\,Ti with 8\,GB, so other researchers can repeat the experiments.
   \end{itemize}
 \end{frame}
@@ -353,17 +445,17 @@
 \small
   \setlength{\parskip}{0pt}
   \begin{itemize}\small\tightlist
-    \item \readout{First, the Solver generates candidates in the predicted magnitude range.}
+    \item \readout{The Solver first generates candidates in the predicted magnitude range.}
           It searches the $3\sigma$ interval, using its size to choose a method:
       \begin{itemize}
         \item \textbf{Dense} ($\Delta n \le 10^6$) checks every integer in the interval.
         \item \textbf{Sieve} ($\le 10^{14}$) uses CRT beam search with confident residues.
         \item \textbf{CRT} ($> 10^{14}$) generates large candidates directly with sparse CRT.
       \end{itemize}
-    \item \readout{Next, it scores candidates using magnitude and all 100 modulo distributions.}
+    \item \readout{Next, it scores each candidate using the magnitude estimate and all 100 residue distributions.}
           For each $m$, it uses $P_m(n \bmod m)$.
   \end{itemize}
-  \textbf{Probabilistic CRT:} \readout{We add weighted log-probabilities.}
+  \textbf{Probabilistic CRT: a weighted sum of log-probabilities.}
   {
     \setlength{\abovedisplayskip}{3pt}
     \setlength{\belowdisplayskip}{3pt}
@@ -385,22 +477,23 @@
 \footnotesize
 \setlength{\parskip}{0pt}
   \begin{itemize}\tightlist
-    \item \readout{We keep about 70 percent of the OEIS entries for this task.}
+    \item \readout{To evaluate the full system, we use about 70\% of the OEIS, split into training, validation, and test sets.}
           From 391{,}710 entries, we retain \alert{274{,}705 (70.1\%)} and split them 8:1:1.
-    \item \readout{We exclude eleven tags, grouped by the reason for exclusion.}
+    \item \readout{The excluded tags concern notation, task suitability, or data quality.}
       \begin{itemize}
-        \item Five tags depend on \textbf{how values are written}:
+        \item 5 tags depend on \textbf{how values are written}:
               \texttt{cons}, \texttt{cofr}, \texttt{frac}, \texttt{base}, \texttt{word}.
-        \item Two tags \textbf{do not fit this task}: \texttt{fini}, \texttt{tabl}.
-        \item Four are \textbf{quality labels}:
+        \item 2 tags \textbf{do not fit this task}: \texttt{fini}, \texttt{tabl}.
+        \item 4 are \textbf{quality labels}:
               \texttt{dead}, \texttt{unkn}, \texttt{less}, \texttt{dumb}.
       \end{itemize}
     \item These choices define our task. The labels \texttt{less}/\texttt{dumb} are subjective,
           and \texttt{tabl} could be converted into sequences. Future benchmarks may choose differently.
-    \item \readout{We group individual terms by their absolute value $|x|$.}
+          \hyperlink{backup-oeis-representation}{\beamergotobutton{Tag definitions and examples}}
+    \item \readout{We compare performance by grouping terms by absolute value $|x|$.}
           These value buckets are separate from model sizes.
   \end{itemize}
-  {\centering\footnotesize\setlength{\tabcolsep}{12pt}
+  {\centering\footnotesize\setlength{\tabcolsep}{12pt}\renewcommand{\arraystretch}{0.95}
   \begin{tabular}{@{}ll@{}}
     \toprule
     \textbf{Value bucket} & \textbf{Range of each term $x$} \\
@@ -414,30 +507,30 @@
   \end{tabular}\par}
 \end{frame}
 
-\begin{frame}{Metrics --- and Three Questions}
+\begin{frame}{Metrics --- and 3 Questions}
   \footnotesize
   \setlength{\parskip}{0pt}
-  \readout{We measure size, residues, and exact integer prediction.}\\[0.3em]
-  {\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.1}
+  \readout{On the test data, we measure both the predicted properties and the final integer.}\\[0.3em]
+  {\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.05}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.43\textwidth}>{\raggedright\arraybackslash}p{0.30\textwidth}@{}}
     \toprule
     \textbf{Metric} & \textbf{Definition} & \textbf{What it measures} \\
     \midrule
     \textbf{Magnitude Accuracy}\newline ($\mathrm{Acc}_{0.5}$)
-      & Fraction within $0.5$ of the true log-scale magnitude
+      & \readout{Magnitude accuracy measures approximate size.}\newline Within $0.5$ on the log scale
       & Approximate size; helps set the Solver's search range \\
     \addlinespace[0.2em]
     \textbf{MMA}\newline (mean modulo accuracy)
-      & Mean classification accuracy over all 100 moduli
+      & \readout{Mean modulo accuracy, or MMA, measures residue prediction accuracy.}\newline Averaged over all 100 moduli
       & Accuracy of residue predictions \\
     \addlinespace[0.2em]
     \textbf{NIG}\newline (normalised information gain)
-      & $1-\mathcal{L}_{\mathrm{CE}}^{(m)}/\ln m$;\newline
-        0 = no gain over uniform prediction; 1 = perfect prediction
+      & \readout{Normalised information gain, or NIG, measures the gain over uniform prediction.}\newline
+        $1-\mathcal{L}_{\mathrm{CE}}^{(m)}/\ln m$; 0 = no gain, 1 = perfect
       & Periodic structure learned for each modulus \\
     \addlinespace[0.2em]
     \textbf{Solver Top-$k$}
-      & Fraction with the true integer among the top $k$ candidates
+      & \readout{Top-$k$ tests whether the correct integer is among the first $k$ candidates.}
       & \alert{Exact integer prediction} \\
     \bottomrule
   \end{tabular}}
@@ -448,14 +541,13 @@
   $[3.2\times10^5,\ 3.2\times10^6]$ count as correct.
   \smallskip
 
-  \readout{We ask three questions: does the dual stream help, where does it help,
-  and can we predict exact integers?}\\
+  \readout{We use these metrics to test overall gains, gains by integer size, and exact prediction.}\\
   Q1: overall gains. \quad Q2: gains by value bucket. \quad Q3: exact prediction.
 \end{frame}
 
 \begin{frame}{What Should Happen If Our Idea Works?}
 \small
-  \readout{If the modulo spectrum captures arithmetic structure, we expect three results.}
+  \readout{Our baseline is \textbf{Vanilla}, a Transformer based on FACT.}
   \par\medskip
   {\setlength{\tabcolsep}{6pt}\renewcommand{\arraystretch}{1.6}
   \begin{tabular}{@{}r
@@ -473,8 +565,6 @@
       & NIG spectrum and totient ratio \\
     \bottomrule
   \end{tabular}}
-  \par\medskip
-  \readout{Now let us test these predictions.}
 \end{frame}
 
 \begin{frame}{Q1 --- Does It Help? Yes, Consistently}
@@ -493,10 +583,10 @@
   \end{center}
 
   \begin{itemize}\tightlist
-    \item \readout{First, the dual stream improves both magnitude and residue prediction.}
+    \item \readout{The dual stream improves both magnitude and residue prediction over Vanilla.}
           The Large model reaches \alert{95.85\%} magnitude accuracy (\textbf{+8.9\,pt} over Vanilla)
           and \alert{50.38\%} MMA (\textbf{+4.5\,pt}).
-    \item \readout{Removing the modulo stream makes both scores worse.}
+    \item \readout{For the Large model, removing the modulo stream lowers residue accuracy by about 15 percentage points.}
           In the ablation, MMA falls by \alert{15.2\,pt} and magnitude accuracy by \textbf{6.2\,pt}.
           Residues limit the possible integer values, helping both predictions.
     \item \readout{The same pattern holds for the Small and Middle models.}
@@ -508,9 +598,8 @@
   \includegraphics[width=0.75\textwidth]{fig3_scaling.pdf}
   \par{\footnotesize\textbf{Model size:} Small $\to$ Middle $\to$ Large}\par
   \begin{itemize}\setlength{\itemsep}{0.15em}\footnotesize
-    \item \readout{IntSeqBERT has the highest modulo accuracy at every model size.}
-          For MMA, the ranking is always IntSeqBERT $>$ Vanilla $>$ Ablation.
-    \item \readout{Larger models help residue prediction more than magnitude prediction.}
+    \item For MMA, the ranking is always IntSeqBERT $>$ Vanilla $>$ Ablation.
+    \item \readout{From Small to Large, residue accuracy gains about 10 percentage points; magnitude accuracy gains only 1 percentage point.}
           From Small to Large, MMA gains \textbf{10.0\,pt}; Mag Acc gains \textbf{1.1\,pt}.
     \item Solver Top-1 also gains \textbf{5.0\,pt}: 14.05 $\to$ 19.09.
     \item We see no clear sign of overfitting: Train 1.00 / Val 1.01 at epoch 200.
@@ -539,10 +628,10 @@
     \begin{column}{0.62\textwidth}
       \footnotesize
       \begin{itemize}\setlength{\itemsep}{0.2em}
-        \item \readout{Next, the clearest gains are in the Large value bucket and above.}
+        \item \readout{Turning to integer size, Vanilla's mean squared magnitude error in the Large bucket is about 13 times ours.}
               Vanilla uses \texttt{UNK} beyond its vocabulary. In the Large bucket, its MSE is \alert{13$\times$ ours}.
               Overall $R^2$ is \alert{0.988} for IntSeqBERT and 0.943 for Vanilla.
-        \item \readout{Overall scores can hide these differences.}
+        \item \readout{Overall scores can hide this gap because many sequences grow slowly.}
               Many OEIS sequences grow slowly, so easier cases strongly affect those scores.
       \end{itemize}
     \end{column}
@@ -564,27 +653,24 @@
   \end{center}
 
   \begin{itemize}\tightlist
-    \item \readout{Finally, we test whether the full system predicts the exact next term.}
-          We predict the last term of \textbf{10{,}000} sequences kept separate for testing.
-    \item \readout{IntSeqBERT reaches 19.09 percent, compared with 2.59 percent for Vanilla.}
-          This is a \alert{7.4-fold improvement}.
+    \item \readout{Next, we test whether the model can predict the exact next term. We use 10,000 sequences kept separate from training.}
+          For each sequence, we hide the last term and predict it from the earlier terms.
+    \item \readout{The top-ranked answer is correct in \textbf{19.09\%} of cases, versus \textbf{2.59\%} for Vanilla.}
+          \readout{This is a \textbf{7.4-fold improvement}.}
     \item Top-1 accuracy is \textbf{68.3\%} in the Small value bucket and \textbf{20.8\%} in Medium.
           Vanilla scores \textbf{0\%} beyond its vocabulary.
-    \item \readout{However, our exact accuracy also falls to near zero for large values.}
-          For the Large bucket and above, combining uncertain predictions from many moduli
-          remains difficult at MMA $\approx 50\%$.
+    \item For the Large bucket and above, exact accuracy is near 0 at MMA $\approx 50\%$.
   \end{itemize}
 \end{frame}
 
 \begin{frame}{What Does 19\% Mean? --- Better, but Still Low}
 \begin{itemize}\tightlist
-    \item \readout{So the improvement is large, but the absolute accuracy is still low.}
-          Top-1 rises from \textbf{2.59\%} to \alert{19.09\%}, about \textbf{7.4 times} the Vanilla score.
-    \item \readout{Only about one in five predictions is exactly correct.}
-          In the \textbf{Large value bucket and above}, exact accuracy is still \alert{close to zero}.
+    \item \readout{Despite this improvement, only about 1 in 5 predictions is exact.}
+    \item \readout{For large integers, exact accuracy is still \textbf{near 0}.}
+          This includes the Large, Huge, and Astronomical value buckets.
   \end{itemize}
   \begin{alertblock}{What this tells us}
-    \readout{The modulo stream helps, but exact prediction of OEIS terms remains difficult.}
+    \readout{Recovering an exact integer from many uncertain residue predictions remains the main difficulty.}
   \end{alertblock}
 \end{frame}
 
@@ -592,9 +678,9 @@
 \centering
   \includegraphics[width=0.72\textwidth]{fig2_nig_spectrum.pdf}
   \begin{itemize}\tightlist\footnotesize
-    \item \readout{We also ask what arithmetic structure the model has learned.}
+    \item \readout{We also want to understand the patterns the model has learned. This plot shows information gain for each modulus.}
           NIG measures this for each modulus from 2 to 101, beyond overall accuracy.
-    \item \readout{IntSeqBERT learns more at every modulus, with a clear pattern of peaks.}
+    \item \readout{IntSeqBERT achieves higher information gain at every modulus, with a clear pattern of peaks.}
           It is above both baselines across the \textbf{entire NIG spectrum}.
     \item \readout{The highest peak is at modulus 96, followed by modulus 2.}
           This holds across all models and sizes: $96 = 2^5 \times 3$ (NIG\,$=0.629$).
@@ -613,23 +699,23 @@
       \footnotesize
       \setlength{\parskip}{0pt}
       \textbf{Observation}\\
-      \readout{We find higher NIG with a lower totient ratio.}\\
-      Euler's ratio is $\varphi(m)/m = \prod_{p \mid m}(1 - 1/p)$.\\
+      \readout{The pattern is related to the factors of each modulus. We measure this using the totient ratio. A lower ratio tends to go with higher information gain.}\\
+      The totient ratio is the fraction of residues coprime to $m$:\\
+      $\varphi(m)/m = \prod_{p \mid m}(1 - 1/p)$.\\
       Pearson \alert{$r = -0.851$} ($p < 10^{-28}$).\\
-      This is an experimental result, not a theorem.
-      \medskip
+      \readout{This is a link found in our experiments, not a proven rule.}
+      \par\vspace{1pt}
 
       \textbf{Interpretation --- CRT aggregation}\\
-      \readout{One modulus can combine information from several smaller moduli.}\\
+      \readout{A composite modulus may help by combining information from its factors.}\\
       For example, $x \bmod 96$ gives $x \bmod 2,4,8,16,32$\newline
       and $x \bmod 3$ at the same time.
-      \medskip
+      \par\vspace{1pt}
 
       \textbf{Next steps}\\
       \readout{This suggests testing more composite moduli.}
       \begin{itemize}\setlength{\itemsep}{0.3em}
         \item Test \alert{highly composite numbers beyond 101} before adding more primes.
-        \item Use these arithmetic patterns to \alert{compare sequences or datasets}.
       \end{itemize}
     \end{column}
   \end{columns}
@@ -637,7 +723,7 @@
 
 \begin{frame}{From Prediction to Mathematical Discovery}
 \small
-  \readout{Prediction is our test; mathematical similarity is our long-term goal.}
+  \readout{We now return to our goal: using these representations to find mathematical connections.}
   \par\smallskip
   {\footnotesize\textbf{This paper:} prediction improvement and learned arithmetic structure.}
   \par\medskip
@@ -650,7 +736,7 @@
     \useasboundingbox (0,0) rectangle (14,4.45);
     \draw[rounded corners=3pt,dashed,draw=mLightBrown]
       (0.05,0.05) rectangle (13.95,4.4);
-    \node[anchor=west,text=mLightBrown,font=\footnotesize\bfseries] at (0.3,4.12)
+    \node[anchor=west,text=black,font=\footnotesize\bfseries] at (0.3,4.12)
       {Future direction: similarity retrieval and conjecture generation (not demonstrated here)};
     \node[card] (a) at (2,3.4) {Sequence A};
     \node[card] (b) at (2,2.5) {Sequence B};
@@ -674,25 +760,23 @@
     \draw[future] (connection) -- (conjecture);
   \end{tikzpicture}
   \par\smallskip
-  {\footnotesize\readout{We aim to use these representations to find connections and suggest conjectures.}}
+  {\footnotesize\readout{Those connections could suggest conjectures. This remains a goal for \textbf{future work}.}}
 \end{frame}
 
 \begin{frame}{Positioning in Computer Mathematics}
 \small
   \begin{itemize}\tightlist
-    \item \readout{This brings us back to our goal of finding mathematical connections.}
-    \item \textbf{Program synthesis on the OEIS} seeks a sequence's generation rule.
+    \item \readout{Finding related sequences could also help with program synthesis.}
+    \item \readout{Program synthesis seeks a rule that generates a sequence.}
           Examples include \textbf{Alien Coding}, \textbf{QSynt}, and \textbf{Learning Conjecturing}.
-    \item \readout{Our representation can support program synthesis by finding shared arithmetic structure.}
-          We learn this structure across the whole corpus.
+    \item \readout{Related sequences could provide clues about which rules to try.}
+          The representations are learned across the whole corpus.
       \begin{itemize}
         \item Synthesis asks: \emph{``What program generates this sequence?''}
         \item We ask: \emph{``Which sequences are number-theoretically similar,
               even when they are generated in different ways?''}
       \end{itemize}
-    \item Pretrained embeddings could \textbf{guide the search} in program synthesis
-          and help us \alert{find similar sequences}.
-    \item \readout{These similarities could help us suggest new conjectures.}
+    \item \readout{Adding this approach to systems such as Alien Coding might improve their accuracy.}
     \item Our code, preprocessing, and evaluation are available at
           \texttt{github.com/aabaa/IntSeqBERT}.
   \end{itemize}
@@ -701,24 +785,23 @@
 \begin{frame}{Conclusion}
 \small
   \setlength{\parskip}{0pt}
-  \textbf{Four main points:}
   \begin{enumerate}\tightlist
-    \item \readout{First, the modulo spectrum makes arithmetic structure visible in the input.}
-          A \textbf{ring homomorphism} preserves multiplication \alert{at depth zero}.
-    \item \readout{Second, it improves prediction at every model size.}
+    \item \readout{The modulo spectrum makes arithmetic structure visible in the input.}
+          A \textbf{ring homomorphism} preserves multiplication \alert{at depth 0}.
+    \item \readout{It improves prediction at every model size.}
           Exact next-term accuracy improves by \alert{7.4$\times$} over Vanilla.
-    \item \readout{Third, composite moduli combine useful arithmetic information.}
+    \item \readout{We observe a link between information gain and the totient ratio.}
           NIG is negatively correlated with $\varphi(m)/m$ ($r = -0.851$).
-    \item \readout{However, exact prediction remains difficult.}
+    \item \readout{Exact prediction remains difficult, especially for large integers.}
           This supports further work on \alert{neural-symbolic methods}.
   \end{enumerate}
   \medskip
-  \readout{Next, we want to improve decoding and use similar sequences to suggest conjectures.}\\
+  \readout{We will improve decoding and explore how to find related sequences.}\\
   We plan approximate CRT for large integers, highly composite moduli beyond 101,
   larger-scale retraining, and \alert{similarity retrieval \& conjecture generation}.
   \medskip
   \begin{center}
-    \alert{\readout{Thank you for listening.}} --- \texttt{github.com/aabaa/IntSeqBERT}
+    \readout{Thank you for listening.} --- \texttt{github.com/aabaa/IntSeqBERT}
   \end{center}
 \end{frame}
 
@@ -728,14 +811,14 @@
 
 \begin{frame}{Backup --- Why Not Digit-Based Tokenisation?}
 \begin{itemize}\tightlist
-    \item \readout{Another option is to generate integers one decimal digit at a time.}
-          Each digit is a token. We have not compared this approach experimentally in this paper.
+    \item \readout{Another option is to generate integers 1 decimal digit at a time.}
+          Each digit is a token. \readout{We have not compared this approach experimentally in this paper.}
     \item \readout{Our input gives the model residues directly.}
           We target the \alert{number-theoretic structure of the integer itself}.
           With digit tokens, the model must calculate residues from the digits.
     \item \readout{Digit-by-digit generation also changes the prediction task.}
-          It predicts a sequence of digits, while our model predicts one integer value.
-    \item We plan to compare the two settings under the same conditions.
+          It predicts a sequence of digits, while our model predicts 1 integer value.
+    \item We plan to compare the 2 settings under the same conditions.
   \end{itemize}
 \end{frame}
 
@@ -747,8 +830,8 @@
     \item \readout{The dataset also affects our overall scores.}
           Many \texttt{nonn} sequences help sign accuracy;
           many slowly growing sequences help magnitude accuracy.
-    \item \readout{Our experiments use limited compute and one random seed.}
-          We use one \textbf{8\,GB GPU}, seed \textbf{42}, and a vocabulary of \textbf{20{,}003} tokens.
+    \item \readout{Our experiments use limited compute and 1 random seed.}
+          We use 1 \textbf{8\,GB GPU}, seed \textbf{42}, and a vocabulary of \textbf{20{,}003} tokens.
           Vanilla uses the \emph{FACT architecture} with our settings;
           we do not reproduce FACT's reported results.
   \end{itemize}
@@ -757,7 +840,7 @@
 \begin{frame}{Backup --- How Hard Is Multiplication for Neural Networks?}
 \footnotesize
   \begin{itemize}\tightlist
-    \item \readout{The answer depends on the circuit type and the training method.}
+    \item \readout{The difficulty of multiplication depends on the model and the training method.}
           In \textbf{circuit theory}, $n$-bit multiplication is not in AC$^0$
           (constant-depth AND/OR). Polynomial-size threshold circuits can do it with
           \alert{3 layers}, and 3 is optimal. Iterated products need only 4 layers
@@ -770,11 +853,75 @@
           (Dziri+, \emph{Faith and Fate}, NeurIPS 2023).
     \item A \textbf{2-layer Transformer} on modular arithmetic generalises only after a
           very long training period: \textbf{grokking} (Power+ 2022, arXiv:2201.02177).
-    \item Standard training fails at multi-digit multiplication even at \textbf{90B} parameters.
-          A \textbf{12-layer model} succeeds on \textbf{15-digit products} only with
-          implicit-CoT training. Its attention forms a \alert{binary tree of partial products}
-          (mechanistic analysis, arXiv:2510.00184, 2025).
+    \item \textbf{Shen et al.\ (2023)} report \textbf{84\%} accuracy on
+          $15{\times}15$-digit multiplication with a \textbf{12-layer Transformer},
+          zero-padding, and reversed output digits (arXiv:2311.14737, Sec.\ 2 / Table 5).
+          This does not establish a minimum layer count.
+    \item \textbf{Bai et al.\ (2025)} study a \textbf{2-layer} model on $4{\times}4$-digit
+          multiplication: implicit-CoT training succeeds where standard fine-tuning fails.
+          Their analysis finds a tree-like attention mechanism (arXiv:2510.00184).
   \end{itemize}
+\end{frame}
+
+
+\begin{frame}[label=backup-oeis-representation]{Backup --- OEIS Tags: Number Representations}
+\small
+\setlength{\parskip}{0pt}
+\readout{These tags describe digits, fractions, or language-based rules. We leave them outside the scope of this study.}
+\par\medskip
+{\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}p{0.9cm}p{5.0cm}p{7.0cm}@{}}
+\toprule
+\textbf{Tag} & \textbf{Meaning} & \textbf{Example} \\
+\midrule
+\texttt{cons} & Digits of a constant, usually in base 10.
+ & $\pi=3.14159\ldots$ gives $3,1,4,1,5,9,\ldots$ \\
+\texttt{cofr} & Coefficients in a continued fraction.
+ & $\pi=[3;7,15,1,292,\ldots]$ gives $3,7,15,1,292,\ldots$ \\
+\texttt{frac} & Numerators or denominators of a sequence of fractions.
+ & For $1/2,\,2/3,\,3/4,\ldots$, the denominators are $2,3,4,\ldots$ \\
+\texttt{base} & A rule that depends on the number base.
+ & Sum of decimal digits: $19\mapsto 1+9=10$. \\
+\texttt{word} & A rule that depends on words in a language.
+ & Number of letters in English number names: ``one'', ``two'', ``three'' give $3,3,5$. \\
+\bottomrule
+\end{tabular}}
+\par\medskip
+\readout{These sequences can have rich mathematical structure. Excluding them is a choice about our task.}
+\par\smallskip
+{\scriptsize Source: \href{https://oeis.org/wiki/Keywords}{OEIS keyword definitions}. Examples illustrate each type.}
+\end{frame}
+
+\begin{frame}{Backup --- OEIS Tags: Task Scope and Data Selection}
+\small
+\setlength{\parskip}{0pt}
+\readout{We also exclude finite sequences, tables, and entries with the following labels.}
+\par\medskip
+{\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{0.9cm}p{5.0cm}p{7.0cm}@{}}
+\toprule
+\textbf{Tag} & \textbf{Meaning} & \textbf{Why we exclude it / what to keep in mind} \\
+\midrule
+\texttt{fini} & A sequence known to be finite.
+ & There is no next term after its endpoint. \\
+\texttt{tabl} & A regular table or triangle read row by row.
+ & For example, Pascal's triangle. Row boundaries add structure beyond a simple list. \\
+\texttt{dead} & An incorrect or duplicate entry.
+ & We exclude known errors and duplicates. \\
+\texttt{unkn} & The definition or context is unknown.
+ & We exclude entries whose meaning is unclear. \\
+\texttt{less} & An entry judged less interesting.
+ & A subjective OEIS label; it does not mean the sequence is incorrect. \\
+\texttt{dumb} & An entry judged unimportant.
+ & Also a subjective label, not a mathematical test. \\
+\bottomrule
+\end{tabular}}
+\par\medskip
+\readout{These filters define our dataset. Other studies may include these sequences.}
+\par\smallskip
+{\scriptsize Source: \href{https://oeis.org/wiki/Keywords}{OEIS keyword definitions}. Selection reasons describe our study.}
 \end{frame}
 
 \end{document}
